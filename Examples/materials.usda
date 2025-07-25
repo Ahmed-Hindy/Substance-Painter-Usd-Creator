@@ -1,0 +1,119 @@
+#usda 1.0
+
+def "RootNode"
+{
+    def Scope "Materials"
+    {
+        def Material "_02_Body_collect"
+        {
+            int inputs:inputnum = 2
+            token outputs:arnold:surface.connect = </RootNode/Materials/_02_Body_collect/arnold_standard_surface.outputs:surface>
+            token outputs:surface.connect = </RootNode/Materials/_02_Body_collect/UsdPreviewNodeGraph/UsdPreviewSurface.outputs:surface>
+
+            def NodeGraph "UsdPreviewNodeGraph"
+            {
+                def Shader "UsdPreviewSurface"
+                {
+                    uniform token info:id = "UsdPreviewSurface"
+                    float3 inputs:diffuseColor.connect = </RootNode/Materials/_02_Body_collect/UsdPreviewNodeGraph/albedoTexture.outputs:rgb>
+                    float3 inputs:metallic.connect = </RootNode/Materials/_02_Body_collect/UsdPreviewNodeGraph/metallicTexture.outputs:r>
+                    float3 inputs:normal.connect = </RootNode/Materials/_02_Body_collect/UsdPreviewNodeGraph/normalTexture.outputs:rgb>
+                    float3 inputs:occlusion.connect = </RootNode/Materials/_02_Body_collect/UsdPreviewNodeGraph/occlusionTexture.outputs:r>
+                    float3 inputs:roughness.connect = </RootNode/Materials/_02_Body_collect/UsdPreviewNodeGraph/roughnessTexture.outputs:r>
+                    token outputs:surface
+                }
+
+                def Shader "albedoTexture"
+                {
+                    uniform token info:id = "UsdUVTexture"
+                    asset inputs:file = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/02_Body_Base_color.png@
+                    float2 inputs:st.connect = </RootNode/Materials/_02_Body_collect/UsdPreviewNodeGraph/TexCoordReader.outputs:result>
+                    float3 outputs:rgb
+                }
+
+                def Shader "TexCoordReader"
+                {
+                    uniform token info:id = "UsdPrimvarReader_float2"
+                    token inputs:varname = "st"
+                    float2 outputs:result
+                }
+
+                def Shader "metallicTexture"
+                {
+                    uniform token info:id = "UsdUVTexture"
+                    asset inputs:file = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/02_Body_Metallic.png@
+                    float2 inputs:st.connect = </RootNode/Materials/_02_Body_collect/UsdPreviewNodeGraph/TexCoordReader.outputs:result>
+                    float3 outputs:r
+                }
+
+                def Shader "roughnessTexture"
+                {
+                    uniform token info:id = "UsdUVTexture"
+                    asset inputs:file = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/02_Body_Roughness.png@
+                    float2 inputs:st.connect = </RootNode/Materials/_02_Body_collect/UsdPreviewNodeGraph/TexCoordReader.outputs:result>
+                    float3 outputs:r
+                }
+
+                def Shader "normalTexture"
+                {
+                    uniform token info:id = "UsdUVTexture"
+                    asset inputs:file = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/02_Body_Normal.png@
+                    float2 inputs:st.connect = </RootNode/Materials/_02_Body_collect/UsdPreviewNodeGraph/TexCoordReader.outputs:result>
+                    float3 outputs:rgb
+                }
+
+                def Shader "occlusionTexture"
+                {
+                    uniform token info:id = "UsdUVTexture"
+                    asset inputs:file = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/02_Body_Height.png@
+                    float2 inputs:st.connect = </RootNode/Materials/_02_Body_collect/UsdPreviewNodeGraph/TexCoordReader.outputs:result>
+                    float3 outputs:r
+                }
+            }
+
+            def Shader "arnold_standard_surface"
+            {
+                uniform token info:id = "arnold:standard_surface"
+                float inputs:base = 1
+                float3 inputs:base_color = (0.8, 0.8, 0.8)
+                float3 inputs:base_color.connect = </RootNode/Materials/_02_Body_collect/albedoTexture.outputs:rgba>
+                float inputs:metalness = 0
+                float inputs:metalness.connect = </RootNode/Materials/_02_Body_collect/metallicTexture.outputs:r>
+                float3 inputs:normal.connect = </RootNode/Materials/_02_Body_collect/normalTexture.outputs:rgb>
+                float3 inputs:opacity = (1, 1, 1)
+                float inputs:specular = 1
+                float3 inputs:specular_roughness.connect = </RootNode/Materials/_02_Body_collect/roughnessTexture.outputs:r>
+                token outputs:surface
+            }
+
+            def Shader "albedoTexture"
+            {
+                uniform token info:id = "arnold:image"
+                asset inputs:filename = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/02_Body_Base_color.png@
+                float3 outputs:rgba
+            }
+
+            def Shader "metallicTexture"
+            {
+                uniform token info:id = "arnold:image"
+                asset inputs:filename = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/02_Body_Metallic.png@
+                float outputs:r
+            }
+
+            def Shader "roughnessTexture"
+            {
+                uniform token info:id = "arnold:image"
+                asset inputs:filename = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/02_Body_Roughness.png@
+                float3 outputs:r
+            }
+
+            def Shader "normalTexture"
+            {
+                uniform token info:id = "arnold:image"
+                asset inputs:filename = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/02_Body_Normal.png@
+                float3 outputs:rgb
+            }
+        }
+    }
+}
+
