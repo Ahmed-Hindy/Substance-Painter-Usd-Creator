@@ -10,7 +10,7 @@ import material_classes
 import usd_material_processor
 reload(material_classes)
 reload(usd_material_processor)
-from material_classes import TextureInfo, MaterialData
+from material_classes import MaterialData
 from usd_material_processor import USD_Shader_Create
 
 print(f'reloading done!')
@@ -192,7 +192,7 @@ class CreateUSD:
 
             material_data = MaterialData(
                 material_name=material_name, material_path=material_path, usd_material=None,
-                textures={key: TextureInfo(file_path=value, traversal_path='', connected_input='') for key, value in
+                textures={key: material_classes.TextureInfo(file_path=value, traversal_path='', connected_input='') for key, value in
                           normalized_dict.items()}
             )
             materialdata_list.append(material_data)
