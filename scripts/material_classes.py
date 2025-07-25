@@ -1,3 +1,7 @@
+"""
+Copyright Ahmed Hindy. Please mention the author if you found any part of this code useful.
+"""
+
 from dataclasses import dataclass, field
 from typing import Optional, Dict, List
 

@@ -1,3 +1,7 @@
+"""
+Copyright Ahmed Hindy. Please mention the author if you found any part of this code useful.
+"""
+
 import sys
 import os
 from importlib import reload
@@ -190,7 +194,7 @@ class CreateUSD:
                 elif "height" in tex_path.lower():
                     normalized_dict["displacement"] = tex_path
 
-            material_data = MaterialData(
+            material_data = material_classes.MaterialData(
                 material_name=material_name, material_path=material_path, usd_material=None,
                 textures={key: material_classes.TextureInfo(file_path=value, traversal_path='', connected_input='') for key, value in
                           normalized_dict.items()}
