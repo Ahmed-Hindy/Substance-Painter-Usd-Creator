@@ -1,26 +1,28 @@
 """
 Copyright Ahmed Hindy. Please mention the author if you found any part of this code useful.
 """
-
 import sys
 sys.path.append(r'G:\Projects\Dev\Github\SP_usd_creator\scripts')
 
+import pprint
 from importlib import reload
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-import substance_painter, substance_painter.ui, substance_painter.event, substance_painter.export
 from PySide2.QtWidgets import (
-    QDialog, QVBoxLayout, QGridLayout, QLabel, QLineEdit, QCheckBox,
+    QDialog, QVBoxLayout, QLabel, QLineEdit, QCheckBox,
     QGroupBox, QHBoxLayout, QSpacerItem, QSizePolicy, QMessageBox
 )
 from PySide2.QtGui import QIcon
-from PySide2.QtCore import Qt
-from pxr import Usd
 
 import usd_material_processor
 reload(usd_material_processor)
-from material_classes import MaterialData, TextureInfo
+
+import substance_painter, substance_painter.ui, substance_painter.event, substance_painter.export
+
+
+
+
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -29,8 +31,8 @@ logging.basicConfig(level=logging.INFO)
 
 DEFAULT_DIALOGUE_DICT = {
     "title": "USD Exporter",
-    "publish_location": "<export_folder>/materials.usda",
-    "primitive_path": "/RootNode/Materials",
+    "publish_location": "<export_folder>",
+    "primitive_path": "/root",
     "enable_usdpreview": True,
     "enable_arnold": True,
     "enable_materialx": False,
@@ -49,7 +51,7 @@ class USDSettings:
         usdpreview (bool): Include UsdPreviewSurface shader.
         arnold (bool): Include Arnold standard_surface shader.
         materialx (bool): Include MaterialX shader.
-        primitive_path (str): USD prim path for materials.
+        primitive_path (str): USD prim path for material_dict_list.
         publish_location (str): Path for output USD file.
         save_geometry (bool): Whether to export mesh geometry.
     """
@@ -71,30 +73,31 @@ class TextureParser:
 
     def parse(self):
         """
-        Build a list of MaterialData from exported textures.
+        Build a list of material_dict from exported textures.
 
         Returns:
-            List of MaterialData
+            (list[Dict]):List of parsed material_dict
         """
-        materials = []
+        material_dict_list = []
         for (mat_name, _), paths in self.textures_dict.items():
-            name = mat_name.replace(' ', '_')
-            if not name[0].isalpha(): name = f"_{name}"
-            prim_path = f"{self.settings.primitive_path}/{name}"
-            tex_info = {}
+            material_dict = {}
             for p in paths:
                 key = (
-                    'albedo' if 'base_color' in p.lower() else
+                    'basecolor' if 'base_color' in p.lower() else
                     'metallic' if 'metallic' in p.lower() else
                     'roughness' if 'roughness' in p.lower() else
                     'normal' if 'normal' in p.lower() else
-                    'occlusion'
+                    'displacement' if 'height' in p.lower() else
+                    'occlusion' if 'occlusion' in p.lower() else
+                    'unknown'  # Fallback for unrecognized textures
                 )
-                tex_info[key] = TextureInfo(file_path=p, traversal_path='')
-            md = MaterialData(name, prim_path, None, tex_info, [])
-            logger.debug("Parsed MaterialData: %s", md)
-            materials.append(md)
-        return materials
+                material_dict[key] = {
+                    'mat_name': mat_name,
+                    'path': p,
+                }
+            logger.debug("Parsed material_dict: %s", material_dict)
+            material_dict_list.append(material_dict)
+        return material_dict_list
 
 
 class USDExporter:
@@ -103,27 +106,25 @@ class USDExporter:
     """
     def __init__(self, settings):
         self.settings = settings
-        self.stage = Usd.Stage.CreateNew(settings.publish_location)
+        # self.stage = Usd.Stage.CreateNew(settings.publish_location)
+        self.stage = None
 
-    def write_materials(self, materials):
+    def write_materials(self, material_dict_list):
         """
         Create USD materials for each MaterialData and save the stage.
 
         Args:
-            materials (List[MaterialData])
+            material_dict_list (List[Dict[str, str]]): List of Dicts.
         """
-        for md in materials:
-            usd_material_processor.USDShaderCreator(
-                self.stage, md,
-                parent_prim=self.settings.primitive_path,
-                create_usd_preview=self.settings.usdpreview,
-                create_arnold=self.settings.arnold,
-                create_mtlx=self.settings.materialx
-            ).create()
-        # Ensure directory exists before saving
-        Path(self.settings.publish_location).parent.mkdir(parents=True, exist_ok=True)
-        self.stage.GetRootLayer().Save()
-        logger.info("Saved USD file to %s", self.settings.publish_location)
+        usd_material_processor.create_shaded_asset_publish(
+            stage=None,
+            parent_path=self.settings.primitive_path,
+            material_dict_list=material_dict_list,
+            create_usd_preview=self.settings.usdpreview,
+            create_arnold=self.settings.arnold,
+            create_mtlx=self.settings.materialx,
+            layer_save_path=self.settings.publish_location.replace("\\", "/")
+        )
 
 
 class MeshExporter:
@@ -162,7 +163,7 @@ class USDExporterView(QDialog):
         engine_layout = QVBoxLayout()
         self.usdpreview = QCheckBox("USD Preview"); self.usdpreview.setChecked(True)
         self.arnold = QCheckBox("Arnold"); self.arnold.setChecked(True)
-        self.materialx = QCheckBox("MaterialX [WIP]")
+        self.materialx = QCheckBox("MaterialX")
         engine_layout.addWidget(self.usdpreview)
         engine_layout.addWidget(self.arnold)
         engine_layout.addWidget(self.materialx)
@@ -184,7 +185,7 @@ class USDExporterView(QDialog):
         self.prim = QLineEdit()
         self.prim.setMinimumWidth(300)
         self.prim.setPlaceholderText(DEFAULT_DIALOGUE_DICT["primitive_path"])
-        self.prim.setToolTip("USD prim path where materials will be created")
+        self.prim.setToolTip("USD prim path where material_dict_list will be created")
         self.prim.editingFinished.connect(self._validate_prim_path)
         h2.addWidget(self.prim)
         h2.addItem(QSpacerItem(0,0,QSizePolicy.Expanding,QSizePolicy.Fixed))
@@ -243,14 +244,15 @@ def register_callbacks():
 def on_post_export(context):
     """Function to be called after textures are exported"""
     print("ExportTexturesEnded emitted!!!")
+    print(f"DEBUG: context.textures: {pprint.pformat(context.textures, sort_dicts=False)}")
     raw = usd_exported_qdialog.get_settings()
     first_tex = next(iter(context.textures.values()))[0]
     export_dir = Path(first_tex).parent
     publish = raw.publish_location.replace("<export_folder>", str(export_dir))
     settings = USDSettings(raw.usdpreview, raw.arnold, raw.materialx, raw.primitive_path, publish, raw.save_geometry)
-    materials = TextureParser(context.textures, settings).parse()
+    material_dict_list = TextureParser(context.textures, settings).parse()
     exporter = USDExporter(settings)
-    exporter.write_materials(materials)
+    exporter.write_materials(material_dict_list)
     if settings.save_geometry:
         MeshExporter(settings).export_mesh()
 
