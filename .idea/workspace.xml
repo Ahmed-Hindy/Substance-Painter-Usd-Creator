@@ -4,9 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="4b1ed697-f303-4c58-83d8-797adcf92695" name="Changes" comment="- usd_material_processor.py added google-style docstrings, removed type hinting from method definitions, refactored long methods and more cleanups.">
+    <list default="true" id="4b1ed697-f303-4c58-83d8-797adcf92695" name="Changes" comment="- sp_plugin.py has been refactored to multiple small classes for readability.">
+      <change afterPath="$PROJECT_DIR$/Examples/materials.usda" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/usd_material_processor.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/usd_material_processor.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/sp_plugin.py" beforeDir="false" afterPath="$PROJECT_DIR$/sp_plugin.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -53,19 +55,20 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ASKED_SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;bugfix/fix-missing-classes&quot;,
-    &quot;last_opened_file_path&quot;: &quot;G:/Projects/Dev/Github/SP_usd_creator&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "git-widget-placeholder": "bugfix/fix-missing-classes",
+    "last_opened_file_path": "G:/Projects/Dev/Github/SP_usd_creator/Examples"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="G:\Projects\Dev\Github\SP_usd_creator\Examples" />
       <recent name="G:\Projects\Dev\Github\SP_usd_creator" />
     </key>
   </component>
@@ -116,7 +119,15 @@
       <option name="project" value="LOCAL" />
       <updated>1753444568864</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="- sp_plugin.py has been refactored to multiple small classes for readability.">
+      <option name="closed" value="true" />
+      <created>1753452747676</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1753452747676</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -135,17 +146,7 @@
     <MESSAGE value="- SP plugin now works. Needs cleanup." />
     <MESSAGE value="- removed unneeded module and a class." />
     <MESSAGE value="- usd_material_processor.py added google-style docstrings, removed type hinting from method definitions, refactored long methods and more cleanups." />
-    <option name="LAST_COMMIT_MESSAGE" value="- usd_material_processor.py added google-style docstrings, removed type hinting from method definitions, refactored long methods and more cleanups." />
-  </component>
-  <component name="XDebuggerManager">
-    <breakpoint-manager>
-      <breakpoints>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/main.py</url>
-          <line>8</line>
-          <option name="timeStamp" value="1" />
-        </line-breakpoint>
-      </breakpoints>
-    </breakpoint-manager>
+    <MESSAGE value="- sp_plugin.py has been refactored to multiple small classes for readability." />
+    <option name="LAST_COMMIT_MESSAGE" value="- sp_plugin.py has been refactored to multiple small classes for readability." />
   </component>
 </project>
