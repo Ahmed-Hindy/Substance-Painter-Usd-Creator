@@ -4,10 +4,14 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="4b1ed697-f303-4c58-83d8-797adcf92695" name="Changes" comment="- added README.md&#10;- added example .usda file&#10;- removed unneeded module&#10;- UX improvements to the QDialog.">
-      <change afterPath="$PROJECT_DIR$/Examples/images/Screenshot_1.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Examples/images/Screenshot_2.png" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+    <list default="true" id="4b1ed697-f303-4c58-83d8-797adcf92695" name="Changes" comment="- updated README.md with screenshots.">
+      <change afterPath="$PROJECT_DIR$/.github/FUNDING.yml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/VERSION" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/scripts/usd_utils.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/material_classes.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/material_classes.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/usd_material_processor.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/usd_material_processor.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sp_plugin.py" beforeDir="false" afterPath="$PROJECT_DIR$/sp_plugin.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -24,7 +28,7 @@
   <component name="Git.Settings">
     <option name="RECENT_BRANCH_BY_REPOSITORY">
       <map>
-        <entry key="$PROJECT_DIR$" value="master" />
+        <entry key="$PROJECT_DIR$" value="bugfix/fix-missing-classes" />
       </map>
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -35,12 +39,22 @@
     &quot;assignee&quot;: &quot;Ahmed-Hindy&quot;
   }
 }</component>
-  <component name="GithubPullRequestsUISettings">{
-  &quot;selectedUrlAndAccountId&quot;: {
-    &quot;url&quot;: &quot;https://github.com/Ahmed-Hindy/substance-painter-usd-creator.git&quot;,
-    &quot;accountId&quot;: &quot;6a14807b-36af-42cc-bdba-78b9197b9ed5&quot;
+  <component name="GithubPullRequestsUISettings"><![CDATA[{
+  "selectedUrlAndAccountId": {
+    "url": "https://github.com/Ahmed-Hindy/substance-painter-usd-creator.git",
+    "accountId": "6a14807b-36af-42cc-bdba-78b9197b9ed5"
+  },
+  "recentNewPullRequestHead": {
+    "server": {
+      "useHttp": false,
+      "host": "github.com",
+      "port": null,
+      "suffix": null
+    },
+    "owner": "Ahmed-Hindy",
+    "repository": "substance-painter-usd-creator"
   }
-}</component>
+}]]></component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 6
 }</component>
@@ -60,15 +74,16 @@
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.git.unshallow": "true",
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "git-widget-placeholder": "bugfix/fix-missing-classes",
-    "last_opened_file_path": "G:/Projects/Dev/Github/SP_usd_creator/Examples/images"
+    "git-widget-placeholder": "master",
+    "last_opened_file_path": "G:/Projects/Dev/Github/SP_usd_creator/scripts"
   }
 }]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="G:\Projects\Dev\Github\SP_usd_creator\scripts" />
+      <recent name="G:\Projects\Dev\Github\SP_usd_creator" />
       <recent name="G:\Projects\Dev\Github\SP_usd_creator\Examples\images" />
       <recent name="G:\Projects\Dev\Github\SP_usd_creator\Examples" />
-      <recent name="G:\Projects\Dev\Github\SP_usd_creator" />
     </key>
   </component>
   <component name="SharedIndexes">
@@ -134,7 +149,15 @@
       <option name="project" value="LOCAL" />
       <updated>1753456388328</updated>
     </task>
-    <option name="localTasksCounter" value="7" />
+    <task id="LOCAL-00007" summary="- updated README.md with screenshots.">
+      <option name="closed" value="true" />
+      <created>1753456816909</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1753456816909</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -155,6 +178,18 @@
     <MESSAGE value="- usd_material_processor.py added google-style docstrings, removed type hinting from method definitions, refactored long methods and more cleanups." />
     <MESSAGE value="- sp_plugin.py has been refactored to multiple small classes for readability." />
     <MESSAGE value="- added README.md&#10;- added example .usda file&#10;- removed unneeded module&#10;- UX improvements to the QDialog." />
-    <option name="LAST_COMMIT_MESSAGE" value="- added README.md&#10;- added example .usda file&#10;- removed unneeded module&#10;- UX improvements to the QDialog." />
+    <MESSAGE value="- updated README.md with screenshots." />
+    <option name="LAST_COMMIT_MESSAGE" value="- updated README.md with screenshots." />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/main.py</url>
+          <line>8</line>
+          <option name="timeStamp" value="1" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
   </component>
 </project>
