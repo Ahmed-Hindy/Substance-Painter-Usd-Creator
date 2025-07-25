@@ -6,18 +6,18 @@ from importlib import reload
 import json
 from pprint import pprint
 from typing import List, Optional
-from pxr import Usd, UsdShade, Sdf
+from pxr import Usd, UsdShade, UsdGeom, Sdf
 
 try:
     import hou
 except:
     pass
 
-import Material_Processor.material_classes
-from Material_Processor.material_classes import TextureInfo, MaterialData
+import material_classes
+from material_classes import TextureInfo, MaterialData
 if 'hou' in globals():
-    from Material_Processor.material_processor import MaterialCreate
-    reload(Material_Processor.material_classes)
+    from material_processor import MaterialCreate
+    reload(material_classes)
 else:
     print('hou not in globals')
 
@@ -162,14 +162,14 @@ class USD_Shaders_Ingest:
     @staticmethod
     def _get_primitives_assigned_to_material(stage, usdshade_material:  UsdShade.Material, material_data: MaterialData) -> None:
         """
-        Adds all primitives that have the given material assigned to them into the nodeinfo_list.
+        Adds all primitives that have the given material assigned to them into the material_data.
 
         :param stage: Usd.Stage object
         :param usdshade_material: UsdShade.Material type primitive on stage
         :param material_data: MaterialData instance containing the material name and textures
         """
         if not isinstance(material_data, MaterialData):
-            raise ValueError(f"nodeinfo_list is not a <MaterialData> object, instead it's a {type(material_data)}.")
+            raise ValueError(f"material_data is not a <MaterialData> object, instead it's a {type(material_data)}.")
 
         if not usdshade_material or not isinstance(usdshade_material, UsdShade.Material):
             raise ValueError(
@@ -201,7 +201,7 @@ class USD_Shaders_Ingest:
 
     def _standardize_textures_format(self, material_data: MaterialData) -> None:
         """
-        Standardizes nodeinfo_list.textures dictionary variable.
+        Standardizes material_data.textures dictionary variable.
         :param material_data: MaterialData object.
         """
         standardized_textures = {}
@@ -395,7 +395,7 @@ class USD_Shader_Create:
 
     def _arnold_fill_texture_file_paths(self, material_prim, shader):
         """
-        Fills the texture file paths for the given shader using the nodeinfo_list.
+        Fills the texture file paths for the given shader using the material_data.
         """
         texture_types_to_inputs = {
             'albedo': 'base_color',
@@ -452,7 +452,7 @@ class USD_Shader_Create:
 
     def _mtlx_fill_texture_file_paths(self, material_prim, shader_usdshade):
         """
-        Fills the texture file paths for the given shader using the nodeinfo_list.
+        Fills the texture file paths for the given shader using the material_data.
         """
         texture_types_to_inputs = {
             'albedo': 'base_color',
@@ -489,6 +489,10 @@ class USD_Shader_Create:
         :return: UsdShade.Material of the collect prim
         """
         collect_prim_path = f'{self.parent_prim}/{self.material_data.material_name}_collect'
+        print(f"DEBUG: {collect_prim_path=}")
+        if not self.parent_prim:
+            UsdGeom.Scope.Define(self.stage, self.parent_prim)
+
         collect_usd_material = UsdShade.Material.Define(self.stage, collect_prim_path)
         collect_usd_material.CreateInput("inputnum", Sdf.ValueTypeNames.Int).Set(2)
 
@@ -538,15 +542,20 @@ class USD_Shader_Create:
 def ingest_stage_and_recreate_usd_materials(stage, parent_prim='/pp/smol', create_usd_preview=True, create_arnold=True, create_mtlx=False):
     """
     [temp] ingests stage, creates new usd materials, and reassign it to prims which already been assigned to previous
-     nodeinfo_list.
+     material_data.
     """
     # get all found materials on stage and return a list of MaterialData objects for each one.
     materialdata_list = USD_Shaders_Ingest(stage).materialdata_list
 
     for material_data in materialdata_list:
         # print(f"//{material_data.prims_assigned_to_material=}")
-        USD_Shader_Create(stage, material_data=material_data, parent_prim=parent_prim,
-                          create_usd_preview=create_usd_preview, create_arnold=create_arnold, create_mtlx=create_mtlx)
+        print(f"DEBUG: {stage=}")
+        USD_Shader_Create(stage,
+                          material_data=material_data,
+                          parent_prim=parent_prim,
+                          create_usd_preview=create_usd_preview,
+                          create_arnold=create_arnold,
+                          create_mtlx=create_mtlx)
 
 
 def ingest_stage_and_recreate_vop_materials(stage, convert_to='arnold'):
@@ -559,4 +568,6 @@ def ingest_stage_and_recreate_vop_materials(stage, convert_to='arnold'):
     for material_data in materialdata_list:
         # print(f"//{material_data.prims_assigned_to_material=}")
         MaterialCreate(material_data=material_data, mat_context=hou.node('/mat'), convert_to=convert_to)
+
+
 
