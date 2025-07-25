@@ -7,8 +7,8 @@ import re
 from pathlib import Path
 from typing import Dict, Optional
 
-from pxr import Usd, UsdShade, UsdGeom, Sdf
-from material_classes import MaterialData, TextureInfo
+from pxr import UsdShade, UsdGeom, Sdf
+from material_classes import MaterialData
 
 # Configure module-level logger
 logger = logging.getLogger(__name__)
@@ -54,12 +54,14 @@ def sanitize_identifier(name):
     Returns:
         str: A sanitized identifier.
     """
-    sanitized = re.sub(r"\W+", "_", name)
+    sanitized = re.sub(r"[^\w/]+", "_", name)
     if not sanitized:
         sanitized = '_'
-    if not (sanitized[0].isalpha() or sanitized[0] == '_'):
+
+    if not sanitized[0].isalpha() and sanitized[0] not in ['/', '_']:
         sanitized = f"_{sanitized}"
     return sanitized
+
 
 def ensure_scope(stage, path):
     """
@@ -76,6 +78,8 @@ def ensure_scope(stage, path):
     if not prim:
         return UsdGeom.Scope.Define(stage, path)
     return UsdGeom.Scope(prim)
+
+
 
 class USDShaderCreator:
     """
@@ -95,7 +99,7 @@ class USDShaderCreator:
         """
         self.stage = stage
         self.material_data = material_data
-        self.parent_prim = sanitize_identifier(parent_prim.rstrip('/'))
+        self.parent_prim = sanitize_identifier(parent_prim)
         self.engines = {'usdpreview': create_usd_preview, 'arnold': create_arnold, 'materialx': create_mtlx}
 
     def create(self):
