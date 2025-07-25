@@ -4,12 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="4b1ed697-f303-4c58-83d8-797adcf92695" name="Changes" comment="- sp_plugin.py has been refactored to multiple small classes for readability.">
-      <change afterPath="$PROJECT_DIR$/Examples/materials.usda" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/sp_plugin.py" beforeDir="false" afterPath="$PROJECT_DIR$/sp_plugin.py" afterDir="false" />
+    <list default="true" id="4b1ed697-f303-4c58-83d8-797adcf92695" name="Changes" comment="- added README.md&#10;- added example .usda file&#10;- removed unneeded module&#10;- UX improvements to the QDialog.">
+      <change afterPath="$PROJECT_DIR$/Examples/images/Screenshot_1.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Examples/images/Screenshot_2.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -63,11 +61,12 @@
     "RunOnceActivity.git.unshallow": "true",
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "git-widget-placeholder": "bugfix/fix-missing-classes",
-    "last_opened_file_path": "G:/Projects/Dev/Github/SP_usd_creator/Examples"
+    "last_opened_file_path": "G:/Projects/Dev/Github/SP_usd_creator/Examples/images"
   }
 }]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="G:\Projects\Dev\Github\SP_usd_creator\Examples\images" />
       <recent name="G:\Projects\Dev\Github\SP_usd_creator\Examples" />
       <recent name="G:\Projects\Dev\Github\SP_usd_creator" />
     </key>
@@ -127,7 +126,15 @@
       <option name="project" value="LOCAL" />
       <updated>1753452747676</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="- added README.md&#10;- added example .usda file&#10;- removed unneeded module&#10;- UX improvements to the QDialog.">
+      <option name="closed" value="true" />
+      <created>1753456388328</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1753456388328</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -147,6 +154,7 @@
     <MESSAGE value="- removed unneeded module and a class." />
     <MESSAGE value="- usd_material_processor.py added google-style docstrings, removed type hinting from method definitions, refactored long methods and more cleanups." />
     <MESSAGE value="- sp_plugin.py has been refactored to multiple small classes for readability." />
-    <option name="LAST_COMMIT_MESSAGE" value="- sp_plugin.py has been refactored to multiple small classes for readability." />
+    <MESSAGE value="- added README.md&#10;- added example .usda file&#10;- removed unneeded module&#10;- UX improvements to the QDialog." />
+    <option name="LAST_COMMIT_MESSAGE" value="- added README.md&#10;- added example .usda file&#10;- removed unneeded module&#10;- UX improvements to the QDialog." />
   </component>
 </project>

@@ -1,3 +1,5 @@
+![Screenshot_1.png](Examples/images/Screenshot_1.png)
+
 # Substance Painter USD Export Plugin
 This plugin allows you to export materials and geometry from Adobe Substance Painter to USD (`.usda`) files, supporting multiple render engines (USD Preview, Arnold, MaterialX).
 
@@ -32,6 +34,9 @@ This plugin allows you to export materials and geometry from Adobe Substance Pai
 5. The plugin will create a `.usda` file with the specified materials and optionally a `.usd` mesh file if geometry export is enabled.
 6. The generated USD file can be opened in any compatible viewer or software that supports USD.
 
+![Screenshot_2.png](Examples/images/Screenshot_2.png)
+
+<br>
 
 ## Examples
 ### Exporting Materials and Geometry
@@ -47,7 +52,8 @@ This plugin allows you to export materials and geometry from Adobe Substance Pai
    - Optionally export a `mesh.usd` file containing the geometry.
 
 
-<br><br>
+<br>
+
 ### Example USD Material File:
 Example File provided: [materials.usda](Examples/materials.usda)
 
