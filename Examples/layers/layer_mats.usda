@@ -1,0 +1,989 @@
+#usda 1.0
+
+over "root"
+{
+    over "material"
+    {
+        def Material "mat_01_Head_collect"
+        {
+            int inputs:inputnum = 2
+            token outputs:arnold:surface.connect = </root/material/mat_01_Head_collect/arnold_standard_surface1.outputs:surface>
+            token outputs:mtlx:surface.connect = </root/material/mat_01_Head_collect/mtlx_mtlxstandard_surface1.outputs:surface>
+            token outputs:surface.connect = </root/material/mat_01_Head_collect/UsdPreviewMaterial/UsdPreviewNodeGraph/UsdPreviewSurface.outputs:surface>
+
+            def Material "UsdPreviewMaterial"
+            {
+                token outputs:surface.connect = </root/material/mat_01_Head_collect/UsdPreviewMaterial/UsdPreviewNodeGraph/UsdPreviewSurface.outputs:surface>
+
+                def NodeGraph "UsdPreviewNodeGraph"
+                {
+                    def Shader "UsdPreviewSurface"
+                    {
+                        uniform token info:id = "UsdPreviewSurface"
+                        float3 inputs:diffuseColor.connect = </root/material/mat_01_Head_collect/UsdPreviewMaterial/UsdPreviewNodeGraph/basecolorTexture.outputs:rgb>
+                        float3 inputs:normal.connect = </root/material/mat_01_Head_collect/UsdPreviewMaterial/UsdPreviewNodeGraph/normalTexture.outputs:rgb>
+                        float3 inputs:roughness.connect = </root/material/mat_01_Head_collect/UsdPreviewMaterial/UsdPreviewNodeGraph/roughnessTexture.outputs:r>
+                        token outputs:surface
+                    }
+
+                    def Shader "basecolorTexture"
+                    {
+                        uniform token info:id = "UsdUVTexture"
+                        asset inputs:file = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/01_Head_Base_color.png@
+                        float2 inputs:st.connect = </root/material/mat_01_Head_collect/UsdPreviewMaterial/UsdPreviewNodeGraph/TexCoordReader.outputs:result>
+                        token inputs:wrapS = "repeat"
+                        token inputs:wrapT = "repeat"
+                        float3 outputs:rgb
+                    }
+
+                    def Shader "TexCoordReader"
+                    {
+                        uniform token info:id = "UsdPrimvarReader_float2"
+                        token inputs:varname = "st"
+                        float2 outputs:result
+                    }
+
+                    def Shader "roughnessTexture"
+                    {
+                        uniform token info:id = "UsdUVTexture"
+                        asset inputs:file = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/01_Head_Roughness.png@
+                        float2 inputs:st.connect = </root/material/mat_01_Head_collect/UsdPreviewMaterial/UsdPreviewNodeGraph/TexCoordReader.outputs:result>
+                        token inputs:wrapS = "repeat"
+                        token inputs:wrapT = "repeat"
+                        float3 outputs:r
+                    }
+
+                    def Shader "normalTexture"
+                    {
+                        uniform token info:id = "UsdUVTexture"
+                        asset inputs:file = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/01_Head_Normal_DirectX.png@
+                        float2 inputs:st.connect = </root/material/mat_01_Head_collect/UsdPreviewMaterial/UsdPreviewNodeGraph/TexCoordReader.outputs:result>
+                        token inputs:wrapS = "repeat"
+                        token inputs:wrapT = "repeat"
+                        float3 outputs:rgb
+                    }
+                }
+            }
+
+            def Shader "arnold_standard_surface1"
+            {
+                uniform token info:id = "arnold:standard_surface"
+                float3 inputs:aov_id1 = (0, 0, 0)
+                float3 inputs:aov_id2 = (0, 0, 0)
+                float3 inputs:aov_id3 = (0, 0, 0)
+                float3 inputs:aov_id4 = (0, 0, 0)
+                float3 inputs:aov_id5 = (0, 0, 0)
+                float3 inputs:aov_id6 = (0, 0, 0)
+                float3 inputs:aov_id7 = (0, 0, 0)
+                float3 inputs:aov_id8 = (0, 0, 0)
+                float inputs:base = 1
+                float3 inputs:base_color = (0.8, 0.8, 0.8)
+                float3 inputs:base_color.connect = </root/material/mat_01_Head_collect/arnold_basecolorColorCorrect.outputs:rgb>
+                bool inputs:caustics = 0
+                float inputs:coat = 0
+                float inputs:coat_affect_color = 0
+                float inputs:coat_affect_roughness = 0
+                float3 inputs:coat_color = (1, 1, 1)
+                float inputs:coat_IOR = 1.5
+                float3 inputs:coat_normal = (0, 0, 0)
+                float inputs:coat_roughness = 0.1
+                float inputs:emission = 0
+                float3 inputs:emission_color = (1, 1, 1)
+                bool inputs:exit_to_background = 0
+                float inputs:indirect_diffuse = 1
+                bool inputs:indirect_reflections = 1
+                float inputs:indirect_specular = 1
+                bool inputs:internal_reflections = 1
+                float inputs:metalness = 0
+                float3 inputs:normal = (0, 0, 0)
+                float3 inputs:normal.connect = </root/material/mat_01_Head_collect/arnold_Bump2d.outputs:vector>
+                float3 inputs:opacity = (1, 1, 1)
+                float inputs:sheen = 0
+                float3 inputs:sheen_color = (1, 1, 1)
+                float inputs:sheen_roughness = 0.3
+                float inputs:specular = 1
+                float inputs:specular_anisotropy = 0
+                float3 inputs:specular_color = (1, 1, 1)
+                float inputs:specular_IOR = 1.5
+                float inputs:specular_rotation = 0
+                float inputs:specular_roughness = 0.2
+                float inputs:specular_roughness.connect = </root/material/mat_01_Head_collect/arnold_roughnessRange.outputs:r>
+                float inputs:subsurface = 0
+                float inputs:subsurface_anisotropy = 0
+                float3 inputs:subsurface_color = (1, 1, 1)
+                float3 inputs:subsurface_radius = (1, 1, 1)
+                float inputs:subsurface_scale = 1
+                string inputs:subsurface_type = "randomwalk"
+                float3 inputs:tangent = (0, 0, 0)
+                float inputs:thin_film_IOR = 1.5
+                float inputs:thin_film_thickness = 0
+                bool inputs:thin_walled = 0
+                float inputs:transmission = 0
+                float3 inputs:transmission_color = (1, 1, 1)
+                float inputs:transmission_depth = 0
+                float inputs:transmission_dispersion = 0
+                float inputs:transmission_extra_roughness = 0
+                float3 inputs:transmission_scatter = (0, 0, 0)
+                float inputs:transmission_scatter_anisotropy = 0
+                bool inputs:transmit_aovs = 0
+                token outputs:surface
+            }
+
+            def Shader "arnold_basecolorTexture"
+            {
+                uniform token info:id = "arnold:image"
+                string inputs:color_space = "auto"
+                asset inputs:filename = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/01_Head_Base_color.png@
+                string inputs:filter = "smart_bicubic"
+                bool inputs:ignore_missing_textures = 0
+                int inputs:mipmap_bias = 0
+                float4 inputs:missing_texture_color = (0, 0, 0, 0)
+                float3 inputs:multiply = (1, 1, 1)
+                float3 inputs:offset = (0, 0, 0)
+                bool inputs:sflip = 0
+                bool inputs:single_channel = 0
+                float inputs:soffset = 0
+                float inputs:sscale = 1
+                int inputs:start_channel = 0
+                bool inputs:swap_st = 0
+                string inputs:swrap = "periodic"
+                bool inputs:tflip = 0
+                float inputs:toffset = 0
+                float inputs:tscale = 1
+                string inputs:twrap = "periodic"
+                float2 inputs:uvcoords = (0, 0)
+                string inputs:uvset = ""
+                float4 outputs:rgba
+            }
+
+            def Shader "arnold_basecolorColorCorrect"
+            {
+                uniform token info:id = "arnold:color_correct"
+                float3 inputs:add = (0, 0, 0)
+                float inputs:contrast = 1
+                float inputs:exposure = 0
+                float inputs:gamma = 1
+                float inputs:hue_shift = 0
+                float4 inputs:input.connect = </root/material/mat_01_Head_collect/arnold_basecolorTexture.outputs:rgba>
+                float3 outputs:rgb
+            }
+
+            def Shader "arnold_roughnessTexture"
+            {
+                uniform token info:id = "arnold:image"
+                string inputs:color_space = "auto"
+                asset inputs:filename = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/01_Head_Roughness.png@
+                string inputs:filter = "smart_bicubic"
+                bool inputs:ignore_missing_textures = 0
+                int inputs:mipmap_bias = 0
+                float4 inputs:missing_texture_color = (0, 0, 0, 0)
+                float3 inputs:multiply = (1, 1, 1)
+                float3 inputs:offset = (0, 0, 0)
+                bool inputs:sflip = 0
+                bool inputs:single_channel = 0
+                float inputs:soffset = 0
+                float inputs:sscale = 1
+                int inputs:start_channel = 0
+                bool inputs:swap_st = 0
+                string inputs:swrap = "periodic"
+                bool inputs:tflip = 0
+                float inputs:toffset = 0
+                float inputs:tscale = 1
+                string inputs:twrap = "periodic"
+                float2 inputs:uvcoords = (0, 0)
+                string inputs:uvset = ""
+                float4 outputs:rgba
+            }
+
+            def Shader "arnold_roughnessRange"
+            {
+                uniform token info:id = "arnold:range"
+                float inputs:bias = 0.5
+                float inputs:contrast = 1
+                float inputs:contrast_pivot = 0.5
+                float inputs:gain = 0.5
+                float4 inputs:input.connect = </root/material/mat_01_Head_collect/arnold_roughnessTexture.outputs:rgba>
+                float inputs:input_max = 1
+                float inputs:input_min = 0
+                float inputs:output_max = 1
+                float inputs:output_min = 0
+                bool inputs:smoothstep = 0
+                float outputs:r
+            }
+
+            def Shader "arnold_normalTexture"
+            {
+                uniform token info:id = "arnold:image"
+                string inputs:color_space = "auto"
+                asset inputs:filename = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/01_Head_Normal_DirectX.png@
+                string inputs:filter = "smart_bicubic"
+                bool inputs:ignore_missing_textures = 0
+                int inputs:mipmap_bias = 0
+                float4 inputs:missing_texture_color = (0, 0, 0, 0)
+                float3 inputs:multiply = (1, 1, 1)
+                float3 inputs:offset = (0, 0, 0)
+                bool inputs:sflip = 0
+                bool inputs:single_channel = 0
+                float inputs:soffset = 0
+                float inputs:sscale = 1
+                int inputs:start_channel = 0
+                bool inputs:swap_st = 0
+                string inputs:swrap = "periodic"
+                bool inputs:tflip = 0
+                float inputs:toffset = 0
+                float inputs:tscale = 1
+                string inputs:twrap = "periodic"
+                float2 inputs:uvcoords = (0, 0)
+                string inputs:uvset = ""
+                float3 outputs:vector
+            }
+
+            def Shader "arnold_NormalMap"
+            {
+                uniform token info:id = "arnold:normal_map"
+                bool inputs:color_to_signed = 1
+                float3 inputs:input = (0, 0, 0)
+                float3 inputs:input.connect = </root/material/mat_01_Head_collect/arnold_normalTexture.outputs:vector>
+                bool inputs:invert_x = 0
+                bool inputs:invert_y = 0
+                bool inputs:invert_z = 0
+                float3 inputs:normal = (0, 0, 0)
+                string inputs:order = "XYZ"
+                float inputs:strength = 1
+                float3 inputs:tangent = (0, 0, 0)
+                bool inputs:tangent_space = 1
+                float3 outputs:vector
+            }
+
+            def Shader "arnold_Bump2d"
+            {
+                uniform token info:id = "arnold:bump2d"
+                float inputs:bump_height = 1
+                float inputs:bump_map = 0
+                float3 inputs:normal = (0, 0, 0)
+                float3 inputs:normal.connect = </root/material/mat_01_Head_collect/arnold_NormalMap.outputs:vector>
+                float3 outputs:vector
+            }
+
+            def Shader "mtlx_mtlxstandard_surface1"
+            {
+                uniform token info:id = "ND_standard_surface_surfaceshader"
+                float inputs:base = 1
+                color3f inputs:base_color = (0.8, 0.8, 0.8)
+                color3f inputs:base_color.connect = </root/material/mat_01_Head_collect/mtlx_basecolorColorCorrect.outputs:out>
+                float inputs:coat = 0
+                float inputs:coat_roughness = 0.1
+                float inputs:emission = 0
+                float3 inputs:emission_color = (1, 1, 1)
+                float inputs:metalness = 0
+                float4 inputs:normal.connect = </root/material/mat_01_Head_collect/mtlx_NormalMap.outputs:out>
+                color3f inputs:opacity = (1, 1, 1)
+                float inputs:specular = 1
+                float3 inputs:specular_color = (1, 1, 1)
+                float inputs:specular_IOR = 1.5
+                float inputs:specular_roughness = 0.2
+                float inputs:specular_roughness.connect = </root/material/mat_01_Head_collect/mtlx_roughnessRange.outputs:out>
+                int inputs:thin_walled = 0
+                float inputs:transmission = 0
+                token outputs:surface
+            }
+
+            def Shader "mtlx_basecolorTexture"
+            {
+                uniform token info:id = "ND_image_color3"
+                asset inputs:file = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/01_Head_Base_color.png@
+                color3f outputs:out
+            }
+
+            def Shader "mtlx_basecolorColorCorrect"
+            {
+                uniform token info:id = "ND_colorcorrect_color3"
+                color3f inputs:in.connect = </root/material/mat_01_Head_collect/mtlx_basecolorTexture.outputs:out>
+                color3f outputs:out
+            }
+
+            def Shader "mtlx_roughnessTexture"
+            {
+                uniform token info:id = "ND_image_float"
+                asset inputs:file = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/01_Head_Roughness.png@
+                color3f outputs:out
+            }
+
+            def Shader "mtlx_roughnessRange"
+            {
+                uniform token info:id = "ND_range_color3"
+                color3f inputs:in.connect = </root/material/mat_01_Head_collect/mtlx_roughnessTexture.outputs:out>
+                float outputs:out
+            }
+
+            def Shader "mtlx_normalTexture"
+            {
+                uniform token info:id = "ND_image_vector3"
+                asset inputs:file = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/01_Head_Normal_DirectX.png@
+                float3 outputs:out
+            }
+
+            def Shader "mtlx_NormalMap"
+            {
+                uniform token info:id = "ND_normalmap"
+                float3 inputs:in.connect = </root/material/mat_01_Head_collect/mtlx_normalTexture.outputs:out>
+                float4 outputs:out
+            }
+        }
+
+        def Material "mat_02_Body_collect"
+        {
+            int inputs:inputnum = 2
+            token outputs:arnold:surface.connect = </root/material/mat_02_Body_collect/arnold_standard_surface1.outputs:surface>
+            token outputs:mtlx:surface.connect = </root/material/mat_02_Body_collect/mtlx_mtlxstandard_surface1.outputs:surface>
+            token outputs:surface.connect = </root/material/mat_02_Body_collect/UsdPreviewMaterial/UsdPreviewNodeGraph/UsdPreviewSurface.outputs:surface>
+
+            def Material "UsdPreviewMaterial"
+            {
+                token outputs:surface.connect = </root/material/mat_02_Body_collect/UsdPreviewMaterial/UsdPreviewNodeGraph/UsdPreviewSurface.outputs:surface>
+
+                def NodeGraph "UsdPreviewNodeGraph"
+                {
+                    def Shader "UsdPreviewSurface"
+                    {
+                        uniform token info:id = "UsdPreviewSurface"
+                        float3 inputs:diffuseColor.connect = </root/material/mat_02_Body_collect/UsdPreviewMaterial/UsdPreviewNodeGraph/basecolorTexture.outputs:rgb>
+                        float3 inputs:normal.connect = </root/material/mat_02_Body_collect/UsdPreviewMaterial/UsdPreviewNodeGraph/normalTexture.outputs:rgb>
+                        float3 inputs:roughness.connect = </root/material/mat_02_Body_collect/UsdPreviewMaterial/UsdPreviewNodeGraph/roughnessTexture.outputs:r>
+                        token outputs:surface
+                    }
+
+                    def Shader "basecolorTexture"
+                    {
+                        uniform token info:id = "UsdUVTexture"
+                        asset inputs:file = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/02_Body_Base_color.png@
+                        float2 inputs:st.connect = </root/material/mat_02_Body_collect/UsdPreviewMaterial/UsdPreviewNodeGraph/TexCoordReader.outputs:result>
+                        token inputs:wrapS = "repeat"
+                        token inputs:wrapT = "repeat"
+                        float3 outputs:rgb
+                    }
+
+                    def Shader "TexCoordReader"
+                    {
+                        uniform token info:id = "UsdPrimvarReader_float2"
+                        token inputs:varname = "st"
+                        float2 outputs:result
+                    }
+
+                    def Shader "roughnessTexture"
+                    {
+                        uniform token info:id = "UsdUVTexture"
+                        asset inputs:file = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/02_Body_Roughness.png@
+                        float2 inputs:st.connect = </root/material/mat_02_Body_collect/UsdPreviewMaterial/UsdPreviewNodeGraph/TexCoordReader.outputs:result>
+                        token inputs:wrapS = "repeat"
+                        token inputs:wrapT = "repeat"
+                        float3 outputs:r
+                    }
+
+                    def Shader "normalTexture"
+                    {
+                        uniform token info:id = "UsdUVTexture"
+                        asset inputs:file = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/02_Body_Normal.png@
+                        float2 inputs:st.connect = </root/material/mat_02_Body_collect/UsdPreviewMaterial/UsdPreviewNodeGraph/TexCoordReader.outputs:result>
+                        token inputs:wrapS = "repeat"
+                        token inputs:wrapT = "repeat"
+                        float3 outputs:rgb
+                    }
+                }
+            }
+
+            def Shader "arnold_standard_surface1"
+            {
+                uniform token info:id = "arnold:standard_surface"
+                float3 inputs:aov_id1 = (0, 0, 0)
+                float3 inputs:aov_id2 = (0, 0, 0)
+                float3 inputs:aov_id3 = (0, 0, 0)
+                float3 inputs:aov_id4 = (0, 0, 0)
+                float3 inputs:aov_id5 = (0, 0, 0)
+                float3 inputs:aov_id6 = (0, 0, 0)
+                float3 inputs:aov_id7 = (0, 0, 0)
+                float3 inputs:aov_id8 = (0, 0, 0)
+                float inputs:base = 1
+                float3 inputs:base_color = (0.8, 0.8, 0.8)
+                float3 inputs:base_color.connect = </root/material/mat_02_Body_collect/arnold_basecolorColorCorrect.outputs:rgb>
+                bool inputs:caustics = 0
+                float inputs:coat = 0
+                float inputs:coat_affect_color = 0
+                float inputs:coat_affect_roughness = 0
+                float3 inputs:coat_color = (1, 1, 1)
+                float inputs:coat_IOR = 1.5
+                float3 inputs:coat_normal = (0, 0, 0)
+                float inputs:coat_roughness = 0.1
+                float inputs:emission = 0
+                float3 inputs:emission_color = (1, 1, 1)
+                bool inputs:exit_to_background = 0
+                float inputs:indirect_diffuse = 1
+                bool inputs:indirect_reflections = 1
+                float inputs:indirect_specular = 1
+                bool inputs:internal_reflections = 1
+                float inputs:metalness = 0
+                float3 inputs:normal = (0, 0, 0)
+                float3 inputs:normal.connect = </root/material/mat_02_Body_collect/arnold_Bump2d.outputs:vector>
+                float3 inputs:opacity = (1, 1, 1)
+                float inputs:sheen = 0
+                float3 inputs:sheen_color = (1, 1, 1)
+                float inputs:sheen_roughness = 0.3
+                float inputs:specular = 1
+                float inputs:specular_anisotropy = 0
+                float3 inputs:specular_color = (1, 1, 1)
+                float inputs:specular_IOR = 1.5
+                float inputs:specular_rotation = 0
+                float inputs:specular_roughness = 0.2
+                float inputs:specular_roughness.connect = </root/material/mat_02_Body_collect/arnold_roughnessRange.outputs:r>
+                float inputs:subsurface = 0
+                float inputs:subsurface_anisotropy = 0
+                float3 inputs:subsurface_color = (1, 1, 1)
+                float3 inputs:subsurface_radius = (1, 1, 1)
+                float inputs:subsurface_scale = 1
+                string inputs:subsurface_type = "randomwalk"
+                float3 inputs:tangent = (0, 0, 0)
+                float inputs:thin_film_IOR = 1.5
+                float inputs:thin_film_thickness = 0
+                bool inputs:thin_walled = 0
+                float inputs:transmission = 0
+                float3 inputs:transmission_color = (1, 1, 1)
+                float inputs:transmission_depth = 0
+                float inputs:transmission_dispersion = 0
+                float inputs:transmission_extra_roughness = 0
+                float3 inputs:transmission_scatter = (0, 0, 0)
+                float inputs:transmission_scatter_anisotropy = 0
+                bool inputs:transmit_aovs = 0
+                token outputs:surface
+            }
+
+            def Shader "arnold_basecolorTexture"
+            {
+                uniform token info:id = "arnold:image"
+                string inputs:color_space = "auto"
+                asset inputs:filename = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/02_Body_Base_color.png@
+                string inputs:filter = "smart_bicubic"
+                bool inputs:ignore_missing_textures = 0
+                int inputs:mipmap_bias = 0
+                float4 inputs:missing_texture_color = (0, 0, 0, 0)
+                float3 inputs:multiply = (1, 1, 1)
+                float3 inputs:offset = (0, 0, 0)
+                bool inputs:sflip = 0
+                bool inputs:single_channel = 0
+                float inputs:soffset = 0
+                float inputs:sscale = 1
+                int inputs:start_channel = 0
+                bool inputs:swap_st = 0
+                string inputs:swrap = "periodic"
+                bool inputs:tflip = 0
+                float inputs:toffset = 0
+                float inputs:tscale = 1
+                string inputs:twrap = "periodic"
+                float2 inputs:uvcoords = (0, 0)
+                string inputs:uvset = ""
+                float4 outputs:rgba
+            }
+
+            def Shader "arnold_basecolorColorCorrect"
+            {
+                uniform token info:id = "arnold:color_correct"
+                float3 inputs:add = (0, 0, 0)
+                float inputs:contrast = 1
+                float inputs:exposure = 0
+                float inputs:gamma = 1
+                float inputs:hue_shift = 0
+                float4 inputs:input.connect = </root/material/mat_02_Body_collect/arnold_basecolorTexture.outputs:rgba>
+                float3 outputs:rgb
+            }
+
+            def Shader "arnold_roughnessTexture"
+            {
+                uniform token info:id = "arnold:image"
+                string inputs:color_space = "auto"
+                asset inputs:filename = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/02_Body_Roughness.png@
+                string inputs:filter = "smart_bicubic"
+                bool inputs:ignore_missing_textures = 0
+                int inputs:mipmap_bias = 0
+                float4 inputs:missing_texture_color = (0, 0, 0, 0)
+                float3 inputs:multiply = (1, 1, 1)
+                float3 inputs:offset = (0, 0, 0)
+                bool inputs:sflip = 0
+                bool inputs:single_channel = 0
+                float inputs:soffset = 0
+                float inputs:sscale = 1
+                int inputs:start_channel = 0
+                bool inputs:swap_st = 0
+                string inputs:swrap = "periodic"
+                bool inputs:tflip = 0
+                float inputs:toffset = 0
+                float inputs:tscale = 1
+                string inputs:twrap = "periodic"
+                float2 inputs:uvcoords = (0, 0)
+                string inputs:uvset = ""
+                float4 outputs:rgba
+            }
+
+            def Shader "arnold_roughnessRange"
+            {
+                uniform token info:id = "arnold:range"
+                float inputs:bias = 0.5
+                float inputs:contrast = 1
+                float inputs:contrast_pivot = 0.5
+                float inputs:gain = 0.5
+                float4 inputs:input.connect = </root/material/mat_02_Body_collect/arnold_roughnessTexture.outputs:rgba>
+                float inputs:input_max = 1
+                float inputs:input_min = 0
+                float inputs:output_max = 1
+                float inputs:output_min = 0
+                bool inputs:smoothstep = 0
+                float outputs:r
+            }
+
+            def Shader "arnold_normalTexture"
+            {
+                uniform token info:id = "arnold:image"
+                string inputs:color_space = "auto"
+                asset inputs:filename = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/02_Body_Normal.png@
+                string inputs:filter = "smart_bicubic"
+                bool inputs:ignore_missing_textures = 0
+                int inputs:mipmap_bias = 0
+                float4 inputs:missing_texture_color = (0, 0, 0, 0)
+                float3 inputs:multiply = (1, 1, 1)
+                float3 inputs:offset = (0, 0, 0)
+                bool inputs:sflip = 0
+                bool inputs:single_channel = 0
+                float inputs:soffset = 0
+                float inputs:sscale = 1
+                int inputs:start_channel = 0
+                bool inputs:swap_st = 0
+                string inputs:swrap = "periodic"
+                bool inputs:tflip = 0
+                float inputs:toffset = 0
+                float inputs:tscale = 1
+                string inputs:twrap = "periodic"
+                float2 inputs:uvcoords = (0, 0)
+                string inputs:uvset = ""
+                float3 outputs:vector
+            }
+
+            def Shader "arnold_NormalMap"
+            {
+                uniform token info:id = "arnold:normal_map"
+                bool inputs:color_to_signed = 1
+                float3 inputs:input = (0, 0, 0)
+                float3 inputs:input.connect = </root/material/mat_02_Body_collect/arnold_normalTexture.outputs:vector>
+                bool inputs:invert_x = 0
+                bool inputs:invert_y = 0
+                bool inputs:invert_z = 0
+                float3 inputs:normal = (0, 0, 0)
+                string inputs:order = "XYZ"
+                float inputs:strength = 1
+                float3 inputs:tangent = (0, 0, 0)
+                bool inputs:tangent_space = 1
+                float3 outputs:vector
+            }
+
+            def Shader "arnold_Bump2d"
+            {
+                uniform token info:id = "arnold:bump2d"
+                float inputs:bump_height = 1
+                float inputs:bump_map = 0
+                float3 inputs:normal = (0, 0, 0)
+                float3 inputs:normal.connect = </root/material/mat_02_Body_collect/arnold_NormalMap.outputs:vector>
+                float3 outputs:vector
+            }
+
+            def Shader "mtlx_mtlxstandard_surface1"
+            {
+                uniform token info:id = "ND_standard_surface_surfaceshader"
+                float inputs:base = 1
+                color3f inputs:base_color = (0.8, 0.8, 0.8)
+                color3f inputs:base_color.connect = </root/material/mat_02_Body_collect/mtlx_basecolorColorCorrect.outputs:out>
+                float inputs:coat = 0
+                float inputs:coat_roughness = 0.1
+                float inputs:emission = 0
+                float3 inputs:emission_color = (1, 1, 1)
+                float inputs:metalness = 0
+                float4 inputs:normal.connect = </root/material/mat_02_Body_collect/mtlx_NormalMap.outputs:out>
+                color3f inputs:opacity = (1, 1, 1)
+                float inputs:specular = 1
+                float3 inputs:specular_color = (1, 1, 1)
+                float inputs:specular_IOR = 1.5
+                float inputs:specular_roughness = 0.2
+                float inputs:specular_roughness.connect = </root/material/mat_02_Body_collect/mtlx_roughnessRange.outputs:out>
+                int inputs:thin_walled = 0
+                float inputs:transmission = 0
+                token outputs:surface
+            }
+
+            def Shader "mtlx_basecolorTexture"
+            {
+                uniform token info:id = "ND_image_color3"
+                asset inputs:file = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/02_Body_Base_color.png@
+                color3f outputs:out
+            }
+
+            def Shader "mtlx_basecolorColorCorrect"
+            {
+                uniform token info:id = "ND_colorcorrect_color3"
+                color3f inputs:in.connect = </root/material/mat_02_Body_collect/mtlx_basecolorTexture.outputs:out>
+                color3f outputs:out
+            }
+
+            def Shader "mtlx_roughnessTexture"
+            {
+                uniform token info:id = "ND_image_float"
+                asset inputs:file = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/02_Body_Roughness.png@
+                color3f outputs:out
+            }
+
+            def Shader "mtlx_roughnessRange"
+            {
+                uniform token info:id = "ND_range_color3"
+                color3f inputs:in.connect = </root/material/mat_02_Body_collect/mtlx_roughnessTexture.outputs:out>
+                float outputs:out
+            }
+
+            def Shader "mtlx_normalTexture"
+            {
+                uniform token info:id = "ND_image_vector3"
+                asset inputs:file = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/02_Body_Normal.png@
+                float3 outputs:out
+            }
+
+            def Shader "mtlx_NormalMap"
+            {
+                uniform token info:id = "ND_normalmap"
+                float3 inputs:in.connect = </root/material/mat_02_Body_collect/mtlx_normalTexture.outputs:out>
+                float4 outputs:out
+            }
+        }
+
+        def Material "mat_03_Base_collect"
+        {
+            int inputs:inputnum = 2
+            token outputs:arnold:surface.connect = </root/material/mat_03_Base_collect/arnold_standard_surface1.outputs:surface>
+            token outputs:mtlx:surface.connect = </root/material/mat_03_Base_collect/mtlx_mtlxstandard_surface1.outputs:surface>
+            token outputs:surface.connect = </root/material/mat_03_Base_collect/UsdPreviewMaterial/UsdPreviewNodeGraph/UsdPreviewSurface.outputs:surface>
+
+            def Material "UsdPreviewMaterial"
+            {
+                token outputs:surface.connect = </root/material/mat_03_Base_collect/UsdPreviewMaterial/UsdPreviewNodeGraph/UsdPreviewSurface.outputs:surface>
+
+                def NodeGraph "UsdPreviewNodeGraph"
+                {
+                    def Shader "UsdPreviewSurface"
+                    {
+                        uniform token info:id = "UsdPreviewSurface"
+                        float3 inputs:diffuseColor.connect = </root/material/mat_03_Base_collect/UsdPreviewMaterial/UsdPreviewNodeGraph/basecolorTexture.outputs:rgb>
+                        float3 inputs:normal.connect = </root/material/mat_03_Base_collect/UsdPreviewMaterial/UsdPreviewNodeGraph/normalTexture.outputs:rgb>
+                        float3 inputs:roughness.connect = </root/material/mat_03_Base_collect/UsdPreviewMaterial/UsdPreviewNodeGraph/roughnessTexture.outputs:r>
+                        token outputs:surface
+                    }
+
+                    def Shader "basecolorTexture"
+                    {
+                        uniform token info:id = "UsdUVTexture"
+                        asset inputs:file = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/03_Base_Base_color.png@
+                        float2 inputs:st.connect = </root/material/mat_03_Base_collect/UsdPreviewMaterial/UsdPreviewNodeGraph/TexCoordReader.outputs:result>
+                        token inputs:wrapS = "repeat"
+                        token inputs:wrapT = "repeat"
+                        float3 outputs:rgb
+                    }
+
+                    def Shader "TexCoordReader"
+                    {
+                        uniform token info:id = "UsdPrimvarReader_float2"
+                        token inputs:varname = "st"
+                        float2 outputs:result
+                    }
+
+                    def Shader "roughnessTexture"
+                    {
+                        uniform token info:id = "UsdUVTexture"
+                        asset inputs:file = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/03_Base_Roughness.png@
+                        float2 inputs:st.connect = </root/material/mat_03_Base_collect/UsdPreviewMaterial/UsdPreviewNodeGraph/TexCoordReader.outputs:result>
+                        token inputs:wrapS = "repeat"
+                        token inputs:wrapT = "repeat"
+                        float3 outputs:r
+                    }
+
+                    def Shader "normalTexture"
+                    {
+                        uniform token info:id = "UsdUVTexture"
+                        asset inputs:file = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/03_Base_Normal_DirectX.png@
+                        float2 inputs:st.connect = </root/material/mat_03_Base_collect/UsdPreviewMaterial/UsdPreviewNodeGraph/TexCoordReader.outputs:result>
+                        token inputs:wrapS = "repeat"
+                        token inputs:wrapT = "repeat"
+                        float3 outputs:rgb
+                    }
+                }
+            }
+
+            def Shader "arnold_standard_surface1"
+            {
+                uniform token info:id = "arnold:standard_surface"
+                float3 inputs:aov_id1 = (0, 0, 0)
+                float3 inputs:aov_id2 = (0, 0, 0)
+                float3 inputs:aov_id3 = (0, 0, 0)
+                float3 inputs:aov_id4 = (0, 0, 0)
+                float3 inputs:aov_id5 = (0, 0, 0)
+                float3 inputs:aov_id6 = (0, 0, 0)
+                float3 inputs:aov_id7 = (0, 0, 0)
+                float3 inputs:aov_id8 = (0, 0, 0)
+                float inputs:base = 1
+                float3 inputs:base_color = (0.8, 0.8, 0.8)
+                float3 inputs:base_color.connect = </root/material/mat_03_Base_collect/arnold_basecolorColorCorrect.outputs:rgb>
+                bool inputs:caustics = 0
+                float inputs:coat = 0
+                float inputs:coat_affect_color = 0
+                float inputs:coat_affect_roughness = 0
+                float3 inputs:coat_color = (1, 1, 1)
+                float inputs:coat_IOR = 1.5
+                float3 inputs:coat_normal = (0, 0, 0)
+                float inputs:coat_roughness = 0.1
+                float inputs:emission = 0
+                float3 inputs:emission_color = (1, 1, 1)
+                bool inputs:exit_to_background = 0
+                float inputs:indirect_diffuse = 1
+                bool inputs:indirect_reflections = 1
+                float inputs:indirect_specular = 1
+                bool inputs:internal_reflections = 1
+                float inputs:metalness = 0
+                float3 inputs:normal = (0, 0, 0)
+                float3 inputs:normal.connect = </root/material/mat_03_Base_collect/arnold_Bump2d.outputs:vector>
+                float3 inputs:opacity = (1, 1, 1)
+                float inputs:sheen = 0
+                float3 inputs:sheen_color = (1, 1, 1)
+                float inputs:sheen_roughness = 0.3
+                float inputs:specular = 1
+                float inputs:specular_anisotropy = 0
+                float3 inputs:specular_color = (1, 1, 1)
+                float inputs:specular_IOR = 1.5
+                float inputs:specular_rotation = 0
+                float inputs:specular_roughness = 0.2
+                float inputs:specular_roughness.connect = </root/material/mat_03_Base_collect/arnold_roughnessRange.outputs:r>
+                float inputs:subsurface = 0
+                float inputs:subsurface_anisotropy = 0
+                float3 inputs:subsurface_color = (1, 1, 1)
+                float3 inputs:subsurface_radius = (1, 1, 1)
+                float inputs:subsurface_scale = 1
+                string inputs:subsurface_type = "randomwalk"
+                float3 inputs:tangent = (0, 0, 0)
+                float inputs:thin_film_IOR = 1.5
+                float inputs:thin_film_thickness = 0
+                bool inputs:thin_walled = 0
+                float inputs:transmission = 0
+                float3 inputs:transmission_color = (1, 1, 1)
+                float inputs:transmission_depth = 0
+                float inputs:transmission_dispersion = 0
+                float inputs:transmission_extra_roughness = 0
+                float3 inputs:transmission_scatter = (0, 0, 0)
+                float inputs:transmission_scatter_anisotropy = 0
+                bool inputs:transmit_aovs = 0
+                token outputs:surface
+            }
+
+            def Shader "arnold_basecolorTexture"
+            {
+                uniform token info:id = "arnold:image"
+                string inputs:color_space = "auto"
+                asset inputs:filename = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/03_Base_Base_color.png@
+                string inputs:filter = "smart_bicubic"
+                bool inputs:ignore_missing_textures = 0
+                int inputs:mipmap_bias = 0
+                float4 inputs:missing_texture_color = (0, 0, 0, 0)
+                float3 inputs:multiply = (1, 1, 1)
+                float3 inputs:offset = (0, 0, 0)
+                bool inputs:sflip = 0
+                bool inputs:single_channel = 0
+                float inputs:soffset = 0
+                float inputs:sscale = 1
+                int inputs:start_channel = 0
+                bool inputs:swap_st = 0
+                string inputs:swrap = "periodic"
+                bool inputs:tflip = 0
+                float inputs:toffset = 0
+                float inputs:tscale = 1
+                string inputs:twrap = "periodic"
+                float2 inputs:uvcoords = (0, 0)
+                string inputs:uvset = ""
+                float4 outputs:rgba
+            }
+
+            def Shader "arnold_basecolorColorCorrect"
+            {
+                uniform token info:id = "arnold:color_correct"
+                float3 inputs:add = (0, 0, 0)
+                float inputs:contrast = 1
+                float inputs:exposure = 0
+                float inputs:gamma = 1
+                float inputs:hue_shift = 0
+                float4 inputs:input.connect = </root/material/mat_03_Base_collect/arnold_basecolorTexture.outputs:rgba>
+                float3 outputs:rgb
+            }
+
+            def Shader "arnold_roughnessTexture"
+            {
+                uniform token info:id = "arnold:image"
+                string inputs:color_space = "auto"
+                asset inputs:filename = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/03_Base_Roughness.png@
+                string inputs:filter = "smart_bicubic"
+                bool inputs:ignore_missing_textures = 0
+                int inputs:mipmap_bias = 0
+                float4 inputs:missing_texture_color = (0, 0, 0, 0)
+                float3 inputs:multiply = (1, 1, 1)
+                float3 inputs:offset = (0, 0, 0)
+                bool inputs:sflip = 0
+                bool inputs:single_channel = 0
+                float inputs:soffset = 0
+                float inputs:sscale = 1
+                int inputs:start_channel = 0
+                bool inputs:swap_st = 0
+                string inputs:swrap = "periodic"
+                bool inputs:tflip = 0
+                float inputs:toffset = 0
+                float inputs:tscale = 1
+                string inputs:twrap = "periodic"
+                float2 inputs:uvcoords = (0, 0)
+                string inputs:uvset = ""
+                float4 outputs:rgba
+            }
+
+            def Shader "arnold_roughnessRange"
+            {
+                uniform token info:id = "arnold:range"
+                float inputs:bias = 0.5
+                float inputs:contrast = 1
+                float inputs:contrast_pivot = 0.5
+                float inputs:gain = 0.5
+                float4 inputs:input.connect = </root/material/mat_03_Base_collect/arnold_roughnessTexture.outputs:rgba>
+                float inputs:input_max = 1
+                float inputs:input_min = 0
+                float inputs:output_max = 1
+                float inputs:output_min = 0
+                bool inputs:smoothstep = 0
+                float outputs:r
+            }
+
+            def Shader "arnold_normalTexture"
+            {
+                uniform token info:id = "arnold:image"
+                string inputs:color_space = "auto"
+                asset inputs:filename = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/03_Base_Normal_DirectX.png@
+                string inputs:filter = "smart_bicubic"
+                bool inputs:ignore_missing_textures = 0
+                int inputs:mipmap_bias = 0
+                float4 inputs:missing_texture_color = (0, 0, 0, 0)
+                float3 inputs:multiply = (1, 1, 1)
+                float3 inputs:offset = (0, 0, 0)
+                bool inputs:sflip = 0
+                bool inputs:single_channel = 0
+                float inputs:soffset = 0
+                float inputs:sscale = 1
+                int inputs:start_channel = 0
+                bool inputs:swap_st = 0
+                string inputs:swrap = "periodic"
+                bool inputs:tflip = 0
+                float inputs:toffset = 0
+                float inputs:tscale = 1
+                string inputs:twrap = "periodic"
+                float2 inputs:uvcoords = (0, 0)
+                string inputs:uvset = ""
+                float3 outputs:vector
+            }
+
+            def Shader "arnold_NormalMap"
+            {
+                uniform token info:id = "arnold:normal_map"
+                bool inputs:color_to_signed = 1
+                float3 inputs:input = (0, 0, 0)
+                float3 inputs:input.connect = </root/material/mat_03_Base_collect/arnold_normalTexture.outputs:vector>
+                bool inputs:invert_x = 0
+                bool inputs:invert_y = 0
+                bool inputs:invert_z = 0
+                float3 inputs:normal = (0, 0, 0)
+                string inputs:order = "XYZ"
+                float inputs:strength = 1
+                float3 inputs:tangent = (0, 0, 0)
+                bool inputs:tangent_space = 1
+                float3 outputs:vector
+            }
+
+            def Shader "arnold_Bump2d"
+            {
+                uniform token info:id = "arnold:bump2d"
+                float inputs:bump_height = 1
+                float inputs:bump_map = 0
+                float3 inputs:normal = (0, 0, 0)
+                float3 inputs:normal.connect = </root/material/mat_03_Base_collect/arnold_NormalMap.outputs:vector>
+                float3 outputs:vector
+            }
+
+            def Shader "mtlx_mtlxstandard_surface1"
+            {
+                uniform token info:id = "ND_standard_surface_surfaceshader"
+                float inputs:base = 1
+                color3f inputs:base_color = (0.8, 0.8, 0.8)
+                color3f inputs:base_color.connect = </root/material/mat_03_Base_collect/mtlx_basecolorColorCorrect.outputs:out>
+                float inputs:coat = 0
+                float inputs:coat_roughness = 0.1
+                float inputs:emission = 0
+                float3 inputs:emission_color = (1, 1, 1)
+                float inputs:metalness = 0
+                float4 inputs:normal.connect = </root/material/mat_03_Base_collect/mtlx_NormalMap.outputs:out>
+                color3f inputs:opacity = (1, 1, 1)
+                float inputs:specular = 1
+                float3 inputs:specular_color = (1, 1, 1)
+                float inputs:specular_IOR = 1.5
+                float inputs:specular_roughness = 0.2
+                float inputs:specular_roughness.connect = </root/material/mat_03_Base_collect/mtlx_roughnessRange.outputs:out>
+                int inputs:thin_walled = 0
+                float inputs:transmission = 0
+                token outputs:surface
+            }
+
+            def Shader "mtlx_basecolorTexture"
+            {
+                uniform token info:id = "ND_image_color3"
+                asset inputs:file = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/03_Base_Base_color.png@
+                color3f outputs:out
+            }
+
+            def Shader "mtlx_basecolorColorCorrect"
+            {
+                uniform token info:id = "ND_colorcorrect_color3"
+                color3f inputs:in.connect = </root/material/mat_03_Base_collect/mtlx_basecolorTexture.outputs:out>
+                color3f outputs:out
+            }
+
+            def Shader "mtlx_roughnessTexture"
+            {
+                uniform token info:id = "ND_image_float"
+                asset inputs:file = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/03_Base_Roughness.png@
+                color3f outputs:out
+            }
+
+            def Shader "mtlx_roughnessRange"
+            {
+                uniform token info:id = "ND_range_color3"
+                color3f inputs:in.connect = </root/material/mat_03_Base_collect/mtlx_roughnessTexture.outputs:out>
+                float outputs:out
+            }
+
+            def Shader "mtlx_normalTexture"
+            {
+                uniform token info:id = "ND_image_vector3"
+                asset inputs:file = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/03_Base_Normal_DirectX.png@
+                float3 outputs:out
+            }
+
+            def Shader "mtlx_NormalMap"
+            {
+                uniform token info:id = "ND_normalmap"
+                float3 inputs:in.connect = </root/material/mat_03_Base_collect/mtlx_normalTexture.outputs:out>
+                float4 outputs:out
+            }
+        }
+    }
+}
+

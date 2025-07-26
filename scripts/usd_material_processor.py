@@ -90,7 +90,7 @@ class USDShaderCreate:
     Creates material prim on usd stage with Arnold, MTLX and/or UsdPreview material_dict_list. Assigns material to prims
     """
 
-    def __init__(self, stage, material_name: str, material_dict: Dict, parent_prim='/root/material',
+    def __init__(self, stage, material_name: str, material_dict: Dict, parent_primpath='/root/material',
                  create_usd_preview=False, usd_preview_format=None, create_arnold=False, create_mtlx=False):
         """
         :param material_dict: example:
@@ -107,7 +107,7 @@ class USDShaderCreate:
 
         self.material_dict = material_dict
         self.material_name = material_name
-        self.parent_prim_path = parent_prim
+        self.parent_primpath = parent_primpath
         self.create_usd_preview = create_usd_preview
         self.usd_preview_format = usd_preview_format
         self.create_arnold = create_arnold
@@ -116,7 +116,7 @@ class USDShaderCreate:
         # detect if it's a transmissive material:
         self.is_transmissive = self.detect_if_transmissive(self.material_name)
 
-        self.create_material()
+        self.run()
 
 
     def detect_if_transmissive(self, material_name):
@@ -673,16 +673,18 @@ class USDShaderCreate:
                 bump2d_shader.ConnectableAPI(), "out")
 
 
-    def _create_collect_prim(self, parent_prim_path: str, create_usd_preview=False, usd_preview_format=None,
+    def _create_collect_prim(self, parent_primpath: str, create_usd_preview=False, usd_preview_format=None,
                              create_arnold=False, create_mtlx=False, enable_transmission=False):
         """
         creates a collect material prim on stage
         :return: collect prim
         :rtype: UsdShade.Material
         """
-        parent_prim_sdf = Sdf.Path(parent_prim_path)
-        parent_prim = UsdGeom.Scope.Define(self.stage, parent_prim_sdf)
-        collect_prim_path = f'{parent_prim_path}/mat_{self.material_name}_collect'
+        # parent = self.stage.GetPrimAtPath(parent_primpath)
+        # if not parent or not parent.IsDefined():
+        #     self.stage.DefinePrim(parent_primpath, 'Scope')
+
+        collect_prim_path = f'{parent_primpath}/mat_{self.material_name}_collect'
         collect_usd_material = UsdShade.Material.Define(self.stage, collect_prim_path)
         collect_usd_material.CreateInput("inputnum", Sdf.ValueTypeNames.Int).Set(2)
 
@@ -708,11 +710,11 @@ class USDShaderCreate:
 
 
 
-    def create_material(self):
+    def run(self):
         """
         Main run function. will create a collect material with Arnold and usdPreview shaders in stage.
         """
-        newly_created_usd_mat = self._create_collect_prim(parent_prim_path=self.parent_prim_path,
+        newly_created_usd_mat = self._create_collect_prim(parent_primpath=self.parent_primpath,
                                                           create_usd_preview=self.create_usd_preview,
                                                           usd_preview_format=self.usd_preview_format,
                                                           create_arnold=self.create_arnold,
@@ -829,47 +831,37 @@ def create_shaded_asset_publish(material_dict_list, stage=None, geo_file=None, p
         os.makedirs(layer_save_path, exist_ok=True)
     os.makedirs(f"{layer_save_path}/layers", exist_ok=True)
 
-
-
-    if geo_file:
-        # copy geo:
-        geo_file_basename = os.path.basename(geo_file)
-        geo_file_new_path = f"{layer_save_path}/layers/{geo_file_basename}"
-        shutil.copyfile(geo_file, geo_file_new_path)
-        print(f"DEBUG: Copied geo usd file to: {geo_file_new_path}")
-        geo_file_new_rel_path = os.path.relpath(geo_file_new_path, layer_save_path)
-        print(f"DEBUG:  geo_file_new_rel_path: {geo_file_new_rel_path}")
-
-
     # create stage:
     if not stage:
         stage = Usd.Stage.CreateNew(f"{layer_save_path}/{main_layer_name}")
 
     # create layers:
     layer_root = stage.GetRootLayer()
+
     layer_mats_path_abs = f"{layer_save_path}/layers/layer_mats.usda"
-    layer_assign_path_abs = f"{layer_save_path}/layers/layer_assign.usda"
     layer_mats_rel_paths = os.path.relpath(layer_mats_path_abs, layer_save_path)
-    layer_assign_rel_paths = os.path.relpath(layer_assign_path_abs, layer_save_path)
     layer_mats = Sdf.Layer.CreateNew(layer_mats_path_abs)
-    layer_assign = Sdf.Layer.CreateNew(layer_assign_path_abs)
     layer_root.subLayerPaths.append(layer_mats_rel_paths)
+
+    layer_assign_path_abs = f"{layer_save_path}/layers/layer_assign.usda"
+    layer_assign_rel_paths = os.path.relpath(layer_assign_path_abs, layer_save_path)
+    layer_assign = Sdf.Layer.CreateNew(layer_assign_path_abs)
     layer_root.subLayerPaths.append(layer_assign_rel_paths)
 
 
     if geo_file:
-        # reference geo:
+        # payload geo:
         stage.SetEditTarget(layer_root)
-        stage.DefinePrim(f'{parent_path}', 'Xform')
         geo_prim = stage.DefinePrim(f'{parent_path}', 'Xform')
-        geo_prim.GetPayloads().AddPayload(geo_file_new_rel_path, "/ASSET/GEO/PARCON/GEO_OFFSET/model_grp")  # we are payloading "/ASSET/GEO/PARCON/GEO_OFFSET/model_grp" since that primpath seems common in all modeling publishes, maybe use it in an argument
+        mesh_rel_path = os.path.relpath(geo_file, layer_save_path)
+        geo_prim.GetPayloads().AddPayload(mesh_rel_path, f"{parent_path}/mesh/")
 
-        # set kinds for geo prims:
-        for asset_name_prim in geo_prim.GetChildren():
-            asset_name_prim.SetMetadata('kind', 'group')
-            for child_prim in asset_name_prim.GetChildren():
-                if child_prim.IsA(UsdGeom.Xform):
-                    child_prim.SetMetadata('kind', 'component')
+        # # set kinds for geo prims:
+        # for asset_name_prim in geo_prim.GetChildren():
+        #     asset_name_prim.SetMetadata('kind', 'group')
+        #     for child_prim in asset_name_prim.GetChildren():
+        #         if child_prim.IsA(UsdGeom.Xform):
+        #             child_prim.SetMetadata('kind', 'component')
 
 
     # create material_dict_list:
@@ -882,7 +874,7 @@ def create_shaded_asset_publish(material_dict_list, stage=None, geo_file=None, p
             material_name = x['mat_name']
             # break
         USDShaderCreate(stage=stage, material_name=material_name, material_dict=material_dict,
-                        parent_prim=material_primitive_path,
+                        parent_primpath=material_primitive_path,
                         create_usd_preview=create_usd_preview,
                         create_arnold=create_arnold,
                         create_mtlx=create_mtlx
