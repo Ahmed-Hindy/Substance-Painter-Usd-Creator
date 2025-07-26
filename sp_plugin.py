@@ -35,8 +35,8 @@ DEFAULT_DIALOGUE_DICT = {
     "primitive_path": "/root",
     "enable_usdpreview": True,
     "enable_arnold": True,
-    "enable_materialx": False,
-    "enable_save_geometry": False
+    "enable_materialx": True,
+    "enable_save_geometry": True
 }
 
 # Hold references to UI widgets
@@ -104,12 +104,12 @@ class USDExporter:
     """
     Writes MaterialData into a USD stage using USDShaderCreator.
     """
-    def __init__(self, settings):
+    def __init__(self, settings, material_dict_list, geo_file=None):
         self.settings = settings
-        # self.stage = Usd.Stage.CreateNew(settings.publish_location)
-        self.stage = None
+        self.material_dict_list = material_dict_list
+        self.geo_file = geo_file
 
-    def write_materials(self, material_dict_list):
+    def write_materials(self):
         """
         Create USD materials for each MaterialData and save the stage.
 
@@ -119,11 +119,12 @@ class USDExporter:
         usd_material_processor.create_shaded_asset_publish(
             stage=None,
             parent_path=self.settings.primitive_path,
-            material_dict_list=material_dict_list,
+            material_dict_list=self.material_dict_list,
             create_usd_preview=self.settings.usdpreview,
             create_arnold=self.settings.arnold,
             create_mtlx=self.settings.materialx,
-            layer_save_path=self.settings.publish_location.replace("\\", "/")
+            layer_save_path=self.settings.publish_location.replace("\\", "/"),
+            geo_file=self.geo_file
         )
 
 
@@ -132,18 +133,28 @@ class MeshExporter:
     Exports mesh geometry to USD if requested.
     """
     def __init__(self, settings):
-        self.mesh_path = Path(settings.publish_location).with_name('mesh.usd')
+        self.mesh_path = Path(settings.publish_location) / 'layers' / 'mesh.usd'
 
     def export_mesh(self):
         """
         Call Substance Painter's USD mesh exporter.
         """
         logger.info("Exporting mesh to %s", self.mesh_path)
+
+        # Choose an export option to use
+        export_option = substance_painter.export.MeshExportOption.BaseMesh
+        if not substance_painter.export.scene_is_triangulated():
+            export_option = substance_painter.export.MeshExportOption.TriangulatedMesh
+        if substance_painter.export.scene_has_tessellation():
+            export_option = substance_painter.export.MeshExportOption.TessellationNormalsBaseMesh
+
         try:
-            substance_painter.export.export_mesh(
-                str(self.mesh_path),
-                substance_painter.export.MeshExportOption.BaseMesh
-            )
+            export_result = substance_painter.export.export_mesh(str(self.mesh_path), export_option)
+
+            # In case of error, display a human readable message:
+            if export_result.status != substance_painter.export.ExportStatus.Success:
+                print(export_result.message)
+            return self.mesh_path
         except Exception as e:
             logger.error("Mesh export failed: %s", e)
 
@@ -161,9 +172,12 @@ class USDExporterView(QDialog):
 
         engine_box = QGroupBox("Render Engines")
         engine_layout = QVBoxLayout()
-        self.usdpreview = QCheckBox("USD Preview"); self.usdpreview.setChecked(True)
-        self.arnold = QCheckBox("Arnold"); self.arnold.setChecked(True)
+        self.usdpreview = QCheckBox("USD Preview")
+        self.usdpreview.setChecked(DEFAULT_DIALOGUE_DICT["enable_usdpreview"])
+        self.arnold = QCheckBox("Arnold")
+        self.arnold.setChecked(DEFAULT_DIALOGUE_DICT["enable_arnold"])
         self.materialx = QCheckBox("MaterialX")
+        self.materialx.setChecked(DEFAULT_DIALOGUE_DICT["enable_materialx"])
         engine_layout.addWidget(self.usdpreview)
         engine_layout.addWidget(self.arnold)
         engine_layout.addWidget(self.materialx)
@@ -193,6 +207,7 @@ class USDExporterView(QDialog):
 
         self.geom = QCheckBox("Save Geometry in USD File")
         self.geom.setToolTip("Exports mesh geometry to USD if supported")
+        self.geom.setChecked(DEFAULT_DIALOGUE_DICT["enable_save_geometry"])
         self.layout().addWidget(self.geom)
 
     def _validate_prim_path(self):
@@ -244,17 +259,19 @@ def register_callbacks():
 def on_post_export(context):
     """Function to be called after textures are exported"""
     print("ExportTexturesEnded emitted!!!")
-    print(f"DEBUG: context.textures: {pprint.pformat(context.textures, sort_dicts=False)}")
-    raw = usd_exported_qdialog.get_settings()
     first_tex = next(iter(context.textures.values()))[0]
     export_dir = Path(first_tex).parent
+
+    raw = usd_exported_qdialog.get_settings()
     publish = raw.publish_location.replace("<export_folder>", str(export_dir))
     settings = USDSettings(raw.usdpreview, raw.arnold, raw.materialx, raw.primitive_path, publish, raw.save_geometry)
     material_dict_list = TextureParser(context.textures, settings).parse()
-    exporter = USDExporter(settings)
-    exporter.write_materials(material_dict_list)
+
+    geo_file = None
     if settings.save_geometry:
-        MeshExporter(settings).export_mesh()
+        geo_file = MeshExporter(settings).export_mesh()
+    exporter = USDExporter(settings, material_dict_list, geo_file)
+    exporter.write_materials()
 
 
 def close_plugin():

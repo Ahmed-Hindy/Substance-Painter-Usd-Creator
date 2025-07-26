@@ -55,7 +55,7 @@ This plugin allows you to export materials and geometry from Adobe Substance Pai
 <br>
 
 ### Example USD Material File:
-Example File provided: [materials.usda](Examples/materials.usda)
+Example File provided: [main.usda](Examples/main.usda)
 
 
 
