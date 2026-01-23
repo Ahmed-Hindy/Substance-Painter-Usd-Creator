@@ -48,6 +48,18 @@ DEFAULT_DIALOGUE_DICT = {
 
 # Hold references to UI widgets
 plugin_widgets = []
+usd_exported_qdialog = None
+callbacks_registered = False
+
+
+def _is_widget_valid(widget) -> bool:
+    if widget is None:
+        return False
+    try:
+        from shiboken2 import isValid
+    except Exception:
+        return True
+    return isValid(widget)
 
 
 @dataclass
@@ -203,14 +215,27 @@ def start_plugin():
 def register_callbacks():
     """Register the post-export callback"""
     print("Registered callbacks")
+    global callbacks_registered
+    if callbacks_registered:
+        return
+    try:
+        substance_painter.event.DISPATCHER.disconnect(
+            substance_painter.event.ExportTexturesEnded, on_post_export
+        )
+    except Exception:
+        pass
     substance_painter.event.DISPATCHER.connect(
         substance_painter.event.ExportTexturesEnded, on_post_export
     )
+    callbacks_registered = True
 
 
 def on_post_export(context):
     """Function to be called after textures are exported"""
     print("ExportTexturesEnded emitted!!!")
+    if not _is_widget_valid(usd_exported_qdialog):
+        logger.warning("USD Export UI is not available; skipping export.")
+        return
     if not context.textures:
         logger.warning("No textures exported; skipping USD publish.")
         return
@@ -239,6 +264,16 @@ def on_post_export(context):
 def close_plugin():
     """Remove all widgets that have been added to the UI"""
     print("Closing plugin")
+    global callbacks_registered, usd_exported_qdialog
+    if callbacks_registered:
+        try:
+            substance_painter.event.DISPATCHER.disconnect(
+                substance_painter.event.ExportTexturesEnded, on_post_export
+            )
+        except Exception:
+            pass
+        callbacks_registered = False
     for widget in plugin_widgets:
         substance_painter.ui.delete_ui_element(widget)
     plugin_widgets.clear()
+    usd_exported_qdialog = None

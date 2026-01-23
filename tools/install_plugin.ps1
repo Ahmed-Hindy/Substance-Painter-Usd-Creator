@@ -14,8 +14,14 @@ if (-not $PluginDir) {
     $PluginDir = Join-Path $documents "Adobe\Adobe Substance 3D Painter\python\plugins"
 }
 
+if (Test-Path $dist) {
+    Remove-Item -Recurse -Force $dist
+}
+
+python (Join-Path $root "tools\\build_plugin.py")
+
 if (-not (Test-Path $dist)) {
-    Write-Error "Bundle not found at $dist. Run tools\\build_plugin.py first."
+    Write-Error "Bundle not found at $dist after build."
     exit 1
 }
 
