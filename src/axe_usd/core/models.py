@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 
 
 @dataclass(frozen=True)
@@ -15,6 +15,7 @@ class ExportSettings:
         publish_directory: Output directory for USD layers.
         save_geometry: Whether to export mesh geometry.
         main_layer_name: Name of the main layer file.
+        texture_format_overrides: Optional per-renderer texture format overrides.
     """
 
     usdpreview: bool
@@ -24,6 +25,7 @@ class ExportSettings:
     publish_directory: Path
     save_geometry: bool
     main_layer_name: str = "main.usda"
+    texture_format_overrides: Optional[Dict[str, str]] = None
 
 
 @dataclass(frozen=True)

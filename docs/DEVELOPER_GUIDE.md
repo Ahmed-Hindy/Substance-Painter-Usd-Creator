@@ -52,6 +52,28 @@ The Substance Painter plugins folder should contain:
 4. Core exporter builds publish paths and delegates to USD writer.
 5. USD writer creates layers and shader networks.
 
+## Texture Format Overrides
+You can override texture formats per renderer by passing `texture_format_overrides` in
+`ExportSettings`. Keys are `usd_preview`, `arnold`, and `mtlx`, and values can be file
+extensions with or without a leading dot.
+
+Example:
+```python
+settings = ExportSettings(
+    usdpreview=True,
+    arnold=True,
+    materialx=True,
+    primitive_path="/ASSET",
+    publish_directory=Path("publish"),
+    save_geometry=False,
+    texture_format_overrides={
+        "usd_preview": "jpg",
+        "arnold": ".exr",
+        "mtlx": "png",
+    },
+)
+```
+
 ## Substance Painter Texture Context
 `on_post_export` receives a `context` object with a `textures` mapping shaped like:
 - `Dict[Tuple[str, str], List[str]]`
