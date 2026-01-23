@@ -35,7 +35,7 @@ jobs:
           dist_dir = pathlib.Path("dist")
           zip_path = dist_dir / "axe_usd_plugin.zip"
 
-          required = [dist_dir / "axe_usd_plugin.py", dist_dir / "axe_usd"]
+          required = [dist_dir / "axe_usd_plugin"]
           for path in required:
               if not path.exists():
                   raise SystemExit(f"Missing bundle component: {path}")

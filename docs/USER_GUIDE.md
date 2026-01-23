@@ -9,15 +9,15 @@ This plugin exports materials and optional geometry from Adobe Substance Painter
    - Windows: `C:\Users\<USERNAME>\Documents\Adobe\Adobe Substance 3D Painter\python\plugins`
    - macOS: `~/Library/Application Support/Adobe/Adobe Substance 3D Painter/python/plugins`
    - Linux: `~/.local/share/Adobe/Adobe Substance 3D Painter/python/plugins`
-   This places `axe_usd_plugin.py` and `axe_usd/` directly in the plugins folder.
+   This places `axe_usd_plugin/` directly in the plugins folder.
 3. Restart Substance Painter.
 
-If you previously installed `AxeFX_usd_plugin.py`, `sp_usd_creator/`, or an older `axe_usd/`, delete them before copying the new build to avoid duplicate plugins.
+If you previously installed `AxeFX_usd_plugin.py`, `sp_usd_creator/`, `axe_usd/`, or an older `axe_usd_plugin.py`, delete them before copying the new build to avoid duplicate plugins.
 
 ## Installation (Developers)
 1. Build the plugin bundle:
    - `python tools/build_plugin.py`
-2. Copy `dist/axe_usd_plugin.py` and `dist/axe_usd/` to your Substance Painter plugins folder.
+2. Copy `dist/axe_usd_plugin/` to your Substance Painter plugins folder.
 3. Optional dev install on Windows:
    - `powershell -File tools/install_plugin.ps1`
 
@@ -48,13 +48,15 @@ The plugin looks for tokens in exported texture file names:
 - `occlusion`, `ao` -> occlusion
 - `height`, `displacement` -> displacement
 
+Tokens are matched as standalone words (non-alphanumeric boundaries), so unrelated substrings like `road` do not match `ao`. Unknown texture files are ignored, and materials are still authored when only a subset of maps is available.
+
 ## Notes
 - USD Preview uses `metallic`, Arnold/MaterialX use `metalness`. The plugin normalizes this for you.
 - The publish directory can include `<export_folder>` to substitute the active texture export folder.
 
 ## Troubleshooting
 - Plugin not showing up:
-  - Ensure `axe_usd_plugin.py` and `axe_usd/` are directly inside the Substance Painter plugins directory.
+  - Ensure `axe_usd_plugin/` is directly inside the Substance Painter plugins directory.
   - Restart Substance Painter.
 - No USD files written:
   - Make sure texture export succeeded and produced files.

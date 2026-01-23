@@ -26,11 +26,14 @@ if (-not (Test-Path $dist)) {
 }
 
 New-Item -ItemType Directory -Path $PluginDir -Force | Out-Null
-if (Test-Path (Join-Path $PluginDir "axe_usd")) {
-    Remove-Item -Recurse -Force (Join-Path $PluginDir "axe_usd")
-}
 if (Test-Path (Join-Path $PluginDir "axe_usd_plugin.py")) {
     Remove-Item -Force (Join-Path $PluginDir "axe_usd_plugin.py")
+}
+if (Test-Path (Join-Path $PluginDir "axe_usd_plugin")) {
+    Remove-Item -Recurse -Force (Join-Path $PluginDir "axe_usd_plugin")
+}
+if (Test-Path (Join-Path $PluginDir "axe_usd")) {
+    Remove-Item -Recurse -Force (Join-Path $PluginDir "axe_usd")
 }
 if (Test-Path (Join-Path $PluginDir "AxeFX_usd_plugin.py")) {
     Remove-Item -Force (Join-Path $PluginDir "AxeFX_usd_plugin.py")
@@ -38,7 +41,6 @@ if (Test-Path (Join-Path $PluginDir "AxeFX_usd_plugin.py")) {
 if (Test-Path (Join-Path $PluginDir "sp_usd_creator")) {
     Remove-Item -Recurse -Force (Join-Path $PluginDir "sp_usd_creator")
 }
-Copy-Item -Path (Join-Path $dist "axe_usd_plugin.py") -Destination $PluginDir -Force
-Copy-Item -Path (Join-Path $dist "axe_usd") -Destination $PluginDir -Recurse -Force
+Copy-Item -Path (Join-Path $dist "axe_usd_plugin") -Destination $PluginDir -Recurse -Force
 
 Write-Host "Installed plugin to $PluginDir"

@@ -6,11 +6,12 @@ import os
 import logging
 import re
 import tempfile
-from typing import Dict
+from typing import Dict, Iterable, Optional, Tuple
 
 from pxr import Usd, UsdGeom, UsdShade, Sdf, Gf
 
 from . import utils as usd_utils
+from .types import MaterialTextureDict, MaterialTextureList
 
 
 
@@ -22,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 # Mapping of shader identifiers to their texture input bindings:
-TEXTURE_BINDINGS: Dict[str, Dict[str, tuple]] = {
+TEXTURE_BINDINGS: Dict[str, Dict[str, Tuple[str, str]]] = {
     'UsdPreviewSurface': {
         'basecolor': ('diffuseColor', 'rgb'),
         'metalness': ('metallic', 'r'),
@@ -48,7 +49,7 @@ TEXTURE_BINDINGS: Dict[str, Dict[str, tuple]] = {
 
 
 
-def sanitize_identifier(name):
+def sanitize_identifier(name: str) -> str:
     """
     Convert an arbitrary string into a valid USD identifier.
 
@@ -67,7 +68,7 @@ def sanitize_identifier(name):
     return sanitized
 
 
-def ensure_scope(stage, path):
+def ensure_scope(stage: Usd.Stage, path: str) -> UsdGeom.Scope:
     """
     Ensure that a Scope prim exists at the given path. If not, define it.
 
@@ -89,8 +90,17 @@ class USDShaderCreate:
     Creates material prim on usd stage with Arnold, MTLX and/or UsdPreview material_dict_list. Assigns material to prims
     """
 
-    def __init__(self, stage, material_name: str, material_dict: Dict, parent_primpath='/root/material',
-                 create_usd_preview=False, usd_preview_format=None, create_arnold=False, create_mtlx=False):
+    def __init__(
+        self,
+        stage: Usd.Stage,
+        material_name: str,
+        material_dict: MaterialTextureDict,
+        parent_primpath: str = "/root/material",
+        create_usd_preview: bool = False,
+        usd_preview_format: Optional[str] = None,
+        create_arnold: bool = False,
+        create_mtlx: bool = False,
+    ) -> None:
         """
         :param material_dict: example:
          {
@@ -118,7 +128,7 @@ class USDShaderCreate:
         self.run()
 
 
-    def detect_if_transmissive(self, material_name):
+    def detect_if_transmissive(self, material_name: str) -> bool:
         """
         detects if a material should have transmission or not based on material name,
         if a material has "glass" in its name, then transmission should be on!
@@ -133,7 +143,11 @@ class USDShaderCreate:
 
 
     ###  usd_preview ###
-    def _create_usd_preview_material(self, parent_path, usd_preview_format):
+    def _create_usd_preview_material(
+        self,
+        parent_path: str,
+        usd_preview_format: Optional[str],
+    ) -> UsdShade.Material:
         material_path = f'{parent_path}/UsdPreviewMaterial'
         material = UsdShade.Material.Define(self.stage, material_path)
 
@@ -207,7 +221,11 @@ class USDShaderCreate:
 
 
     ###  arnold ###
-    def _arnold_create_material(self, parent_path, enable_transmission=False):
+    def _arnold_create_material(
+        self,
+        parent_path: str,
+        enable_transmission: bool = False,
+    ) -> UsdShade.Material:
         """
         example prints for variables created by the script:
             shader: UsdShade.Shader(Usd.Prim(</root/material/mat_hello_world_collect/standard_surface1>))
@@ -231,7 +249,10 @@ class USDShaderCreate:
 
         return material_usdshade
 
-    def _arnold_initialize_standard_surface_shader(self, shader_usdshade):
+    def _arnold_initialize_standard_surface_shader(
+        self,
+        shader_usdshade: UsdShade.Shader,
+    ) -> None:
         """
         initializes Arnold Standard Surface inputs
         """
@@ -294,7 +315,7 @@ class USDShaderCreate:
         shader_usdshade.CreateInput('thin_walled', Sdf.ValueTypeNames.Bool).Set(False)
         shader_usdshade.CreateInput('transmit_aovs', Sdf.ValueTypeNames.Bool).Set(False)
 
-    def _arnold_initialize_image_shader(self, image_path: str):
+    def _arnold_initialize_image_shader(self, image_path: str) -> UsdShade.Shader:
         image_shader = UsdShade.Shader.Define(self.stage, image_path)
         image_shader.CreateIdAttr("arnold:image")
 
@@ -342,7 +363,10 @@ class USDShaderCreate:
 
         return image_shader
 
-    def _arnold_initialize_color_correct_shader(self, color_correct_path: str):
+    def _arnold_initialize_color_correct_shader(
+        self,
+        color_correct_path: str,
+    ) -> UsdShade.Shader:
         color_correct_shader = UsdShade.Shader.Define(self.stage, color_correct_path)
         color_correct_shader.CreateIdAttr("arnold:color_correct")
         cc_add_input = color_correct_shader.CreateInput("add", Sdf.ValueTypeNames.Float3)
@@ -358,7 +382,7 @@ class USDShaderCreate:
 
         return color_correct_shader
 
-    def _arnold_initialize_range_shader(self, range_path: str):
+    def _arnold_initialize_range_shader(self, range_path: str) -> UsdShade.Shader:
         range_shader = UsdShade.Shader.Define(self.stage, range_path)
         range_shader.CreateIdAttr("arnold:range")
 
@@ -384,7 +408,10 @@ class USDShaderCreate:
         return range_shader
 
 
-    def _arnold_initialize_normal_map_shader(self, normal_map_path: str):
+    def _arnold_initialize_normal_map_shader(
+        self,
+        normal_map_path: str,
+    ) -> UsdShade.Shader:
         normal_map_shader = UsdShade.Shader.Define(self.stage, normal_map_path)
         normal_map_shader.CreateIdAttr("arnold:normal_map")
 
@@ -411,7 +438,7 @@ class USDShaderCreate:
 
         return normal_map_shader
 
-    def _arnold_initialize_bump2d_shader(self, bump2d_path: str):
+    def _arnold_initialize_bump2d_shader(self, bump2d_path: str) -> UsdShade.Shader:
         bump2d_shader = UsdShade.Shader.Define(self.stage, bump2d_path)
         bump2d_shader.CreateIdAttr("arnold:bump2d")
 
@@ -433,7 +460,11 @@ class USDShaderCreate:
         shader_usdshade.GetInput('thin_walled').Set(True)
 
 
-    def _arnold_fill_texture_file_paths(self, material_prim, std_surf_shader):
+    def _arnold_fill_texture_file_paths(
+        self,
+        material_prim: Usd.Prim,
+        std_surf_shader: UsdShade.Shader,
+    ) -> None:
         """
         Fills the texture file paths for the given shader using the material_data.
         """
@@ -507,7 +538,11 @@ class USDShaderCreate:
 
 
     ###  mtlx ###
-    def _mtlx_create_material(self, parent_path, enable_transmission=False):
+    def _mtlx_create_material(
+        self,
+        parent_path: str,
+        enable_transmission: bool = False,
+    ) -> UsdShade.Material:
         shader_path = f'{parent_path}/mtlx_mtlxstandard_surface1'
         shader_usdshade = UsdShade.Shader.Define(self.stage, shader_path)
         material_prim = self.stage.GetPrimAtPath(parent_path)
@@ -522,7 +557,10 @@ class USDShaderCreate:
         return material_usdshade
 
 
-    def _mtlx_initialize_standard_surface_shader(self, shader_usdshade):
+    def _mtlx_initialize_standard_surface_shader(
+        self,
+        shader_usdshade: UsdShade.Shader,
+    ) -> None:
         shader_usdshade.CreateIdAttr("ND_standard_surface_surfaceshader")
 
         shader_usdshade.CreateInput('base', Sdf.ValueTypeNames.Float).Set(1)
@@ -541,32 +579,50 @@ class USDShaderCreate:
         shader_usdshade.CreateInput('opacity',  Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f(1, 1, 1))
 
 
-    def _mtlx_initialize_image_shader(self, image_path: str, signature="color3"):
+    def _mtlx_initialize_image_shader(
+        self,
+        image_path: str,
+        signature: str = "color3",
+    ) -> UsdShade.Shader:
         image_shader = UsdShade.Shader.Define(self.stage, image_path)
         image_shader.CreateIdAttr(f"ND_image_{signature}")
         image_shader.CreateInput("file", Sdf.ValueTypeNames.Asset)
         return image_shader
 
 
-    def _mtlx_initialize_color_correct_shader(self, color_correct_path: str, signature="color3"):
+    def _mtlx_initialize_color_correct_shader(
+        self,
+        color_correct_path: str,
+        signature: str = "color3",
+    ) -> UsdShade.Shader:
         color_correct_shader = UsdShade.Shader.Define(self.stage, color_correct_path)
         color_correct_shader.CreateIdAttr(f"ND_colorcorrect_{signature}")
 
         return color_correct_shader
 
-    def _mtlx_initialize_range_shader(self, range_path: str, signature="color3"):
+    def _mtlx_initialize_range_shader(
+        self,
+        range_path: str,
+        signature: str = "color3",
+    ) -> UsdShade.Shader:
         range_shader = UsdShade.Shader.Define(self.stage, range_path)
         range_shader.CreateIdAttr(f"ND_range_{signature}")
         return range_shader
 
 
-    def _mtlx_initialize_normal_map_shader(self, normal_map_path: str):
+    def _mtlx_initialize_normal_map_shader(
+        self,
+        normal_map_path: str,
+    ) -> UsdShade.Shader:
         normal_map_shader = UsdShade.Shader.Define(self.stage, normal_map_path)
         normal_map_shader.CreateIdAttr("ND_normalmap")
 
         return normal_map_shader
 
-    def _mtlx_initialize_bump2d_shader(self, bump2d_path: str):
+    def _mtlx_initialize_bump2d_shader(
+        self,
+        bump2d_path: str,
+    ) -> UsdShade.Shader:
         bump2d_shader = UsdShade.Shader.Define(self.stage, bump2d_path)
         bump2d_shader.CreateIdAttr("ND_bump_vector3")
 
@@ -580,7 +636,7 @@ class USDShaderCreate:
         return bump2d_shader
 
 
-    def _mtlx_enable_transmission(self, shader_usdshade):
+    def _mtlx_enable_transmission(self, shader_usdshade: UsdShade.Shader) -> None:
         """
         given the mtlx standard surface, will set input primvar 'transmission' to value '0.9'
         """
@@ -588,7 +644,11 @@ class USDShaderCreate:
         shader_usdshade.GetInput('thin_walled').Set(1)
 
 
-    def _mtlx_fill_texture_file_paths(self, material_prim, std_surf_shader):
+    def _mtlx_fill_texture_file_paths(
+        self,
+        material_prim: Usd.Prim,
+        std_surf_shader: UsdShade.Shader,
+    ) -> None:
         """
         Fills the texture file paths for the given shader using the material_data.
         """
@@ -720,7 +780,7 @@ class USDShaderCreate:
 
 
 
-    def run(self):
+    def run(self) -> None:
         """
         Main run function. will create a collect material with Arnold and usdPreview shaders in stage.
         """
@@ -735,11 +795,15 @@ class USDShaderCreate:
 
 
 class USDShaderAssign:
-    def __init__(self, stage):
+    def __init__(self, stage: Usd.Stage) -> None:
         self.stage = stage
 
 
-    def assign_material_to_primitives(self, material_prim, prims_to_assign_to):
+    def assign_material_to_primitives(
+        self,
+        material_prim: Usd.Prim,
+        prims_to_assign_to: Iterable[Usd.Prim],
+    ) -> None:
         """
         Assigns a new USD material to a list of primitives.
         :param material_prim: Usd.Prim primitive to assign to the primitives
@@ -759,7 +823,7 @@ class USDShaderAssign:
             UsdShade.MaterialBindingAPI(prim).Bind(material)
 
 
-    def run(self, mats_parent_path: str, mesh_parent_path: str):
+    def run(self, mats_parent_path: str, mesh_parent_path: str) -> None:
         """
         run function for  class, steps:
             1. get list of Materials under a parent prim
@@ -807,10 +871,10 @@ class USDMeshConfigure:
     TODO:     - set subdiv schema to: "__none__"
 
     """
-    def __init__(self, stage):
+    def __init__(self, stage: Usd.Stage) -> None:
         self.stage = stage
 
-    def add_karma_primvars(self, prim):
+    def add_karma_primvars(self, prim: Usd.Prim) -> None:
         karma_primvars = {
             "primvars:karma:object:causticsenable": (True, Sdf.ValueTypeNames.Bool),
             # "karma:customShading": (0.5, Sdf.ValueTypeNames.Float),
@@ -830,9 +894,17 @@ class USDMeshConfigure:
 
 
 
-def create_shaded_asset_publish(material_dict_list, stage=None, geo_file=None, parent_path="/ASSET",
-                                layer_save_path=None, main_layer_name='main.usda',
-                                create_usd_preview=True, create_arnold=False, create_mtlx=True):
+def create_shaded_asset_publish(
+    material_dict_list: MaterialTextureList,
+    stage: Optional[Usd.Stage] = None,
+    geo_file: Optional[str] = None,
+    parent_path: str = "/ASSET",
+    layer_save_path: Optional[str] = None,
+    main_layer_name: str = "main.usda",
+    create_usd_preview: bool = True,
+    create_arnold: bool = False,
+    create_mtlx: bool = True,
+) -> None:
     """
     Main run method.
     """
