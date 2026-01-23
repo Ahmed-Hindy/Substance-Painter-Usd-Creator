@@ -3,8 +3,8 @@ import shutil
 
 ROOT = Path(__file__).resolve().parents[1]
 DIST_DIR = ROOT / "dist"
-PACKAGE_SRC = ROOT / "sp_usd_creator"
-WRAPPER_SRC = ROOT / "packaging" / "AxeFX_usd_plugin.py"
+PACKAGE_SRC = ROOT / "src" / "axe_usd"
+WRAPPER_SRC = ROOT / "packaging" / "axe_usd_plugin.py"
 VERSION_SRC = ROOT / "VERSION"
 
 if not PACKAGE_SRC.exists():
@@ -17,10 +17,10 @@ if DIST_DIR.exists():
 
 DIST_DIR.mkdir(parents=True, exist_ok=True)
 
-shutil.copy2(WRAPPER_SRC, DIST_DIR / "AxeFX_usd_plugin.py")
+shutil.copy2(WRAPPER_SRC, DIST_DIR / "axe_usd_plugin.py")
 shutil.copytree(
     PACKAGE_SRC,
-    DIST_DIR / "sp_usd_creator",
+    DIST_DIR / "axe_usd",
     ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".ruff_cache", ".pytest_cache"),
 )
 

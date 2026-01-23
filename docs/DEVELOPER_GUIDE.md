@@ -2,7 +2,7 @@
 
 
 ## Repo Layout
-- `sp_usd_creator/`
+- `src/axe_usd/`
   - `core/`: pure logic (paths, parsing, export orchestration)
   - `usd/`: USD authoring backend (pxr adapter + shader authoring)
   - `dcc/`: Substance Painter integration (UI, event wiring)
@@ -12,25 +12,24 @@
 
 ## Plugins Folder Layout
 The Substance Painter plugins folder should contain:
-- `AxeFX_usd_plugin.py` (entry point)
-- `sp_usd_creator/` (package)
+- `axe_usd_plugin.py` (entry point)
+- `axe_usd/` (package)
 
 ## Entry Points
-- `sp_usd_creator/dcc/substance_plugin.py`: actual plugin logic (UI + export).
-- `packaging/AxeFX_usd_plugin.py`: thin wrapper used for shipping.
-- `sp_plugin.py`: repo-level thin wrapper for convenience.
+- `src/axe_usd/dcc/substance_plugin.py`: actual plugin logic (UI + export).
+- `packaging/axe_usd_plugin.py`: thin wrapper used for shipping.
 
 ## Build and Install
 - Build bundle:
   - `python tools/build_plugin.py`
-  - Output: `dist/AxeFX_usd_plugin.py` and `dist/sp_usd_creator/`
+  - Output: `dist/axe_usd_plugin.py` and `dist/axe_usd/`
 - Install to Substance Painter (Windows):
   - `powershell -File tools/install_plugin.ps1`
 
 ## CI/CD (GitHub Releases)
 - Workflow: `.github/workflows/build-and-release.yml`
 - On every push to `main`, the workflow builds and uploads a zip artifact.
-- On tags matching `v*`, it publishes a GitHub Release with `AxeFX_usd_plugin.zip`.
+- On tags matching `v*`, it publishes a GitHub Release with `axe_usd_plugin.zip`.
 - To cut a release:
   1. Update `VERSION`
   2. Tag: `git tag vX.Y.Z`
@@ -53,14 +52,14 @@ The Substance Painter plugins folder should contain:
 5. USD writer creates layers and shader networks.
 
 ## Extending Renderers
-- Update `sp_usd_creator/usd/material_processor.py` to add new shader networks.
-- Update `sp_usd_creator/core/texture_keys.py` if new texture slot tokens are required.
+- Update `src/axe_usd/usd/material_processor.py` to add new shader networks.
+- Update `src/axe_usd/core/texture_keys.py` if new texture slot tokens are required.
 - Keep `core` independent of USD or Substance Painter imports.
 
 ## Packaging Notes
 - Only ship:
-  - `AxeFX_usd_plugin.py`
-  - `sp_usd_creator/`
+- `axe_usd_plugin.py`
+- `axe_usd/`
   - `VERSION` (optional)
 - Do not ship:
   - `.venv`, `tests/`, `Examples/`, `dist/`, `__pycache__/`

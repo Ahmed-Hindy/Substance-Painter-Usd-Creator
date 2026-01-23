@@ -1,4 +1,4 @@
-from sp_usd_creator.core.fs_utils import ensure_directory
+from axe_usd.core.fs_utils import ensure_directory
 
 
 def test_ensure_directory_creates_path(tmp_path):

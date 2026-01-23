@@ -14,22 +14,31 @@ if (-not $PluginDir) {
     $PluginDir = Join-Path $documents "Adobe\Adobe Substance 3D Painter\python\plugins"
 }
 
+if (Test-Path $dist) {
+    Remove-Item -Recurse -Force $dist
+}
+
+python (Join-Path $root "tools\\build_plugin.py")
+
 if (-not (Test-Path $dist)) {
-    Write-Error "Bundle not found at $dist. Run tools\\build_plugin.py first."
+    Write-Error "Bundle not found at $dist after build."
     exit 1
 }
 
 New-Item -ItemType Directory -Path $PluginDir -Force | Out-Null
-if (Test-Path (Join-Path $PluginDir "AxeFX_usd_plugin")) {
-    Remove-Item -Recurse -Force (Join-Path $PluginDir "AxeFX_usd_plugin")
+if (Test-Path (Join-Path $PluginDir "axe_usd")) {
+    Remove-Item -Recurse -Force (Join-Path $PluginDir "axe_usd")
 }
-if (Test-Path (Join-Path $PluginDir "sp_usd_creator")) {
-    Remove-Item -Recurse -Force (Join-Path $PluginDir "sp_usd_creator")
+if (Test-Path (Join-Path $PluginDir "axe_usd_plugin.py")) {
+    Remove-Item -Force (Join-Path $PluginDir "axe_usd_plugin.py")
 }
 if (Test-Path (Join-Path $PluginDir "AxeFX_usd_plugin.py")) {
     Remove-Item -Force (Join-Path $PluginDir "AxeFX_usd_plugin.py")
 }
-Copy-Item -Path (Join-Path $dist "AxeFX_usd_plugin.py") -Destination $PluginDir -Force
-Copy-Item -Path (Join-Path $dist "sp_usd_creator") -Destination $PluginDir -Recurse -Force
+if (Test-Path (Join-Path $PluginDir "sp_usd_creator")) {
+    Remove-Item -Recurse -Force (Join-Path $PluginDir "sp_usd_creator")
+}
+Copy-Item -Path (Join-Path $dist "axe_usd_plugin.py") -Destination $PluginDir -Force
+Copy-Item -Path (Join-Path $dist "axe_usd") -Destination $PluginDir -Recurse -Force
 
 Write-Host "Installed plugin to $PluginDir"

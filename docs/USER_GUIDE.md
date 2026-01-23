@@ -4,20 +4,20 @@
 This plugin exports materials and optional geometry from Adobe Substance Painter to USD. It supports multiple render engines (USD Preview Surface, Arnold, MaterialX) and writes a layered USD publish under a chosen output directory.
 
 ## Installation (End Users)
-1. Download the latest release zip from GitHub Releases (`AxeFX_usd_plugin.zip`).
+1. Download the latest release zip from GitHub Releases (`axe_usd_plugin.zip`).
 2. Unzip the archive to your Substance Painter plugins folder:
    - Windows: `C:\Users\<USERNAME>\Documents\Adobe\Adobe Substance 3D Painter\python\plugins`
    - macOS: `~/Library/Application Support/Adobe/Adobe Substance 3D Painter/python/plugins`
    - Linux: `~/.local/share/Adobe/Adobe Substance 3D Painter/python/plugins`
-   This places `AxeFX_usd_plugin.py` and `sp_usd_creator/` directly in the plugins folder.
+   This places `axe_usd_plugin.py` and `axe_usd/` directly in the plugins folder.
 3. Restart Substance Painter.
 
-If you previously installed a folder named `AxeFX_usd_plugin/` or an older `sp_usd_creator/`, delete them to avoid duplicate plugins.
+If you previously installed `AxeFX_usd_plugin.py`, `sp_usd_creator/`, or an older `axe_usd/`, delete them before copying the new build to avoid duplicate plugins.
 
 ## Installation (Developers)
 1. Build the plugin bundle:
    - `python tools/build_plugin.py`
-2. Copy `dist/AxeFX_usd_plugin.py` and `dist/sp_usd_creator/` to your Substance Painter plugins folder.
+2. Copy `dist/axe_usd_plugin.py` and `dist/axe_usd/` to your Substance Painter plugins folder.
 3. Optional dev install on Windows:
    - `powershell -File tools/install_plugin.ps1`
 
@@ -54,7 +54,7 @@ The plugin looks for tokens in exported texture file names:
 
 ## Troubleshooting
 - Plugin not showing up:
-  - Ensure `AxeFX_usd_plugin` folder is directly inside the Substance Painter plugins directory.
+  - Ensure `axe_usd_plugin.py` and `axe_usd/` are directly inside the Substance Painter plugins directory.
   - Restart Substance Painter.
 - No USD files written:
   - Make sure texture export succeeded and produced files.

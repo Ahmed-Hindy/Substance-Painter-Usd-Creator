@@ -8,6 +8,10 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+  "pytest-cov",
   "pytest",
   "ruff",
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/test_usd_*.py" = ["E402"]

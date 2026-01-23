@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from sp_usd_creator.core.exporter import export_publish
-from sp_usd_creator.core.models import ExportSettings, MaterialBundle
+from axe_usd.core.exporter import export_publish
+from axe_usd.core.models import ExportSettings, MaterialBundle
 
 
 class FakeWriter:

@@ -1,4 +1,4 @@
-from sp_usd_creator.core.texture_parser import parse_textures
+from axe_usd.core.texture_parser import parse_textures
 
 
 def test_parse_textures_skips_empty_bundle():
