@@ -11,6 +11,6 @@ if not PACKAGE_DIR.exists():
         "axe_usd package not found. Ensure axe_usd/ is inside the axe_usd_plugin folder."
     )
 
-from .axe_usd.dcc.substance_plugin import start_plugin, close_plugin  # noqa: E402
+from .axe_usd.dcc.substance_painter.substance_plugin import start_plugin, close_plugin  # noqa: E402
 
 __all__ = ["start_plugin", "close_plugin"]

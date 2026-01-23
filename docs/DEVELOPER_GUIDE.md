@@ -17,7 +17,7 @@ The Substance Painter plugins folder should contain:
   - `axe_usd/` (core package)
 
 ## Entry Points
-- `src/axe_usd/dcc/substance_plugin.py`: actual plugin logic (UI + export).
+- `src/axe_usd/dcc/substance_painter/substance_plugin.py`: actual plugin logic (UI + export).
 - `packaging/axe_usd_plugin/__init__.py`: thin wrapper used for shipping.
 
 ## Build and Install

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Optional, Protocol, Sequence, Tuple
 
-from ..version import get_version
+from ...version import get_version
 from .qt_compat import (
     QCheckBox,
     QDialog,
@@ -30,12 +30,12 @@ from .qt_compat import (
     Qt,
 )
 
-from ..core.exporter import export_publish
-from ..core.fs_utils import ensure_directory
-from ..core.models import ExportSettings
-from ..core.publish_paths import build_publish_paths
-from ..core.texture_parser import parse_textures
-from ..usd.pxr_writer import PxrUsdWriter
+from ...core.exporter import export_publish
+from ...core.fs_utils import ensure_directory
+from ...core.models import ExportSettings
+from ...core.publish_paths import build_publish_paths
+from ...core.texture_parser import parse_textures
+from ...usd.pxr_writer import PxrUsdWriter
 
 import substance_painter
 import substance_painter.event

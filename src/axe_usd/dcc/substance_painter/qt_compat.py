@@ -5,29 +5,18 @@ Supports PySide2 (SP < 10.1.0) and PySide6 (SP >= 10.1.0).
 """
 from __future__ import annotations
 
-try:
-    import substance_painter as sp
-except Exception:
-    sp = None
+import substance_painter as sp
 
-if sp is not None:
-    use_pyside2 = sp.application.version_info() < (10, 1, 0)
-else:
-    use_pyside2 = False
+use_pyside2 = sp.application.version_info() < (10, 1, 0)
 
 if use_pyside2:
     from PySide2 import QtCore, QtGui, QtWidgets  # type: ignore
 
     PYSIDE_VERSION = 2
 else:
-    try:
-        from PySide6 import QtCore, QtGui, QtWidgets  # type: ignore
+    from PySide6 import QtCore, QtGui, QtWidgets  # type: ignore
 
-        PYSIDE_VERSION = 6
-    except Exception:
-        from PySide2 import QtCore, QtGui, QtWidgets  # type: ignore
-
-        PYSIDE_VERSION = 2
+    PYSIDE_VERSION = 6
 
 Qt = QtCore.Qt
 
