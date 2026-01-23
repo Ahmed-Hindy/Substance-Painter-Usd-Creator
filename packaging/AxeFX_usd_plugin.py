@@ -15,6 +15,6 @@ if not PACKAGE_DIR.exists():
         "sp_usd_creator package not found. Ensure sp_usd_creator/ is next to AxeFX_usd_plugin.py."
     )
 
-from sp_usd_creator.dcc.substance_plugin import start_plugin, close_plugin
+from sp_usd_creator.dcc.substance_plugin import start_plugin, close_plugin  # noqa: E402
 
 __all__ = ["start_plugin", "close_plugin"]
