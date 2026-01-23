@@ -21,6 +21,14 @@ _TOKEN_SLOTS = [
 
 
 def slot_from_path(path: str) -> Optional[str]:
+    """Resolve a texture slot name from a file path.
+
+    Args:
+        path: Texture file path to inspect.
+
+    Returns:
+        Optional[str]: The normalized slot name if matched.
+    """
     lower_path = path.lower()
     for token, slot in _TOKEN_SLOTS:
         pattern = rf"(^|[^a-z0-9]){re.escape(token)}([^a-z0-9]|$)"

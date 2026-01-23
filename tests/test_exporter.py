@@ -5,7 +5,10 @@ from axe_usd.core.models import ExportSettings, MaterialBundle
 
 
 class FakeWriter:
+    """Test double for the export writer protocol."""
+
     def __init__(self):
+        """Initialize the fake writer state."""
         self.called = False
         self.materials = None
         self.settings = None
@@ -13,6 +16,14 @@ class FakeWriter:
         self.paths = None
 
     def export(self, materials, settings, geo_file, paths):
+        """Capture export arguments for assertions.
+
+        Args:
+            materials: Material bundles passed to the writer.
+            settings: Export settings used for the call.
+            geo_file: Optional geometry file path.
+            paths: Publish paths used for export.
+        """
         self.called = True
         self.materials = list(materials)
         self.settings = settings
@@ -21,6 +32,7 @@ class FakeWriter:
 
 
 def test_export_publish_calls_writer():
+    """Ensure export_publish delegates to the writer and returns paths."""
     settings = ExportSettings(
         usdpreview=True,
         arnold=False,

@@ -8,6 +8,7 @@ from axe_usd.usd.utils import collect_prims_of_type
 
 
 def test_collect_prims_of_type_finds_materials():
+    """Ensure collect_prims_of_type finds material prims."""
     stage = Usd.Stage.CreateInMemory()
     UsdShade.Material.Define(stage, "/Root/Materials/MatA")
 
