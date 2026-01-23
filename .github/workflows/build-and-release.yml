@@ -33,9 +33,9 @@ jobs:
           import zipfile
 
           dist_dir = pathlib.Path("dist")
-          zip_path = dist_dir / "AxeFX_usd_plugin.zip"
+          zip_path = dist_dir / "axe_usd_plugin.zip"
 
-          required = [dist_dir / "AxeFX_usd_plugin.py", dist_dir / "sp_usd_creator"]
+          required = [dist_dir / "axe_usd_plugin.py", dist_dir / "axe_usd"]
           for path in required:
               if not path.exists():
                   raise SystemExit(f"Missing bundle component: {path}")
@@ -52,8 +52,8 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AxeFX_usd_plugin
-          path: dist/AxeFX_usd_plugin.zip
+          name: axe_usd_plugin
+          path: dist/axe_usd_plugin.zip
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -63,10 +63,10 @@ jobs:
       - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
-          name: AxeFX_usd_plugin
+          name: axe_usd_plugin
           path: dist
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/AxeFX_usd_plugin.zip
+          files: dist/axe_usd_plugin.zip

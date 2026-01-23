@@ -1,0 +1,19 @@
+import pytest
+
+pxr = pytest.importorskip("pxr")
+
+from pxr import Usd, UsdShade
+
+from axe_usd.usd.utils import collect_prims_of_type
+
+
+def test_collect_prims_of_type_finds_materials():
+    stage = Usd.Stage.CreateInMemory()
+    UsdShade.Material.Define(stage, "/Root/Materials/MatA")
+
+    root = stage.GetPrimAtPath("/Root")
+    ok, found = collect_prims_of_type(root, UsdShade.Material, recursive=True)
+
+    assert ok is True
+    assert len(found) == 1
+    assert found[0].GetPath().pathString == "/Root/Materials/MatA"

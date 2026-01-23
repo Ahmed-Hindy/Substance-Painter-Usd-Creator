@@ -1,4 +1,4 @@
-from sp_usd_creator.core.texture_keys import slot_from_path
+from axe_usd.core.texture_keys import slot_from_path
 
 
 def test_slot_from_path_ao_matches_token():

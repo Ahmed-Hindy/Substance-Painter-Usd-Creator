@@ -15,20 +15,20 @@ This plugin allows you to export materials and geometry from Adobe Substance Pai
 
 
 ## Installation
-1. Download the latest release zip from GitHub Releases (`AxeFX_usd_plugin.zip`).
+1. Download the latest release zip from GitHub Releases (`axe_usd_plugin.zip`).
 2. Unzip it into your Substance Painter plugins directory, usually located at:
    - Windows: `C:\Users\<USERNAME>\Documents\Adobe\Adobe Substance 3D Painter\python\plugins`
    - macOS: `~/Library/Application Support/Adobe/Adobe Substance 3D Painter/python/plugins`
    - Linux: `~/.local/share/Adobe/Adobe Substance 3D Painter/python/plugins`
-   This will place `AxeFX_usd_plugin.py` and `sp_usd_creator/` directly in the plugins folder.
+   This will place `axe_usd_plugin.py` and `axe_usd/` directly in the plugins folder.
 3. Restart Substance Painter.
 
-If you previously installed a folder named `AxeFX_usd_plugin/` or an older `sp_usd_creator/`, delete them to avoid duplicate plugins.
+If you previously installed `AxeFX_usd_plugin.py`, `sp_usd_creator/`, or an older `axe_usd/`, delete them before copying the new build to avoid duplicate plugins.
 
 ## Developer Install
 1. Build the plugin bundle:
    - `python tools/build_plugin.py`
-2. Copy `dist/AxeFX_usd_plugin.py` and `dist/sp_usd_creator/` into your Substance Painter plugins directory.
+2. Copy `dist/axe_usd_plugin.py` and `dist/axe_usd/` into your Substance Painter plugins directory.
 3. Optional dev install on Windows:
    - `powershell -File tools/install_plugin.ps1`
 

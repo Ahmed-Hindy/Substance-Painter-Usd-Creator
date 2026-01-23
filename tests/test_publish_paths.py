@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from sp_usd_creator.core.publish_paths import build_publish_paths
+from axe_usd.core.publish_paths import build_publish_paths
 
 
 def test_build_publish_paths_from_directory():
