@@ -27,6 +27,7 @@ QHBoxLayout = QtWidgets.QHBoxLayout
 QLabel = QtWidgets.QLabel
 QLineEdit = QtWidgets.QLineEdit
 QMessageBox = QtWidgets.QMessageBox
+QMenuBar = QtWidgets.QMenuBar
 QPushButton = QtWidgets.QPushButton
 QScrollArea = QtWidgets.QScrollArea
 QSizePolicy = QtWidgets.QSizePolicy
@@ -48,6 +49,7 @@ __all__ = [
     "QLabel",
     "QLineEdit",
     "QMessageBox",
+    "QMenuBar",
     "QPushButton",
     "QScrollArea",
     "QSizePolicy",

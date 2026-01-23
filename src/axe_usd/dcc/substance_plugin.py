@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Optional, Protocol, Sequence, Tuple
 
+from ..version import get_version
 from .qt_compat import (
     QCheckBox,
     QDialog,
@@ -18,6 +19,7 @@ from .qt_compat import (
     QLabel,
     QLineEdit,
     QMessageBox,
+    QMenuBar,
     QPushButton,
     QScrollArea,
     QSizePolicy,
@@ -159,11 +161,19 @@ class USDExporterView(QDialog):
         self.setWindowTitle("USD Exporter")
         self.setWindowIcon(QIcon())
         self.setMinimumSize(520, 240)
+        self._plugin_version = get_version()
 
         root_layout = QVBoxLayout()
         root_layout.setContentsMargins(10, 10, 10, 10)
         root_layout.setSpacing(6)
         self.setLayout(root_layout)
+
+        menu_bar = QMenuBar()
+        menu_bar.setNativeMenuBar(False)
+        help_menu = menu_bar.addMenu("Help")
+        help_menu.addAction("Help", self._show_help)
+        help_menu.addAction("About", self._show_about)
+        root_layout.setMenuBar(menu_bar)
 
         title = QLabel("Axe USD Exporter")
         title_font = title.font()
@@ -298,6 +308,23 @@ class USDExporterView(QDialog):
         hint.setPalette(pal)
         hint.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
         return hint
+
+    def _show_help(self) -> None:
+        """Show a short help dialog."""
+        message = (
+            "Export textures first, then the plugin writes USD next to the export folder.\n\n"
+            "Use <export_folder> to auto-insert the current texture export path."
+        )
+        QMessageBox.information(self, "Axe USD Exporter Help", message)
+
+    def _show_about(self) -> None:
+        """Show an about dialog with version details."""
+        message = (
+            f"Axe USD Exporter\n"
+            f"Version {self._plugin_version}\n\n"
+            "Exports Substance Painter textures to USD with supported render engines."
+        )
+        QMessageBox.information(self, "About Axe USD Exporter", message)
 
     def _browse_publish_directory(self) -> None:
         """Open a directory picker for the publish path."""
