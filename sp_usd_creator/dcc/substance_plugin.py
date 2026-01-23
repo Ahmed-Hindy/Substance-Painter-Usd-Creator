@@ -20,6 +20,7 @@ from PySide2.QtWidgets import (
 )
 
 from ..core.exporter import export_publish
+from ..core.fs_utils import ensure_directory
 from ..core.models import ExportSettings
 from ..core.publish_paths import build_publish_paths
 from ..core.texture_parser import parse_textures
@@ -84,6 +85,7 @@ class MeshExporter:
         """
         Call Substance Painter's USD mesh exporter.
         """
+        ensure_directory(self.mesh_path.parent)
         logger.info("Exporting mesh to %s", self.mesh_path)
 
         # Choose an export option to use
@@ -99,6 +101,7 @@ class MeshExporter:
             # In case of error, display a human readable message:
             if export_result.status != substance_painter.export.ExportStatus.Success:
                 print(export_result.message)
+                return None
             return self.mesh_path
         except Exception as exc:
             logger.error("Mesh export failed: %s", exc)

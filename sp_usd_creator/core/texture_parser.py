@@ -1,5 +1,5 @@
 import logging
-from typing import Iterable, List
+from typing import List
 
 from .models import MaterialBundle
 from .texture_keys import slot_from_path
@@ -28,6 +28,9 @@ def parse_textures(textures_dict) -> List[MaterialBundle]:
                 continue
             textures[slot] = str(path)
 
-        material_bundles.append(MaterialBundle(name=material_name, textures=textures))
+        if textures:
+            material_bundles.append(MaterialBundle(name=material_name, textures=textures))
+        else:
+            logger.info("Skipping material '%s' with no recognized textures.", material_name)
 
     return material_bundles

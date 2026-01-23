@@ -1,3 +1,4 @@
+import re
 from typing import Optional
 
 
@@ -22,6 +23,7 @@ _TOKEN_SLOTS = [
 def slot_from_path(path: str) -> Optional[str]:
     lower_path = path.lower()
     for token, slot in _TOKEN_SLOTS:
-        if token in lower_path:
+        pattern = rf"(^|[^a-z0-9]){re.escape(token)}([^a-z0-9]|$)"
+        if re.search(pattern, lower_path):
             return slot
     return None

@@ -3,13 +3,12 @@ Copyright Ahmed Hindy. Please mention the author if you found any part of this c
 """
 
 import os
-import shutil
 import logging
 import re
-from pathlib import Path
-from typing import Dict, Optional
+import tempfile
+from typing import Dict
 
-from pxr import Usd, UsdGeom, UsdShade, Sdf, Gf, Kind
+from pxr import Usd, UsdGeom, UsdShade, Sdf, Gf
 
 from . import utils as usd_utils
 
@@ -139,7 +138,7 @@ class USDShaderCreate:
         material = UsdShade.Material.Define(self.stage, material_path)
 
         nodegraph_path = f'{material_path}/UsdPreviewNodeGraph'
-        nodegraph = self.stage.DefinePrim(nodegraph_path, 'NodeGraph')
+        self.stage.DefinePrim(nodegraph_path, 'NodeGraph')
 
         shader_path = f'{nodegraph_path}/UsdPreviewSurface'
         shader = UsdShade.Shader.Define(self.stage, shader_path)
@@ -301,7 +300,7 @@ class USDShaderCreate:
 
         color_space = image_shader.CreateInput("color_space", Sdf.ValueTypeNames.String)
         color_space.Set("auto")
-        file_input = image_shader.CreateInput("filename", Sdf.ValueTypeNames.Asset)
+        image_shader.CreateInput("filename", Sdf.ValueTypeNames.Asset)
         filter = image_shader.CreateInput("filter", Sdf.ValueTypeNames.String)
         filter.Set("smart_bicubic")
         ignore_missing_textures = image_shader.CreateInput("ignore_missing_textures", Sdf.ValueTypeNames.Bool)
@@ -612,7 +611,6 @@ class USDShaderCreate:
             'height': "float",
         }
 
-        bump2d_path = f"{material_prim.GetPath()}/mtlx_Bump2d"
         bump2d_shader = None
 
         for tex_type, tex_dict in self.material_dict.items():
@@ -726,13 +724,13 @@ class USDShaderCreate:
         """
         Main run function. will create a collect material with Arnold and usdPreview shaders in stage.
         """
-        newly_created_usd_mat = self._create_collect_prim(parent_primpath=self.parent_primpath,
-                                                          create_usd_preview=self.create_usd_preview,
-                                                          usd_preview_format=self.usd_preview_format,
-                                                          create_arnold=self.create_arnold,
-                                                          create_mtlx=self.create_mtlx,
-                                                          enable_transmission=self.is_transmissive,
-                                                          )
+        self._create_collect_prim(parent_primpath=self.parent_primpath,
+                                  create_usd_preview=self.create_usd_preview,
+                                  usd_preview_format=self.usd_preview_format,
+                                  create_arnold=self.create_arnold,
+                                  create_mtlx=self.create_mtlx,
+                                  enable_transmission=self.is_transmissive,
+                                  )
 
 
 
@@ -839,7 +837,7 @@ def create_shaded_asset_publish(material_dict_list, stage=None, geo_file=None, p
     Main run method.
     """
     if not layer_save_path:
-        layer_save_path = f"{os.environ['TEMP']}/temp_usd_export"
+        layer_save_path = f"{tempfile.gettempdir()}/temp_usd_export"
         os.makedirs(layer_save_path, exist_ok=True)
     layer_save_path = str(layer_save_path)
     os.makedirs(f"{layer_save_path}/layers", exist_ok=True)
@@ -905,6 +903,6 @@ def create_shaded_asset_publish(material_dict_list, stage=None, geo_file=None, p
     layer_root.Save()
 
     print(f"INFO: Finished creating usd asset: '{layer_save_path}/{main_layer_name}'.")
-    print(f"INFO: Success")
+    print("INFO: Success")
 
 
