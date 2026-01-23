@@ -37,6 +37,7 @@ class PxrUsdWriter:
             create_usd_preview=settings.usdpreview,
             create_arnold=settings.arnold,
             create_mtlx=settings.materialx,
+            texture_format_overrides=settings.texture_format_overrides,
         )
 
 
