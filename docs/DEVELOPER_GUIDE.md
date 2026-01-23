@@ -32,7 +32,7 @@ The Substance Painter plugins folder should contain:
 - On every push to `main`, the workflow builds and uploads a zip artifact.
 - On tags matching `v*`, it publishes a GitHub Release with `axe_usd_plugin.zip`.
 - To cut a release:
-  1. Update `VERSION`
+  1. Update `pyproject.toml` version
   2. Tag: `git tag vX.Y.Z`
   3. Push tag: `git push origin vX.Y.Z`
 
@@ -79,7 +79,6 @@ The parser ignores unknown texture tokens and skips empty bundles.
 - Only ship:
 - `axe_usd_plugin/`
   - `axe_usd/`
-  - `VERSION` (optional)
 - Do not ship:
   - `.venv`, `tests/`, `Examples/`, `dist/`, `__pycache__/`
 
