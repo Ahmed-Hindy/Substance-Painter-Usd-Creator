@@ -3,11 +3,18 @@ Copyright Ahmed Hindy. Please mention the author if you found any part of this c
 """
 
 
+from typing import List, Optional, Tuple
+
 from pxr import Usd
 
 
 
-def collect_prims_of_type(parent_prim, prim_type, contains_str=None, recursive=False):
+def collect_prims_of_type(
+    parent_prim: Usd.Prim,
+    prim_type: type,
+    contains_str: Optional[str] = None,
+    recursive: bool = False,
+) -> Tuple[bool, List[Usd.Prim]]:
     """
     gets a list of prims of specific type under a parent prim
     :param parent_prim: parent primitive
@@ -23,7 +30,7 @@ def collect_prims_of_type(parent_prim, prim_type, contains_str=None, recursive=F
 
     prims_found = []
 
-    def _recursive_search(prim: Usd.Prim):
+    def _recursive_search(prim: Usd.Prim) -> List[Usd.Prim]:
         """
         inner function. Don't use
         """

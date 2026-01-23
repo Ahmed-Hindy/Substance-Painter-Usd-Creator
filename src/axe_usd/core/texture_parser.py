@@ -1,5 +1,5 @@
 import logging
-from typing import List
+from typing import Dict, List, Mapping, Sequence, Tuple, Union
 
 from .models import MaterialBundle
 from .texture_keys import slot_from_path
@@ -8,18 +8,22 @@ from .texture_keys import slot_from_path
 logger = logging.getLogger(__name__)
 
 
-def _material_name_from_key(key) -> str:
+TextureKey = Union[str, Tuple[str, ...]]
+TexturePathMap = Mapping[TextureKey, Sequence[str]]
+
+
+def _material_name_from_key(key: TextureKey) -> str:
     if isinstance(key, (list, tuple)) and key:
         return str(key[0])
     return str(key)
 
 
-def parse_textures(textures_dict) -> List[MaterialBundle]:
+def parse_textures(textures_dict: TexturePathMap) -> List[MaterialBundle]:
     material_bundles: List[MaterialBundle] = []
 
     for key, paths in textures_dict.items():
         material_name = _material_name_from_key(key)
-        textures = {}
+        textures: Dict[str, str] = {}
 
         for path in paths:
             slot = slot_from_path(str(path))

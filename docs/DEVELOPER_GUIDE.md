@@ -12,17 +12,18 @@
 
 ## Plugins Folder Layout
 The Substance Painter plugins folder should contain:
-- `axe_usd_plugin.py` (entry point)
-- `axe_usd/` (package)
+- `axe_usd_plugin/` (entry point package)
+  - `__init__.py` (entry point)
+  - `axe_usd/` (core package)
 
 ## Entry Points
 - `src/axe_usd/dcc/substance_plugin.py`: actual plugin logic (UI + export).
-- `packaging/axe_usd_plugin.py`: thin wrapper used for shipping.
+- `packaging/axe_usd_plugin/__init__.py`: thin wrapper used for shipping.
 
 ## Build and Install
 - Build bundle:
   - `python tools/build_plugin.py`
-  - Output: `dist/axe_usd_plugin.py` and `dist/axe_usd/`
+  - Output: `dist/axe_usd_plugin/`
 - Install to Substance Painter (Windows):
   - `powershell -File tools/install_plugin.ps1`
 
@@ -51,6 +52,24 @@ The Substance Painter plugins folder should contain:
 4. Core exporter builds publish paths and delegates to USD writer.
 5. USD writer creates layers and shader networks.
 
+## Substance Painter Texture Context
+`on_post_export` receives a `context` object with a `textures` mapping shaped like:
+- `Dict[Tuple[str, str], List[str]]`
+  - Key tuple: `(material_name, texture_set)` (the exporter uses the first item).
+  - Value list: absolute texture file paths.
+
+Example:
+```python
+context.textures = {
+    ("02_Body", ""): [
+        "F:/Projects/export/Asset_02_Body_BaseColor.png",
+        "F:/Projects/export/Asset_02_Body_Roughness.png",
+    ]
+}
+```
+
+The parser ignores unknown texture tokens and skips empty bundles.
+
 ## Extending Renderers
 - Update `src/axe_usd/usd/material_processor.py` to add new shader networks.
 - Update `src/axe_usd/core/texture_keys.py` if new texture slot tokens are required.
@@ -58,8 +77,8 @@ The Substance Painter plugins folder should contain:
 
 ## Packaging Notes
 - Only ship:
-- `axe_usd_plugin.py`
-- `axe_usd/`
+- `axe_usd_plugin/`
+  - `axe_usd/`
   - `VERSION` (optional)
 - Do not ship:
   - `.venv`, `tests/`, `Examples/`, `dist/`, `__pycache__/`

@@ -4,6 +4,7 @@ Copyright Ahmed Hindy. Please mention the author if you found any part of this c
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Mapping, Optional, Protocol, Sequence, Tuple
 
 from PySide2.QtGui import QIcon
 from PySide2.QtWidgets import (
@@ -93,7 +94,7 @@ class MeshExporter:
         publish_paths = build_publish_paths(settings.publish_directory, settings.main_layer_name)
         self.mesh_path = publish_paths.layers_dir / "mesh.usd"
 
-    def export_mesh(self):
+    def export_mesh(self) -> Optional[Path]:
         """
         Call Substance Painter's USD mesh exporter.
         """
@@ -202,8 +203,11 @@ class USDExporterView(QDialog):
 
 
 # Entry-point functions required by Substance Painter
+class ExportContext(Protocol):
+    textures: Mapping[Tuple[str, str], Sequence[str]]
 
-def start_plugin():
+
+def start_plugin() -> None:
     print("Plugin Starting...")
     global usd_exported_qdialog
     usd_exported_qdialog = USDExporterView()
@@ -212,25 +216,19 @@ def start_plugin():
     register_callbacks()
 
 
-def register_callbacks():
+def register_callbacks() -> None:
     """Register the post-export callback"""
     print("Registered callbacks")
     global callbacks_registered
     if callbacks_registered:
         return
-    try:
-        substance_painter.event.DISPATCHER.disconnect(
-            substance_painter.event.ExportTexturesEnded, on_post_export
-        )
-    except Exception:
-        pass
     substance_painter.event.DISPATCHER.connect(
         substance_painter.event.ExportTexturesEnded, on_post_export
     )
     callbacks_registered = True
 
 
-def on_post_export(context):
+def on_post_export(context: ExportContext) -> None:
     """Function to be called after textures are exported"""
     print("ExportTexturesEnded emitted!!!")
     if not _is_widget_valid(usd_exported_qdialog):
@@ -261,7 +259,7 @@ def on_post_export(context):
     export_publish(materials, settings, geo_file, PxrUsdWriter())
 
 
-def close_plugin():
+def close_plugin() -> None:
     """Remove all widgets that have been added to the UI"""
     print("Closing plugin")
     global callbacks_registered, usd_exported_qdialog
@@ -270,7 +268,8 @@ def close_plugin():
             substance_painter.event.DISPATCHER.disconnect(
                 substance_painter.event.ExportTexturesEnded, on_post_export
             )
-        except Exception:
+        except Exception as e:
+            print(f"WARNING: close_plugin() Failed to disconnect event handler: {e}")
             pass
         callbacks_registered = False
     for widget in plugin_widgets:
