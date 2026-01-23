@@ -53,7 +53,7 @@ Tokens are matched as standalone words (non-alphanumeric boundaries), so unrelat
 ## Notes
 - USD Preview uses `metallic`, Arnold/MaterialX use `metalness`. The plugin normalizes this for you.
 - The publish directory can include `<export_folder>` to substitute the active texture export folder.
-- Advanced: per-renderer texture format overrides are available via the API (see `docs/DEVELOPER_GUIDE.md`).
+- Advanced: per-renderer texture format overrides (`usd_preview`, `arnold`, `mtlx`) are available via the API (see `docs/DEVELOPER_GUIDE.md`).
 
 ## Troubleshooting
 - Plugin not showing up:

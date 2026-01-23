@@ -55,7 +55,8 @@ The Substance Painter plugins folder should contain:
 ## Texture Format Overrides
 You can override texture formats per renderer by passing `texture_format_overrides` in
 `ExportSettings`. Keys are `usd_preview`, `arnold`, and `mtlx`, and values can be file
-extensions with or without a leading dot.
+extensions with or without a leading dot. Overrides replace existing suffixes and are
+appended when the texture path has no suffix.
 
 Example:
 ```python
@@ -73,6 +74,9 @@ settings = ExportSettings(
     },
 )
 ```
+
+## MaterialX Notes
+- Metalness and roughness textures are wired as float inputs end-to-end.
 
 ## Substance Painter Texture Context
 `on_post_export` receives a `context` object with a `textures` mapping shaped like:
@@ -93,7 +97,8 @@ context.textures = {
 The parser ignores unknown texture tokens and skips empty bundles.
 
 ## Extending Renderers
-- Update `src/axe_usd/usd/material_processor.py` to add new shader networks.
+- Add a shader network builder in `src/axe_usd/usd/material_builders.py`.
+- Wire the builder into `src/axe_usd/usd/material_processor.py`.
 - Update `src/axe_usd/core/texture_keys.py` if new texture slot tokens are required.
 - Keep `core` independent of USD or Substance Painter imports.
 
