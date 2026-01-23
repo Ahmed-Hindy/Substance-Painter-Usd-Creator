@@ -7,6 +7,8 @@ from .types import MaterialTextureDict, MaterialTextureList
 
 
 class PxrUsdWriter:
+    """Write USD layers using the Pixar USD Python API."""
+
     def export(
         self,
         materials: Iterable[MaterialBundle],
@@ -14,6 +16,14 @@ class PxrUsdWriter:
         geo_file: Optional[Path],
         paths: PublishPaths,
     ) -> None:
+        """Export materials and optional geometry to USD layers.
+
+        Args:
+            materials: Material bundles to export.
+            settings: Export settings to honor.
+            geo_file: Optional geometry USD file to payload.
+            paths: Publish path container.
+        """
         material_dict_list: MaterialTextureList = [
             _bundle_to_dict(bundle) for bundle in materials
         ]
@@ -31,6 +41,14 @@ class PxrUsdWriter:
 
 
 def _bundle_to_dict(bundle: MaterialBundle) -> MaterialTextureDict:
+    """Convert a material bundle into the expected texture dict format.
+
+    Args:
+        bundle: Material bundle to convert.
+
+    Returns:
+        MaterialTextureDict: Mapping of slots to texture info dictionaries.
+    """
     return {
         slot: {"mat_name": bundle.name, "path": texture_path}
         for slot, texture_path in bundle.textures.items()

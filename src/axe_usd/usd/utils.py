@@ -1,7 +1,7 @@
-"""
+"""USD utility helpers.
+
 Copyright Ahmed Hindy. Please mention the author if you found any part of this code useful.
 """
-
 
 from typing import List, Optional, Tuple
 
@@ -15,14 +15,16 @@ def collect_prims_of_type(
     contains_str: Optional[str] = None,
     recursive: bool = False,
 ) -> Tuple[bool, List[Usd.Prim]]:
-    """
-    gets a list of prims of specific type under a parent prim
-    :param parent_prim: parent primitive
-    :type parent_prim: Usd.Prim
-    :param prim_type: primitive type we are selecting
-    :type prim_type: UsdShade.Material
-    :return: list of all prims found
-    :rtype: (bool, List[Usd.Prim])
+    """Collect prims of a given type under a parent prim.
+
+    Args:
+        parent_prim: Parent primitive to search under.
+        prim_type: USD prim type to match.
+        contains_str: Optional name substring filter.
+        recursive: Whether to traverse descendants recursively.
+
+    Returns:
+        Tuple[bool, List[Usd.Prim]]: Success flag and list of matching prims.
     """
     if not parent_prim.IsValid():
         print(f"Invalid prim: {parent_prim}")
@@ -31,9 +33,7 @@ def collect_prims_of_type(
     prims_found = []
 
     def _recursive_search(prim: Usd.Prim) -> List[Usd.Prim]:
-        """
-        inner function. Don't use
-        """
+        """Recursively collect matching prims."""
         for child_prim in prim.GetChildren():  # child_prim: Usd.Prim
             if child_prim.IsA(prim_type):
                 if contains_str:

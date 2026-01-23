@@ -1,4 +1,5 @@
-"""
+"""USD material processing utilities.
+
 Copyright Ahmed Hindy. Please mention the author if you found any part of this code useful.
 """
 
@@ -86,8 +87,18 @@ def ensure_scope(stage: Usd.Stage, path: str) -> UsdGeom.Scope:
 
 
 class USDShaderCreate:
-    """
-    Creates material prim on usd stage with Arnold, MTLX and/or UsdPreview material_dict_list. Assigns material to prims
+    """Create USD material prims and shader networks.
+
+    Attributes:
+        stage: USD stage to author into.
+        material_name: Name of the material to create.
+        material_dict: Mapping of texture slots to file paths.
+        parent_primpath: Parent prim path to place materials under.
+        create_usd_preview: Whether to create UsdPreviewSurface materials.
+        usd_preview_format: Optional texture extension override for preview.
+        create_arnold: Whether to create Arnold materials.
+        create_mtlx: Whether to create MaterialX materials.
+        is_transmissive: Whether the material is treated as transmissive.
     """
 
     def __init__(
@@ -101,16 +112,17 @@ class USDShaderCreate:
         create_arnold: bool = False,
         create_mtlx: bool = False,
     ) -> None:
-        """
-        :param material_dict: example:
-         {
-          'basecolor': 'C:/~/Documents/~/textures/03_Base_Base_color.png',
-          'metalness': 'C:/~/Documents/~/textures/03_Base_Metalness.png',
-          'roughness': 'C:/~/Documents/~/textures/03_Base_Roughness.png',
-          'normal': 'C:/~/Documents/~/textures/03_Base_Normal_DirectX.png',
-          'displacement': 'C:/~/Documents/~/textures/03_Base_Height.png',
-          'occlusion': 'C:/~/Documents/~/textures/03_Base_Mixed_AO.png'
-         }
+        """Initialize the shader creator and build the materials.
+
+        Args:
+            stage: USD stage to author into.
+            material_name: Name of the material to create.
+            material_dict: Mapping of texture slots to file paths.
+            parent_primpath: Parent prim path to place materials under.
+            create_usd_preview: Whether to create UsdPreviewSurface materials.
+            usd_preview_format: Optional texture extension override for preview.
+            create_arnold: Whether to create Arnold materials.
+            create_mtlx: Whether to create MaterialX materials.
         """
         self.stage = stage
 
@@ -129,10 +141,13 @@ class USDShaderCreate:
 
 
     def detect_if_transmissive(self, material_name: str) -> bool:
-        """
-        detects if a material should have transmission or not based on material name,
-        if a material has "glass" in its name, then transmission should be on!
-        :rtype: bool
+        """Detect whether a material should enable transmission.
+
+        Args:
+            material_name: Material name to inspect.
+
+        Returns:
+            bool: True if the material is considered transmissive.
         """
         transmissive_matnames_list = ['glass', 'glas']
         is_transmissive = any(substring in material_name.lower() for substring in transmissive_matnames_list)
@@ -148,6 +163,15 @@ class USDShaderCreate:
         parent_path: str,
         usd_preview_format: Optional[str],
     ) -> UsdShade.Material:
+        """Create a UsdPreviewSurface material network.
+
+        Args:
+            parent_path: Parent path where the material should be created.
+            usd_preview_format: Optional texture extension override.
+
+        Returns:
+            UsdShade.Material: The created material prim.
+        """
         material_path = f'{parent_path}/UsdPreviewMaterial'
         material = UsdShade.Material.Define(self.stage, material_path)
 
@@ -226,11 +250,14 @@ class USDShaderCreate:
         parent_path: str,
         enable_transmission: bool = False,
     ) -> UsdShade.Material:
-        """
-        example prints for variables created by the script:
-            shader: UsdShade.Shader(Usd.Prim(</root/material/mat_hello_world_collect/standard_surface1>))
-            material_prim: Usd.Prim(</root/material/mat_hello_world_collect>)
-            material_usdshade: UsdShade.Material(Usd.Prim(</root/material/mat_hello_world_collect>))
+        """Create an Arnold material network under the parent path.
+
+        Args:
+            parent_path: Parent path where the material should be created.
+            enable_transmission: Whether to enable transmission inputs.
+
+        Returns:
+            UsdShade.Material: The created Arnold material.
         """
         shader_path = f'{parent_path}/arnold_standard_surface1'
         shader_usdshade = UsdShade.Shader.Define(self.stage, shader_path)
@@ -253,8 +280,10 @@ class USDShaderCreate:
         self,
         shader_usdshade: UsdShade.Shader,
     ) -> None:
-        """
-        initializes Arnold Standard Surface inputs
+        """Initialize Arnold standard_surface inputs.
+
+        Args:
+            shader_usdshade: Arnold shader prim to initialize.
         """
         shader_usdshade.CreateInput('aov_id1', Sdf.ValueTypeNames.Float3).Set((0, 0, 0))
         shader_usdshade.CreateInput('aov_id2', Sdf.ValueTypeNames.Float3).Set((0, 0, 0))
@@ -316,6 +345,14 @@ class USDShaderCreate:
         shader_usdshade.CreateInput('transmit_aovs', Sdf.ValueTypeNames.Bool).Set(False)
 
     def _arnold_initialize_image_shader(self, image_path: str) -> UsdShade.Shader:
+        """Create and initialize an Arnold image shader.
+
+        Args:
+            image_path: Prim path for the image shader.
+
+        Returns:
+            UsdShade.Shader: The created image shader.
+        """
         image_shader = UsdShade.Shader.Define(self.stage, image_path)
         image_shader.CreateIdAttr("arnold:image")
 
@@ -367,6 +404,14 @@ class USDShaderCreate:
         self,
         color_correct_path: str,
     ) -> UsdShade.Shader:
+        """Create and initialize an Arnold color_correct shader.
+
+        Args:
+            color_correct_path: Prim path for the color correct shader.
+
+        Returns:
+            UsdShade.Shader: The created color correct shader.
+        """
         color_correct_shader = UsdShade.Shader.Define(self.stage, color_correct_path)
         color_correct_shader.CreateIdAttr("arnold:color_correct")
         cc_add_input = color_correct_shader.CreateInput("add", Sdf.ValueTypeNames.Float3)
@@ -383,6 +428,14 @@ class USDShaderCreate:
         return color_correct_shader
 
     def _arnold_initialize_range_shader(self, range_path: str) -> UsdShade.Shader:
+        """Create and initialize an Arnold range shader.
+
+        Args:
+            range_path: Prim path for the range shader.
+
+        Returns:
+            UsdShade.Shader: The created range shader.
+        """
         range_shader = UsdShade.Shader.Define(self.stage, range_path)
         range_shader.CreateIdAttr("arnold:range")
 
@@ -412,6 +465,14 @@ class USDShaderCreate:
         self,
         normal_map_path: str,
     ) -> UsdShade.Shader:
+        """Create and initialize an Arnold normal_map shader.
+
+        Args:
+            normal_map_path: Prim path for the normal map shader.
+
+        Returns:
+            UsdShade.Shader: The created normal map shader.
+        """
         normal_map_shader = UsdShade.Shader.Define(self.stage, normal_map_path)
         normal_map_shader.CreateIdAttr("arnold:normal_map")
 
@@ -439,6 +500,14 @@ class USDShaderCreate:
         return normal_map_shader
 
     def _arnold_initialize_bump2d_shader(self, bump2d_path: str) -> UsdShade.Shader:
+        """Create and initialize an Arnold bump2d shader.
+
+        Args:
+            bump2d_path: Prim path for the bump shader.
+
+        Returns:
+            UsdShade.Shader: The created bump shader.
+        """
         bump2d_shader = UsdShade.Shader.Define(self.stage, bump2d_path)
         bump2d_shader.CreateIdAttr("arnold:bump2d")
 
@@ -453,8 +522,10 @@ class USDShaderCreate:
 
 
     def _arnold_enable_transmission(self, shader_usdshade):
-        """
-        given the mtlx standard surface, will set input primvar 'transmission' to value '0.9'
+        """Enable transmission inputs on the Arnold shader.
+
+        Args:
+            shader_usdshade: Arnold shader prim to update.
         """
         shader_usdshade.GetInput('transmission').Set(0.9)
         shader_usdshade.GetInput('thin_walled').Set(True)
@@ -465,8 +536,11 @@ class USDShaderCreate:
         material_prim: Usd.Prim,
         std_surf_shader: UsdShade.Shader,
     ) -> None:
-        """
-        Fills the texture file paths for the given shader using the material_data.
+        """Wire texture file paths into the Arnold shader network.
+
+        Args:
+            material_prim: Material prim that owns the shader network.
+            std_surf_shader: Standard surface shader to connect.
         """
         # map of tex_type to it's name on an Arnold Standard Surface shader.
         texture_types_to_inputs = {
@@ -543,6 +617,15 @@ class USDShaderCreate:
         parent_path: str,
         enable_transmission: bool = False,
     ) -> UsdShade.Material:
+        """Create a MaterialX material network under the parent path.
+
+        Args:
+            parent_path: Parent path where the material should be created.
+            enable_transmission: Whether to enable transmission inputs.
+
+        Returns:
+            UsdShade.Material: The created MaterialX material.
+        """
         shader_path = f'{parent_path}/mtlx_mtlxstandard_surface1'
         shader_usdshade = UsdShade.Shader.Define(self.stage, shader_path)
         material_prim = self.stage.GetPrimAtPath(parent_path)
@@ -561,6 +644,11 @@ class USDShaderCreate:
         self,
         shader_usdshade: UsdShade.Shader,
     ) -> None:
+        """Initialize MaterialX standard_surface inputs.
+
+        Args:
+            shader_usdshade: MaterialX shader prim to initialize.
+        """
         shader_usdshade.CreateIdAttr("ND_standard_surface_surfaceshader")
 
         shader_usdshade.CreateInput('base', Sdf.ValueTypeNames.Float).Set(1)
@@ -584,6 +672,15 @@ class USDShaderCreate:
         image_path: str,
         signature: str = "color3",
     ) -> UsdShade.Shader:
+        """Create and initialize a MaterialX image shader.
+
+        Args:
+            image_path: Prim path for the image shader.
+            signature: MaterialX signature for the image shader.
+
+        Returns:
+            UsdShade.Shader: The created image shader.
+        """
         image_shader = UsdShade.Shader.Define(self.stage, image_path)
         image_shader.CreateIdAttr(f"ND_image_{signature}")
         image_shader.CreateInput("file", Sdf.ValueTypeNames.Asset)
@@ -595,6 +692,15 @@ class USDShaderCreate:
         color_correct_path: str,
         signature: str = "color3",
     ) -> UsdShade.Shader:
+        """Create and initialize a MaterialX color correct shader.
+
+        Args:
+            color_correct_path: Prim path for the color correct shader.
+            signature: MaterialX signature for the node.
+
+        Returns:
+            UsdShade.Shader: The created color correct shader.
+        """
         color_correct_shader = UsdShade.Shader.Define(self.stage, color_correct_path)
         color_correct_shader.CreateIdAttr(f"ND_colorcorrect_{signature}")
 
@@ -605,6 +711,15 @@ class USDShaderCreate:
         range_path: str,
         signature: str = "color3",
     ) -> UsdShade.Shader:
+        """Create and initialize a MaterialX range shader.
+
+        Args:
+            range_path: Prim path for the range shader.
+            signature: MaterialX signature for the node.
+
+        Returns:
+            UsdShade.Shader: The created range shader.
+        """
         range_shader = UsdShade.Shader.Define(self.stage, range_path)
         range_shader.CreateIdAttr(f"ND_range_{signature}")
         return range_shader
@@ -614,6 +729,14 @@ class USDShaderCreate:
         self,
         normal_map_path: str,
     ) -> UsdShade.Shader:
+        """Create and initialize a MaterialX normal map shader.
+
+        Args:
+            normal_map_path: Prim path for the normal map shader.
+
+        Returns:
+            UsdShade.Shader: The created normal map shader.
+        """
         normal_map_shader = UsdShade.Shader.Define(self.stage, normal_map_path)
         normal_map_shader.CreateIdAttr("ND_normalmap")
 
@@ -623,6 +746,14 @@ class USDShaderCreate:
         self,
         bump2d_path: str,
     ) -> UsdShade.Shader:
+        """Create and initialize a MaterialX bump2d shader.
+
+        Args:
+            bump2d_path: Prim path for the bump shader.
+
+        Returns:
+            UsdShade.Shader: The created bump shader.
+        """
         bump2d_shader = UsdShade.Shader.Define(self.stage, bump2d_path)
         bump2d_shader.CreateIdAttr("ND_bump_vector3")
 
@@ -637,8 +768,10 @@ class USDShaderCreate:
 
 
     def _mtlx_enable_transmission(self, shader_usdshade: UsdShade.Shader) -> None:
-        """
-        given the mtlx standard surface, will set input primvar 'transmission' to value '0.9'
+        """Enable transmission inputs on the MaterialX shader.
+
+        Args:
+            shader_usdshade: MaterialX shader prim to update.
         """
         shader_usdshade.GetInput('transmission').Set(0.9)
         shader_usdshade.GetInput('thin_walled').Set(1)
@@ -649,8 +782,11 @@ class USDShaderCreate:
         material_prim: Usd.Prim,
         std_surf_shader: UsdShade.Shader,
     ) -> None:
-        """
-        Fills the texture file paths for the given shader using the material_data.
+        """Wire texture file paths into the MaterialX shader network.
+
+        Args:
+            material_prim: Material prim that owns the shader network.
+            std_surf_shader: Standard surface shader to connect.
         """
         texture_types_to_inputs = {
             'basecolor': 'base_color',
@@ -745,10 +881,18 @@ class USDShaderCreate:
 
     def _create_collect_prim(self, parent_primpath: str, create_usd_preview=False, usd_preview_format=None,
                              create_arnold=False, create_mtlx=False, enable_transmission=False):
-        """
-        creates a collect material prim on stage
-        :return: collect prim
-        :rtype: UsdShade.Material
+        """Create a collect material prim on the stage.
+
+        Args:
+            parent_primpath: Parent prim path to create the collect material under.
+            create_usd_preview: Whether to create UsdPreviewSurface network.
+            usd_preview_format: Optional texture extension override for preview.
+            create_arnold: Whether to create Arnold network.
+            create_mtlx: Whether to create MaterialX network.
+            enable_transmission: Whether to enable transmission inputs.
+
+        Returns:
+            UsdShade.Material: The collect material prim.
         """
         # parent = self.stage.GetPrimAtPath(parent_primpath)
         # if not parent or not parent.IsDefined():
@@ -781,9 +925,7 @@ class USDShaderCreate:
 
 
     def run(self) -> None:
-        """
-        Main run function. will create a collect material with Arnold and usdPreview shaders in stage.
-        """
+        """Create the collect material and requested shader networks."""
         self._create_collect_prim(parent_primpath=self.parent_primpath,
                                   create_usd_preview=self.create_usd_preview,
                                   usd_preview_format=self.usd_preview_format,
@@ -795,7 +937,14 @@ class USDShaderCreate:
 
 
 class USDShaderAssign:
+    """Assign USD materials to matching mesh prims."""
+
     def __init__(self, stage: Usd.Stage) -> None:
+        """Initialize the material assigner.
+
+        Args:
+            stage: USD stage to update.
+        """
         self.stage = stage
 
 
@@ -804,12 +953,14 @@ class USDShaderAssign:
         material_prim: Usd.Prim,
         prims_to_assign_to: Iterable[Usd.Prim],
     ) -> None:
-        """
-        Assigns a new USD material to a list of primitives.
-        :param material_prim: Usd.Prim primitive to assign to the primitives
-        :type material_prim: Usd.Prim
-        :param prims_to_assign_to: list of prims which we will assign the material to them
-        :type prims_to_assign_to: list[Usd.Prim]
+        """Assign a USD material to a list of primitives.
+
+        Args:
+            material_prim: Material prim to bind.
+            prims_to_assign_to: Prims that should receive the material.
+
+        Raises:
+            ValueError: If the provided material is not a UsdShade.Material.
         """
         material = UsdShade.Material(material_prim)
 
@@ -824,13 +975,11 @@ class USDShaderAssign:
 
 
     def run(self, mats_parent_path: str, mesh_parent_path: str) -> None:
-        """
-        run function for  class, steps:
-            1. get list of Materials under a parent prim
-            for each material found:
-                i. clean material name
-                ii. collect all meshes that have the mat name as part of its name
-                iii. assign the material to the list of mesh prims
+        """Bind materials to meshes with matching names.
+
+        Args:
+            mats_parent_path: Parent prim path containing materials.
+            mesh_parent_path: Parent prim path containing meshes.
         """
         mats_parent_prim = self.stage.GetPrimAtPath(mats_parent_path)
 
@@ -865,16 +1014,27 @@ class USDShaderAssign:
 
 
 class USDMeshConfigure:
-    """
-    TODO:     - add transmission support to mtlx
-    TODO:     - add rgs for karma: caustics, double sided,
-    TODO:     - set subdiv schema to: "__none__"
+    """Configure mesh primvars and metadata.
 
+    Notes:
+        TODO: Add transmission support to MTLX.
+        TODO: Add Karma render settings for caustics and double sided.
+        TODO: Set subdiv schema to "__none__".
     """
     def __init__(self, stage: Usd.Stage) -> None:
+        """Initialize the mesh configurator.
+
+        Args:
+            stage: USD stage to update.
+        """
         self.stage = stage
 
     def add_karma_primvars(self, prim: Usd.Prim) -> None:
+        """Add Karma-specific primvars to a prim.
+
+        Args:
+            prim: Prim to update.
+        """
         karma_primvars = {
             "primvars:karma:object:causticsenable": (True, Sdf.ValueTypeNames.Bool),
             # "karma:customShading": (0.5, Sdf.ValueTypeNames.Float),
@@ -905,8 +1065,18 @@ def create_shaded_asset_publish(
     create_arnold: bool = False,
     create_mtlx: bool = True,
 ) -> None:
-    """
-    Main run method.
+    """Create USD layers for materials and optional geometry.
+
+    Args:
+        material_dict_list: Material texture dictionaries to publish.
+        stage: Optional existing USD stage to author into.
+        geo_file: Optional geometry USD file to payload.
+        parent_path: Root prim path for the published asset.
+        layer_save_path: Directory to save the USD layers.
+        main_layer_name: File name for the main layer.
+        create_usd_preview: Whether to create UsdPreviewSurface materials.
+        create_arnold: Whether to create Arnold materials.
+        create_mtlx: Whether to create MaterialX materials.
     """
     if not layer_save_path:
         layer_save_path = f"{tempfile.gettempdir()}/temp_usd_export"

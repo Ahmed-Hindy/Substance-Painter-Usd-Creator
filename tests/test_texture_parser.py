@@ -2,6 +2,7 @@ from axe_usd.core.texture_parser import parse_textures
 
 
 def test_parse_textures_canonicalizes_slots():
+    """Ensure texture slots are normalized from export names."""
     textures = {
         ("Mat_A", "set"): [
             "C:/tex/Mat_A_Base_Color.png",
@@ -22,6 +23,7 @@ def test_parse_textures_canonicalizes_slots():
 
 
 def test_parse_textures_sample_context_payload():
+    """Ensure sample payloads produce expected slot sets."""
     textures = {
         ("02_Body", ""): [
             "F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/"
@@ -52,6 +54,7 @@ def test_parse_textures_sample_context_payload():
 
 
 def test_parse_textures_missing_maps():
+    """Ensure missing maps still produce a bundle with found slots."""
     textures = {
         ("Mat_Minimal", ""): [
             "C:/tex/Mat_Minimal_BaseColor.png",
@@ -68,6 +71,7 @@ def test_parse_textures_missing_maps():
 
 
 def test_parse_textures_ignores_unknown_textures():
+    """Ensure unrecognized textures are ignored."""
     textures = {
         ("Mat_Unknowns", ""): [
             "C:/tex/Mat_Unknowns_BaseColor.png",

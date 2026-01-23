@@ -10,6 +10,7 @@ from axe_usd.usd.pxr_writer import PxrUsdWriter
 
 
 def test_pxr_writer_exports_layers(tmp_path):
+    """Ensure PxrUsdWriter writes the expected layer files."""
     materials = [MaterialBundle(name="MatA", textures={"basecolor": "C:/tex/MatA_BaseColor.png"})]
     settings = ExportSettings(
         usdpreview=True,

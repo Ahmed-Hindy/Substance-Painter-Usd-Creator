@@ -2,6 +2,7 @@ from axe_usd.core.fs_utils import ensure_directory
 
 
 def test_ensure_directory_creates_path(tmp_path):
+    """Verify ensure_directory creates the requested path."""
     target = tmp_path / "nested" / "layers"
     assert not target.exists()
 

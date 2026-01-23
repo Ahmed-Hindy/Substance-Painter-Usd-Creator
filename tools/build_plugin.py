@@ -5,7 +5,6 @@ ROOT = Path(__file__).resolve().parents[1]
 DIST_DIR = ROOT / "dist"
 PACKAGE_SRC = ROOT / "src" / "axe_usd"
 PLUGIN_SRC = ROOT / "packaging" / "axe_usd_plugin"
-VERSION_SRC = ROOT / "VERSION"
 
 if not PACKAGE_SRC.exists():
     raise SystemExit(f"Package not found: {PACKAGE_SRC}")
@@ -28,8 +27,5 @@ shutil.copytree(
     plugin_dist / "axe_usd",
     ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".ruff_cache", ".pytest_cache"),
 )
-
-if VERSION_SRC.exists():
-    shutil.copy2(VERSION_SRC, plugin_dist / "VERSION")
 
 print(f"Built plugin bundle at: {DIST_DIR}")

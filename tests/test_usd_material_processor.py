@@ -6,6 +6,7 @@ from axe_usd.usd import material_processor
 
 
 def test_create_shaded_asset_publish_creates_layers(tmp_path):
+    """Ensure USD publish creates the expected layer files."""
     material_dict_list = [
         {
             "basecolor": {

@@ -1,4 +1,5 @@
-"""
+"""Substance Painter plugin for exporting USD assets.
+
 Copyright Ahmed Hindy. Please mention the author if you found any part of this code useful.
 """
 import logging
@@ -6,18 +7,25 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Optional, Protocol, Sequence, Tuple
 
-from PySide2.QtGui import QIcon
-from PySide2.QtWidgets import (
+from .qt_compat import (
     QCheckBox,
     QDialog,
+    QFileDialog,
+    QFormLayout,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QSpacerItem,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
     QSizePolicy,
     QVBoxLayout,
-    QMessageBox,
+    QWidget,
+    QIcon,
+    QPalette,
+    Qt,
 )
 
 from ..core.exporter import export_publish
@@ -54,6 +62,14 @@ callbacks_registered = False
 
 
 def _is_widget_valid(widget) -> bool:
+    """Return True when the Qt widget reference is still valid.
+
+    Args:
+        widget: Qt widget instance or None.
+
+    Returns:
+        bool: True if the widget is valid or unavailable to validate.
+    """
     if widget is None:
         return False
     try:
@@ -91,12 +107,19 @@ class MeshExporter:
     """
 
     def __init__(self, settings: ExportSettings):
+        """Initialize the mesh exporter.
+
+        Args:
+            settings: Export settings for determining output paths.
+        """
         publish_paths = build_publish_paths(settings.publish_directory, settings.main_layer_name)
         self.mesh_path = publish_paths.layers_dir / "mesh.usd"
 
     def export_mesh(self) -> Optional[Path]:
-        """
-        Call Substance Painter's USD mesh exporter.
+        """Call Substance Painter's USD mesh exporter.
+
+        Returns:
+            Optional[Path]: Path to the exported mesh if successful.
         """
         ensure_directory(self.mesh_path.parent)
         logger.info("Exporting mesh to %s", self.mesh_path)
@@ -127,14 +150,49 @@ class USDExporterView(QDialog):
     """
 
     def __init__(self, parent=None):
+        """Build the export settings UI.
+
+        Args:
+            parent: Optional parent widget.
+        """
         super().__init__(parent)
         self.setWindowTitle("USD Exporter")
         self.setWindowIcon(QIcon())
-        self.setMinimumSize(500, 200)
-        self.setLayout(QVBoxLayout())
+        self.setMinimumSize(520, 240)
+
+        root_layout = QVBoxLayout()
+        root_layout.setContentsMargins(10, 10, 10, 10)
+        root_layout.setSpacing(6)
+        self.setLayout(root_layout)
+
+        title = QLabel("Axe USD Exporter")
+        title_font = title.font()
+        title_font.setBold(True)
+        title_font.setPointSize(title_font.pointSize() + 1)
+        title.setFont(title_font)
+        title.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        root_layout.addWidget(title)
+
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        root_layout.addWidget(scroll_area, 1)
+
+        content = QWidget()
+        content_layout = QVBoxLayout()
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(8)
+        content_layout.setAlignment(Qt.AlignTop)
+        content.setLayout(content_layout)
+        scroll_area.setWidget(content)
 
         engine_box = QGroupBox("Render Engines")
+        engine_box.setFlat(True)
         engine_layout = QVBoxLayout()
+        engine_layout.setContentsMargins(8, 6, 8, 8)
+        engine_layout.setSpacing(4)
         self.usdpreview = QCheckBox("USD Preview")
         self.usdpreview.setChecked(DEFAULT_DIALOGUE_DICT["enable_usdpreview"])
         self.arnold = QCheckBox("Arnold")
@@ -145,35 +203,69 @@ class USDExporterView(QDialog):
         engine_layout.addWidget(self.arnold)
         engine_layout.addWidget(self.materialx)
         engine_box.setLayout(engine_layout)
-        self.layout().addWidget(engine_box)
+        engine_box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+        content_layout.addWidget(engine_box)
 
-        h1 = QHBoxLayout()
-        h1.addWidget(QLabel("Publish Directory"))
+        paths_box = QGroupBox("Paths")
+        paths_box.setFlat(True)
+        paths_layout = QFormLayout()
+        paths_layout.setContentsMargins(8, 6, 8, 8)
+        paths_layout.setSpacing(4)
+        paths_layout.setLabelAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        paths_layout.setFormAlignment(Qt.AlignTop)
+        paths_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+
         self.pub = QLineEdit()
-        self.pub.setMinimumWidth(300)
+        self.pub.setMinimumWidth(320)
         self.pub.setPlaceholderText(DEFAULT_DIALOGUE_DICT["publish_location"])
         self.pub.setToolTip("Use <export_folder> token to insert texture folder path")
-        h1.addWidget(self.pub)
-        h1.addItem(QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Fixed))
-        self.layout().addLayout(h1)
+        self.pub.setClearButtonEnabled(True)
+        pub_row = QHBoxLayout()
+        pub_row.setContentsMargins(0, 0, 0, 0)
+        pub_row.setSpacing(6)
+        pub_row.addWidget(self.pub, 1)
+        self.pub_browse = QPushButton("Browse...")
+        self.pub_browse.setToolTip("Select a publish directory on disk")
+        self.pub_browse.clicked.connect(self._browse_publish_directory)
+        self.pub_browse.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+        pub_row.addWidget(self.pub_browse, 0)
+        pub_row_widget = QWidget()
+        pub_row_widget.setLayout(pub_row)
+        paths_layout.addRow("Publish Directory", pub_row_widget)
 
-        h2 = QHBoxLayout()
-        h2.addWidget(QLabel("Primitive Path"))
+        pub_hint = self._make_hint_label("Tip: <export_folder> uses the texture export folder.")
+        paths_layout.addRow("", pub_hint)
+
         self.prim = QLineEdit()
-        self.prim.setMinimumWidth(300)
+        self.prim.setMinimumWidth(320)
         self.prim.setPlaceholderText(DEFAULT_DIALOGUE_DICT["primitive_path"])
         self.prim.setToolTip("USD prim path where material_dict_list will be created")
+        self.prim.setClearButtonEnabled(True)
         self.prim.editingFinished.connect(self._validate_prim_path)
-        h2.addWidget(self.prim)
-        h2.addItem(QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Fixed))
-        self.layout().addLayout(h2)
+        paths_layout.addRow("Primitive Path", self.prim)
 
-        self.geom = QCheckBox("Save Geometry in USD File")
+        prim_hint = self._make_hint_label("Example: /root or /root/materials")
+        paths_layout.addRow("", prim_hint)
+
+        paths_box.setLayout(paths_layout)
+        paths_box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        content_layout.addWidget(paths_box)
+
+        options_box = QGroupBox("Export Options")
+        options_box.setFlat(True)
+        options_layout = QVBoxLayout()
+        options_layout.setContentsMargins(8, 6, 8, 8)
+        options_layout.setSpacing(4)
+        self.geom = QCheckBox("Include Geometry in USD")
         self.geom.setToolTip("Exports mesh geometry to USD if supported")
         self.geom.setChecked(DEFAULT_DIALOGUE_DICT["enable_save_geometry"])
-        self.layout().addWidget(self.geom)
+        options_layout.addWidget(self.geom)
+        options_box.setLayout(options_layout)
+        options_box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+        content_layout.addWidget(options_box)
 
     def _validate_prim_path(self):
+        """Validate the primitive path input field."""
         text = self.prim.text()
         if not text.startswith("/"):
             QMessageBox.warning(self, "Invalid Path", "Primitive path must start with '/'")
@@ -181,12 +273,51 @@ class USDExporterView(QDialog):
         else:
             self.prim.setStyleSheet("")
 
+    def _make_hint_label(self, text: str) -> QLabel:
+        """Create a hint label styled for the dialog.
+
+        Args:
+            text: Hint text to display.
+
+        Returns:
+            QLabel: Configured hint label widget.
+        """
+        hint = QLabel(text)
+        hint.setWordWrap(True)
+        hint_font = hint.font()
+        hint_font.setPointSize(max(8, hint_font.pointSize() - 1))
+        hint.setFont(hint_font)
+        pal = hint.palette()
+        placeholder_role = getattr(QPalette, "PlaceholderText", None)
+        if placeholder_role is not None:
+            hint_color = pal.color(placeholder_role)
+        else:
+            hint_color = pal.color(QPalette.Disabled, QPalette.WindowText)
+        if hint_color.isValid():
+            pal.setColor(QPalette.WindowText, hint_color)
+        hint.setPalette(pal)
+        hint.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        return hint
+
+    def _browse_publish_directory(self) -> None:
+        """Open a directory picker for the publish path."""
+        current = self.pub.text().strip()
+        if not current or current == DEFAULT_DIALOGUE_DICT["publish_location"]:
+            current = str(Path.home())
+        selected = QFileDialog.getExistingDirectory(
+            self,
+            "Select Publish Directory",
+            current,
+        )
+        if selected:
+            self.pub.setText(selected)
+
     def get_settings(self) -> USDSettings:
         """
         Read UI state into USDSettings.
 
         Returns:
-            USDSettings
+            USDSettings: Settings collected from the dialog.
         """
         # Use default publish location if user leaves the field blank
         publish_dir = self.pub.text().strip() or DEFAULT_DIALOGUE_DICT["publish_location"]
@@ -204,10 +335,13 @@ class USDExporterView(QDialog):
 
 # Entry-point functions required by Substance Painter
 class ExportContext(Protocol):
+    """Substance Painter export context interface."""
+
     textures: Mapping[Tuple[str, str], Sequence[str]]
 
 
 def start_plugin() -> None:
+    """Create the export UI and register callbacks."""
     print("Plugin Starting...")
     global usd_exported_qdialog
     usd_exported_qdialog = USDExporterView()
@@ -217,7 +351,7 @@ def start_plugin() -> None:
 
 
 def register_callbacks() -> None:
-    """Register the post-export callback"""
+    """Register the post-export callback."""
     print("Registered callbacks")
     global callbacks_registered
     if callbacks_registered:
@@ -229,7 +363,11 @@ def register_callbacks() -> None:
 
 
 def on_post_export(context: ExportContext) -> None:
-    """Function to be called after textures are exported"""
+    """Handle the texture export completion event.
+
+    Args:
+        context: Substance Painter export context.
+    """
     print("ExportTexturesEnded emitted!!!")
     if not _is_widget_valid(usd_exported_qdialog):
         logger.warning("USD Export UI is not available; skipping export.")
@@ -260,7 +398,7 @@ def on_post_export(context: ExportContext) -> None:
 
 
 def close_plugin() -> None:
-    """Remove all widgets that have been added to the UI"""
+    """Remove all widgets that have been added to the UI."""
     print("Closing plugin")
     global callbacks_registered, usd_exported_qdialog
     if callbacks_registered:

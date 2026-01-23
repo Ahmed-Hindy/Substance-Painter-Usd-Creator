@@ -13,12 +13,28 @@ TexturePathMap = Mapping[TextureKey, Sequence[str]]
 
 
 def _material_name_from_key(key: TextureKey) -> str:
+    """Normalize a material name from a texture map key.
+
+    Args:
+        key: Texture dictionary key from Substance export.
+
+    Returns:
+        str: Material name string.
+    """
     if isinstance(key, (list, tuple)) and key:
         return str(key[0])
     return str(key)
 
 
 def parse_textures(textures_dict: TexturePathMap) -> List[MaterialBundle]:
+    """Parse texture exports into material bundles.
+
+    Args:
+        textures_dict: Mapping of texture set keys to file paths.
+
+    Returns:
+        List[MaterialBundle]: Bundles with normalized texture slots.
+    """
     material_bundles: List[MaterialBundle] = []
 
     for key, paths in textures_dict.items():
