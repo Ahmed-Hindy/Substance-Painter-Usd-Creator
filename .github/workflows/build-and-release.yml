@@ -1,0 +1,72 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build plugin bundle
+        run: python tools/build_plugin.py
+
+      - name: Package zip
+        run: |
+          python - <<'PY'
+          import pathlib
+          import zipfile
+
+          dist_dir = pathlib.Path("dist")
+          zip_path = dist_dir / "AxeFX_usd_plugin.zip"
+
+          required = [dist_dir / "AxeFX_usd_plugin.py", dist_dir / "sp_usd_creator"]
+          for path in required:
+              if not path.exists():
+                  raise SystemExit(f"Missing bundle component: {path}")
+
+          with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+              for path in dist_dir.rglob("*"):
+                  if path == zip_path:
+                      continue
+                  zf.write(path, path.relative_to(dist_dir))
+
+          print(f"Created {zip_path}")
+          PY
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AxeFX_usd_plugin
+          path: dist/AxeFX_usd_plugin.zip
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: AxeFX_usd_plugin
+          path: dist
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/AxeFX_usd_plugin.zip
