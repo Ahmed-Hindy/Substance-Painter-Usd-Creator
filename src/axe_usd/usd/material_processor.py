@@ -6,100 +6,17 @@ Copyright Ahmed Hindy. Please mention the author if you found any part of this c
 import logging
 import os
 import tempfile
-from pathlib import Path
-from typing import Dict, Iterable, Mapping, Optional
+from typing import Iterable, Mapping, Optional
 
-from pxr import Usd, UsdGeom, UsdShade, Sdf, Gf
+from pxr import Sdf, Tf, Usd, UsdGeom, UsdShade
 
 from . import utils as usd_utils
+from .material_builders import ArnoldBuilder, MaterialBuildContext, MtlxBuilder, OpenPbrBuilder, UsdPreviewBuilder
+from .material_model import TextureFormatOverrides, is_transmissive_material, normalize_material_dict
 from .types import MaterialTextureDict, MaterialTextureList
-
-
 
 # Configure module-level logger
 logger = logging.getLogger(__name__)
-
-
-
-
-
-RENDERER_USD_PREVIEW = "usd_preview"
-RENDERER_ARNOLD = "arnold"
-RENDERER_MTLX = "mtlx"
-
-SLOT_ALIASES = {
-    "height": "displacement",
-}
-
-USD_PREVIEW_INPUTS = {
-    "basecolor": "diffuseColor",
-    "metalness": "metallic",
-    "roughness": "roughness",
-    "normal": "normal",
-    "opacity": "opacity",
-    "occlusion": "occlusion",
-    "displacement": "displacement",
-}
-USD_PREVIEW_SCALAR_SLOTS = {"metalness", "roughness", "opacity", "occlusion", "displacement"}
-
-ARNOLD_INPUTS = {
-    "basecolor": "base_color",
-    "metalness": "metalness",
-    "roughness": "specular_roughness",
-    "normal": "normal",
-    "opacity": "opacity",
-    "displacement": "height",
-}
-
-MTLX_INPUTS = {
-    "basecolor": "base_color",
-    "metalness": "metalness",
-    "roughness": "specular_roughness",
-    "normal": "normal",
-    "opacity": "opacity",
-    "displacement": "displacement",
-}
-
-
-
-def _normalize_slot_name(slot: str) -> str:
-    normalized = slot.strip().lower()
-    return SLOT_ALIASES.get(normalized, normalized)
-
-
-def _normalize_material_dict(material_dict: MaterialTextureDict) -> MaterialTextureDict:
-    normalized: MaterialTextureDict = {}
-    for slot, info in material_dict.items():
-        normalized_slot = _normalize_slot_name(slot)
-        if normalized_slot in normalized and normalized_slot != slot:
-            logger.debug("Overriding texture slot '%s' with '%s'.", normalized_slot, slot)
-        normalized[normalized_slot] = info
-    return normalized
-
-
-def _normalize_texture_format_overrides(
-    texture_format_overrides: Optional[Mapping[str, str]],
-) -> Dict[str, str]:
-    normalized: Dict[str, str] = {}
-    if not texture_format_overrides:
-        return normalized
-    for key, value in texture_format_overrides.items():
-        normalized[key.lower()] = value
-    return normalized
-
-
-def _texture_format_override_for(renderer: str, overrides: Mapping[str, str]) -> Optional[str]:
-    return overrides.get(renderer)
-
-
-def _apply_texture_format_override(path: str, override: Optional[str]) -> str:
-    if not override:
-        return path
-    ext = override if override.startswith(".") else f".{override}"
-    path_obj = Path(path)
-    if path_obj.suffix:
-        return str(path_obj.with_suffix(ext))
-    return f"{path}{ext}"
 
 
 class USDShaderCreate:
@@ -113,7 +30,8 @@ class USDShaderCreate:
         create_usd_preview: Whether to create UsdPreviewSurface materials.
         create_arnold: Whether to create Arnold materials.
         create_mtlx: Whether to create MaterialX materials.
-        texture_format_overrides: Optional per-renderer texture format overrides (usd_preview, arnold, mtlx).
+        create_openpbr: Whether to create MaterialX OpenPBR materials.
+        texture_format_overrides: Optional per-renderer texture format overrides (usd_preview, arnold, mtlx, openpbr).
         is_transmissive: Whether the material is treated as transmissive.
     """
 
@@ -122,10 +40,11 @@ class USDShaderCreate:
         stage: Usd.Stage,
         material_name: str,
         material_dict: MaterialTextureDict,
-        parent_primpath: str = "/root/material",
+        parent_primpath: str = "/Asset/material",
         create_usd_preview: bool = False,
         create_arnold: bool = False,
         create_mtlx: bool = False,
+        create_openpbr: bool = False,
         texture_format_overrides: Optional[Mapping[str, str]] = None,
     ) -> None:
         """Initialize the shader creator and build the materials.
@@ -138,844 +57,86 @@ class USDShaderCreate:
             create_usd_preview: Whether to create UsdPreviewSurface materials.
             create_arnold: Whether to create Arnold materials.
             create_mtlx: Whether to create MaterialX materials.
-            texture_format_overrides: Optional per-renderer texture format overrides (usd_preview, arnold, mtlx).
+            create_openpbr: Whether to create MaterialX OpenPBR materials.
+            texture_format_overrides: Optional per-renderer texture format overrides (usd_preview, arnold, mtlx, openpbr).
         """
         self.stage = stage
-
-        self.material_dict = _normalize_material_dict(material_dict)
+        self.material_dict = normalize_material_dict(material_dict, logger=logger)
         self.material_name = material_name
         self.parent_primpath = parent_primpath
         self.create_usd_preview = create_usd_preview
         self.create_arnold = create_arnold
         self.create_mtlx = create_mtlx
-        self.texture_format_overrides = _normalize_texture_format_overrides(texture_format_overrides)
+        self.create_openpbr = create_openpbr
+        self.texture_format_overrides = TextureFormatOverrides.from_mapping(texture_format_overrides)
 
-        # detect if it's a transmissive material:
-        self.is_transmissive = self.detect_if_transmissive(self.material_name)
+        self.is_transmissive = is_transmissive_material(self.material_name)
+        if self.is_transmissive:
+            logger.debug("Detected transmissive material: '%s'.", self.material_name)
 
         self.run()
 
-
-    def detect_if_transmissive(self, material_name: str) -> bool:
-        """Detect whether a material should enable transmission.
-
-        Args:
-            material_name: Material name to inspect.
-
-        Returns:
-            bool: True if the material is considered transmissive.
-        """
-        transmissive_matnames_list = ['glass', 'glas']
-        is_transmissive = any(substring in material_name.lower() for substring in transmissive_matnames_list)
-        if is_transmissive:
-            logger.debug("Detected transmissive material: '%s'.", material_name)
-
-        return is_transmissive
-
-
-    ###  usd_preview ###
-    def _create_usd_preview_material(
-        self,
-        parent_path: str,
-        texture_format_override: Optional[str],
-    ) -> UsdShade.Material:
-        """Create a UsdPreviewSurface material network.
-
-        Args:
-            parent_path: Parent path where the material should be created.
-            texture_format_override: Optional texture format override.
-
-        Returns:
-            UsdShade.Material: The created material prim.
-        """
-        material_path = f'{parent_path}/UsdPreviewMaterial'
-        material = UsdShade.Material.Define(self.stage, material_path)
-
-        nodegraph_path = f'{material_path}/UsdPreviewNodeGraph'
-        self.stage.DefinePrim(nodegraph_path, 'NodeGraph')
-
-        shader_path = f'{nodegraph_path}/UsdPreviewSurface'
-        shader = UsdShade.Shader.Define(self.stage, shader_path)
-        shader.CreateIdAttr("UsdPreviewSurface")
-
-        material.CreateSurfaceOutput().ConnectToSource(shader.ConnectableAPI(), "surface")
-
-        st_reader_path = f'{nodegraph_path}/TexCoordReader'
-        st_reader = UsdShade.Shader.Define(self.stage, st_reader_path)
-        st_reader.CreateIdAttr("UsdPrimvarReader_float2")
-        st_reader.CreateInput("varname", Sdf.ValueTypeNames.Token).Set("st")
-
-        for tex_type, tex_dict in self.material_dict.items():
-            tex_type = _normalize_slot_name(tex_type)
-            input_name = USD_PREVIEW_INPUTS.get(tex_type)
-            if not input_name:
-                logger.warning("Texture slot '%s' not supported for usdpreview.", tex_type)
-                continue
-
-            tex_filepath = tex_dict.get("path")
-            if not tex_filepath:
-                logger.warning("Texture slot '%s' missing path; skipping.", tex_type)
-                continue
-
-            tex_filepath = _apply_texture_format_override(tex_filepath, texture_format_override)
-            texture_prim_path = f'{nodegraph_path}/{tex_type}Texture'
-            texture_prim = UsdShade.Shader.Define(self.stage, texture_prim_path)
-            texture_prim.CreateIdAttr("UsdUVTexture")
-            file_input = texture_prim.CreateInput("file", Sdf.ValueTypeNames.Asset)
-            file_input.Set(tex_filepath)
-
-            wrapS = texture_prim.CreateInput("wrapS", Sdf.ValueTypeNames.Token)
-            wrapT = texture_prim.CreateInput("wrapT", Sdf.ValueTypeNames.Token)
-            wrapS.Set('repeat')
-            wrapT.Set('repeat')
-
-            texture_prim.CreateInput("st", Sdf.ValueTypeNames.Float2).ConnectToSource(st_reader.ConnectableAPI(), "result")
-
-            if tex_type in USD_PREVIEW_SCALAR_SLOTS:
-                value_type = Sdf.ValueTypeNames.Float
-                channel = "r"
-            else:
-                value_type = Sdf.ValueTypeNames.Float3
-                channel = "rgb"
-
-            shader.CreateInput(input_name, value_type).ConnectToSource(
-                texture_prim.ConnectableAPI(), channel
+    def _create_collect_material(self) -> UsdShade.Material:
+        UsdGeom.Scope.Define(self.stage, self.parent_primpath)
+        prim_name = self.material_name or "Material"
+        if not Sdf.Path.IsValidIdentifier(prim_name):
+            prim_name = f"_{prim_name}"
+            sanitized = Tf.MakeValidIdentifier(prim_name)
+            logger.debug(
+                "Material name '%s' is not a valid USD identifier; using '%s'.",
+                prim_name,
+                sanitized,
             )
-
-        return material
-
-
-    ###  arnold ###
-    def _arnold_create_material(
-        self,
-        parent_path: str,
-        enable_transmission: bool = False,
-        texture_format_override: Optional[str] = None,
-    ) -> UsdShade.Material:
-        """Create an Arnold material network under the parent path.
-
-        Args:
-            parent_path: Parent path where the material should be created.
-            enable_transmission: Whether to enable transmission inputs.
-            texture_format_override: Optional texture format override.
-
-        Returns:
-            UsdShade.Material: The created Arnold material.
-        """
-        shader_path = f'{parent_path}/arnold_standard_surface1'
-        shader_usdshade = UsdShade.Shader.Define(self.stage, shader_path)
-        shader_usdshade.CreateIdAttr("arnold:standard_surface")
-        material_prim = self.stage.GetPrimAtPath(parent_path)
-
-        material_usdshade = UsdShade.Material.Define(self.stage, material_prim.GetPath())
-        material_usdshade.CreateOutput("arnold:surface", Sdf.ValueTypeNames.Token).ConnectToSource(shader_usdshade.ConnectableAPI(), "surface")
-        # print(f"DEBUG: shader: {shader}\n")
-
-        self._arnold_initialize_standard_surface_shader(shader_usdshade)
-        self._arnold_fill_texture_file_paths(
-            material_prim,
-            shader_usdshade,
-            texture_format_override=texture_format_override,
-        )
-
-        if enable_transmission:
-            self._arnold_enable_transmission(shader_usdshade)
-
-        return material_usdshade
-
-    def _arnold_initialize_standard_surface_shader(
-        self,
-        shader_usdshade: UsdShade.Shader,
-    ) -> None:
-        """Initialize Arnold standard_surface inputs.
-
-        Args:
-            shader_usdshade: Arnold shader prim to initialize.
-        """
-        shader_usdshade.CreateInput('aov_id1', Sdf.ValueTypeNames.Float3).Set((0, 0, 0))
-        shader_usdshade.CreateInput('aov_id2', Sdf.ValueTypeNames.Float3).Set((0, 0, 0))
-        shader_usdshade.CreateInput('aov_id3', Sdf.ValueTypeNames.Float3).Set((0, 0, 0))
-        shader_usdshade.CreateInput('aov_id4', Sdf.ValueTypeNames.Float3).Set((0, 0, 0))
-        shader_usdshade.CreateInput('aov_id5', Sdf.ValueTypeNames.Float3).Set((0, 0, 0))
-        shader_usdshade.CreateInput('aov_id6', Sdf.ValueTypeNames.Float3).Set((0, 0, 0))
-        shader_usdshade.CreateInput('aov_id7', Sdf.ValueTypeNames.Float3).Set((0, 0, 0))
-        shader_usdshade.CreateInput('aov_id8', Sdf.ValueTypeNames.Float3).Set((0, 0, 0))
-        shader_usdshade.CreateInput('base', Sdf.ValueTypeNames.Float).Set(1)
-        shader_usdshade.CreateInput('base_color', Sdf.ValueTypeNames.Float3).Set((0.8, 0.8, 0.8))
-        shader_usdshade.CreateInput('metalness', Sdf.ValueTypeNames.Float).Set(0)
-        shader_usdshade.CreateInput('specular', Sdf.ValueTypeNames.Float).Set(1)
-        shader_usdshade.CreateInput('specular_color', Sdf.ValueTypeNames.Float3).Set((1, 1, 1))
-        shader_usdshade.CreateInput('specular_roughness', Sdf.ValueTypeNames.Float).Set(0.2)
-        shader_usdshade.CreateInput('specular_IOR', Sdf.ValueTypeNames.Float).Set(1.5)
-        shader_usdshade.CreateInput('specular_anisotropy', Sdf.ValueTypeNames.Float).Set(0)
-        shader_usdshade.CreateInput('specular_rotation', Sdf.ValueTypeNames.Float).Set(0)
-        shader_usdshade.CreateInput('caustics', Sdf.ValueTypeNames.Bool).Set(False)
-        shader_usdshade.CreateInput('coat', Sdf.ValueTypeNames.Float).Set(0.0)
-        shader_usdshade.CreateInput('coat_color', Sdf.ValueTypeNames.Float3).Set((1, 1, 1))
-        shader_usdshade.CreateInput('coat_roughness', Sdf.ValueTypeNames.Float).Set(0.1)
-        shader_usdshade.CreateInput('coat_IOR', Sdf.ValueTypeNames.Float).Set(1.5)
-        shader_usdshade.CreateInput('coat_normal', Sdf.ValueTypeNames.Float3).Set((0, 0, 0))
-        shader_usdshade.CreateInput('coat_affect_color', Sdf.ValueTypeNames.Float).Set(0)
-        shader_usdshade.CreateInput('coat_affect_roughness', Sdf.ValueTypeNames.Float).Set(0)
-        shader_usdshade.CreateInput('indirect_diffuse', Sdf.ValueTypeNames.Float).Set(1)
-        shader_usdshade.CreateInput('indirect_specular', Sdf.ValueTypeNames.Float).Set(1)
-        shader_usdshade.CreateInput('indirect_reflections', Sdf.ValueTypeNames.Bool).Set(True)
-        shader_usdshade.CreateInput('subsurface', Sdf.ValueTypeNames.Float).Set(0)
-        shader_usdshade.CreateInput('subsurface_anisotropy', Sdf.ValueTypeNames.Float).Set(0)
-        shader_usdshade.CreateInput('subsurface_color', Sdf.ValueTypeNames.Float3).Set((1, 1, 1))
-        shader_usdshade.CreateInput('subsurface_radius', Sdf.ValueTypeNames.Float3).Set((1, 1, 1))
-        shader_usdshade.CreateInput('subsurface_scale', Sdf.ValueTypeNames.Float).Set(1)
-        shader_usdshade.CreateInput('subsurface_type', Sdf.ValueTypeNames.String).Set("randomwalk")
-        shader_usdshade.CreateInput('emission', Sdf.ValueTypeNames.Float).Set(0)
-        shader_usdshade.CreateInput('emission_color', Sdf.ValueTypeNames.Float3).Set((1, 1, 1))
-        shader_usdshade.CreateInput('normal', Sdf.ValueTypeNames.Float3).Set((0, 0, 0))
-        shader_usdshade.CreateInput('opacity', Sdf.ValueTypeNames.Float3).Set((1, 1, 1))
-        shader_usdshade.CreateInput('sheen', Sdf.ValueTypeNames.Float).Set(0)
-        shader_usdshade.CreateInput('sheen_color', Sdf.ValueTypeNames.Float3).Set((1, 1, 1))
-        shader_usdshade.CreateInput('sheen_roughness', Sdf.ValueTypeNames.Float).Set(0.3)
-        shader_usdshade.CreateInput('indirect_diffuse', Sdf.ValueTypeNames.Float).Set(1)
-        shader_usdshade.CreateInput('indirect_specular', Sdf.ValueTypeNames.Float).Set(1)
-        shader_usdshade.CreateInput('internal_reflections', Sdf.ValueTypeNames.Bool).Set(True)
-        shader_usdshade.CreateInput('caustics', Sdf.ValueTypeNames.Bool).Set(False)
-        shader_usdshade.CreateInput('exit_to_background', Sdf.ValueTypeNames.Bool).Set(False)
-        shader_usdshade.CreateInput('tangent', Sdf.ValueTypeNames.Float3).Set((0, 0, 0))
-        shader_usdshade.CreateInput('transmission', Sdf.ValueTypeNames.Float).Set(0)
-        shader_usdshade.CreateInput('transmission_color', Sdf.ValueTypeNames.Float3).Set((1, 1, 1))
-        shader_usdshade.CreateInput('transmission_depth', Sdf.ValueTypeNames.Float).Set(0)
-        shader_usdshade.CreateInput('transmission_scatter', Sdf.ValueTypeNames.Float3).Set((0, 0, 0))
-        shader_usdshade.CreateInput('transmission_scatter_anisotropy', Sdf.ValueTypeNames.Float).Set(0)
-        shader_usdshade.CreateInput('transmission_dispersion', Sdf.ValueTypeNames.Float).Set(0)
-        shader_usdshade.CreateInput('transmission_extra_roughness', Sdf.ValueTypeNames.Float).Set(0)
-        shader_usdshade.CreateInput('thin_film_IOR', Sdf.ValueTypeNames.Float).Set(1.5)
-        shader_usdshade.CreateInput('thin_film_thickness', Sdf.ValueTypeNames.Float).Set(0)
-        shader_usdshade.CreateInput('thin_walled', Sdf.ValueTypeNames.Bool).Set(False)
-        shader_usdshade.CreateInput('transmit_aovs', Sdf.ValueTypeNames.Bool).Set(False)
-
-    def _arnold_initialize_image_shader(self, image_path: str) -> UsdShade.Shader:
-        """Create and initialize an Arnold image shader.
-
-        Args:
-            image_path: Prim path for the image shader.
-
-        Returns:
-            UsdShade.Shader: The created image shader.
-        """
-        image_shader = UsdShade.Shader.Define(self.stage, image_path)
-        image_shader.CreateIdAttr("arnold:image")
-
-        color_space = image_shader.CreateInput("color_space", Sdf.ValueTypeNames.String)
-        color_space.Set("auto")
-        image_shader.CreateInput("filename", Sdf.ValueTypeNames.Asset)
-        filter = image_shader.CreateInput("filter", Sdf.ValueTypeNames.String)
-        filter.Set("smart_bicubic")
-        ignore_missing_textures = image_shader.CreateInput("ignore_missing_textures", Sdf.ValueTypeNames.Bool)
-        ignore_missing_textures.Set(False)
-        mipmap_bias = image_shader.CreateInput("mipmap_bias", Sdf.ValueTypeNames.Int)
-        mipmap_bias.Set(0)
-        missing_texture_color = image_shader.CreateInput("missing_texture_color", Sdf.ValueTypeNames.Float4)
-        missing_texture_color.Set((0,0,0,0))
-        multiply = image_shader.CreateInput("multiply", Sdf.ValueTypeNames.Float3)
-        multiply.Set((1,1,1))
-        offset = image_shader.CreateInput("offset", Sdf.ValueTypeNames.Float3)
-        offset.Set((0,0,0))
-        sflip = image_shader.CreateInput("sflip", Sdf.ValueTypeNames.Bool)
-        sflip.Set(False)
-        single_channel = image_shader.CreateInput("single_channel", Sdf.ValueTypeNames.Bool)
-        single_channel.Set(False)
-        soffset = image_shader.CreateInput("soffset", Sdf.ValueTypeNames.Float)
-        soffset.Set(0)
-        sscale = image_shader.CreateInput("sscale", Sdf.ValueTypeNames.Float)
-        sscale.Set(1)
-        start_channel = image_shader.CreateInput("start_channel", Sdf.ValueTypeNames.Int)
-        start_channel.Set(0)
-        swap_st = image_shader.CreateInput("swap_st", Sdf.ValueTypeNames.Bool)
-        swap_st.Set(False)
-        swrap = image_shader.CreateInput("swrap", Sdf.ValueTypeNames.String)
-        swrap.Set("periodic")
-        tflip = image_shader.CreateInput("tflip", Sdf.ValueTypeNames.Bool)
-        tflip.Set(False)
-        toffset = image_shader.CreateInput("toffset", Sdf.ValueTypeNames.Float)
-        toffset.Set(0)
-        tscale = image_shader.CreateInput("tscale", Sdf.ValueTypeNames.Float)
-        tscale.Set(1)
-        twrap = image_shader.CreateInput("twrap", Sdf.ValueTypeNames.String)
-        twrap.Set("periodic")
-        uvcoords = image_shader.CreateInput("uvcoords", Sdf.ValueTypeNames.Float2)
-        uvcoords.Set((0,0))
-        uvset = image_shader.CreateInput("uvset", Sdf.ValueTypeNames.String)
-        uvset.Set("")
-
-        return image_shader
-
-    def _arnold_initialize_color_correct_shader(
-        self,
-        color_correct_path: str,
-    ) -> UsdShade.Shader:
-        """Create and initialize an Arnold color_correct shader.
-
-        Args:
-            color_correct_path: Prim path for the color correct shader.
-
-        Returns:
-            UsdShade.Shader: The created color correct shader.
-        """
-        color_correct_shader = UsdShade.Shader.Define(self.stage, color_correct_path)
-        color_correct_shader.CreateIdAttr("arnold:color_correct")
-        cc_add_input = color_correct_shader.CreateInput("add", Sdf.ValueTypeNames.Float3)
-        cc_add_input.Set((0, 0, 0))
-        cc_contrast_input = color_correct_shader.CreateInput("contrast", Sdf.ValueTypeNames.Float)
-        cc_contrast_input.Set(1)
-        cc_exposure_input = color_correct_shader.CreateInput("exposure", Sdf.ValueTypeNames.Float)
-        cc_exposure_input.Set(0)
-        cc_gamma_input = color_correct_shader.CreateInput("gamma", Sdf.ValueTypeNames.Float)
-        cc_gamma_input.Set(1)
-        cc_hue_shift_input = color_correct_shader.CreateInput("hue_shift", Sdf.ValueTypeNames.Float)
-        cc_hue_shift_input.Set(0)
-
-        return color_correct_shader
-
-    def _arnold_initialize_range_shader(self, range_path: str) -> UsdShade.Shader:
-        """Create and initialize an Arnold range shader.
-
-        Args:
-            range_path: Prim path for the range shader.
-
-        Returns:
-            UsdShade.Shader: The created range shader.
-        """
-        range_shader = UsdShade.Shader.Define(self.stage, range_path)
-        range_shader.CreateIdAttr("arnold:range")
-
-        bias_input = range_shader.CreateInput("bias", Sdf.ValueTypeNames.Float)
-        bias_input.Set(0.5)
-        contrast_input = range_shader.CreateInput("contrast", Sdf.ValueTypeNames.Float)
-        contrast_input.Set(1)
-        contrast_pivot_input = range_shader.CreateInput("contrast_pivot", Sdf.ValueTypeNames.Float)
-        contrast_pivot_input.Set(0.5)
-        gain_input = range_shader.CreateInput("gain", Sdf.ValueTypeNames.Float)
-        gain_input.Set(0.5)
-        input_min_input = range_shader.CreateInput("input_min", Sdf.ValueTypeNames.Float)
-        input_min_input.Set(0)
-        input_max_input = range_shader.CreateInput("input_max", Sdf.ValueTypeNames.Float)
-        input_max_input.Set(1)
-        output_min_input = range_shader.CreateInput("output_min", Sdf.ValueTypeNames.Float)
-        output_min_input.Set(0)
-        output_max_input = range_shader.CreateInput("output_max", Sdf.ValueTypeNames.Float)
-        output_max_input.Set(1)
-        output_max_input = range_shader.CreateInput("smoothstep", Sdf.ValueTypeNames.Bool)
-        output_max_input.Set(False)
-
-        return range_shader
-
-
-    def _arnold_initialize_normal_map_shader(
-        self,
-        normal_map_path: str,
-    ) -> UsdShade.Shader:
-        """Create and initialize an Arnold normal_map shader.
-
-        Args:
-            normal_map_path: Prim path for the normal map shader.
-
-        Returns:
-            UsdShade.Shader: The created normal map shader.
-        """
-        normal_map_shader = UsdShade.Shader.Define(self.stage, normal_map_path)
-        normal_map_shader.CreateIdAttr("arnold:normal_map")
-
-        color_to_signed_input = normal_map_shader.CreateInput("color_to_signed", Sdf.ValueTypeNames.Bool)
-        color_to_signed_input.Set(True)
-        input_input = normal_map_shader.CreateInput("input", Sdf.ValueTypeNames.Float3)
-        input_input.Set((0, 0, 0))
-        invert_x_input = normal_map_shader.CreateInput("invert_x", Sdf.ValueTypeNames.Bool)
-        invert_x_input.Set(False)
-        invert_y_input = normal_map_shader.CreateInput("invert_y", Sdf.ValueTypeNames.Bool)
-        invert_y_input.Set(False)
-        invert_z_input = normal_map_shader.CreateInput("invert_z", Sdf.ValueTypeNames.Bool)
-        invert_z_input.Set(False)
-        normal_input = normal_map_shader.CreateInput("normal", Sdf.ValueTypeNames.Float3)
-        normal_input.Set((0, 0, 0))
-        order_input = normal_map_shader.CreateInput("order", Sdf.ValueTypeNames.String)
-        order_input.Set('XYZ')
-        strength_input = normal_map_shader.CreateInput("strength", Sdf.ValueTypeNames.Float)
-        strength_input.Set(1)
-        tangent_input = normal_map_shader.CreateInput("tangent", Sdf.ValueTypeNames.Float3)
-        tangent_input.Set((0, 0, 0))
-        tangent_space_input = normal_map_shader.CreateInput("tangent_space", Sdf.ValueTypeNames.Bool)
-        tangent_space_input.Set(True)
-
-        return normal_map_shader
-
-    def _arnold_initialize_bump2d_shader(self, bump2d_path: str) -> UsdShade.Shader:
-        """Create and initialize an Arnold bump2d shader.
-
-        Args:
-            bump2d_path: Prim path for the bump shader.
-
-        Returns:
-            UsdShade.Shader: The created bump shader.
-        """
-        bump2d_shader = UsdShade.Shader.Define(self.stage, bump2d_path)
-        bump2d_shader.CreateIdAttr("arnold:bump2d")
-
-        bump_height_input = bump2d_shader.CreateInput("bump_height", Sdf.ValueTypeNames.Float)
-        bump_height_input.Set(1)
-        bump_map_input = bump2d_shader.CreateInput("bump_map", Sdf.ValueTypeNames.Float)
-        bump_map_input.Set(0)
-        normal_input = bump2d_shader.CreateInput("normal", Sdf.ValueTypeNames.Float3)
-        normal_input.Set((0, 0, 0))
-
-        return bump2d_shader
-
-
-    def _arnold_enable_transmission(self, shader_usdshade):
-        """Enable transmission inputs on the Arnold shader.
-
-        Args:
-            shader_usdshade: Arnold shader prim to update.
-        """
-        shader_usdshade.GetInput('transmission').Set(0.9)
-        shader_usdshade.GetInput('thin_walled').Set(True)
-
-
-    def _arnold_fill_texture_file_paths(
-        self,
-        material_prim: Usd.Prim,
-        std_surf_shader: UsdShade.Shader,
-        texture_format_override: Optional[str] = None,
-    ) -> None:
-        """Wire texture file paths into the Arnold shader network.
-
-        Args:
-            material_prim: Material prim that owns the shader network.
-            std_surf_shader: Standard surface shader to connect.
-            texture_format_override: Optional texture format override.
-        """
-        bump2d_path = f"{material_prim.GetPath()}/arnold_Bump2d"
-        bump2d_shader = None
-
-        for tex_type, tex_dict in self.material_dict.items():
-            tex_type = _normalize_slot_name(tex_type)
-            input_name = ARNOLD_INPUTS.get(tex_type)
-            if not input_name:
-                logger.warning("Texture slot '%s' not supported for arnold.", tex_type)
-                continue
-
-            tex_filepath = tex_dict.get("path")
-            if not tex_filepath:
-                logger.warning("Texture slot '%s' missing path; skipping.", tex_type)
-                continue
-
-            tex_filepath = _apply_texture_format_override(tex_filepath, texture_format_override)
-
-            # create arnold::image prim
-            texture_prim_path = f'{material_prim.GetPath()}/arnold_{tex_type}Texture'
-            texture_shader = self._arnold_initialize_image_shader(texture_prim_path)
-            texture_shader.GetInput("filename").Set(tex_filepath)
-
-            if tex_type == "basecolor":
-                color_correct_path = f"{material_prim.GetPath()}/arnold_{tex_type}ColorCorrect"
-                color_correct_shader = self._arnold_initialize_color_correct_shader(color_correct_path)
-                color_correct_shader.CreateInput("input", Sdf.ValueTypeNames.Float4).ConnectToSource(texture_shader.ConnectableAPI(), "rgba")
-                std_surf_shader.CreateInput(input_name, Sdf.ValueTypeNames.Float3).ConnectToSource(color_correct_shader.ConnectableAPI(), "rgb")
-
-            elif tex_type == "metalness":
-                # disable metalness if material is transmissive like glass:
-                if self.is_transmissive:
-                    continue
-                range_path = f"{material_prim.GetPath()}/arnold_{tex_type}Range"
-                range_shader = self._arnold_initialize_range_shader(range_path)
-                range_shader.CreateInput("input", Sdf.ValueTypeNames.Float4).ConnectToSource(texture_shader.ConnectableAPI(), "rgba")
-                std_surf_shader.CreateInput(input_name, Sdf.ValueTypeNames.Float).ConnectToSource(range_shader.ConnectableAPI(), "r")
-
-            elif tex_type == "roughness":
-                range_path = f"{material_prim.GetPath()}/arnold_{tex_type}Range"
-                range_shader = self._arnold_initialize_range_shader(range_path)
-                range_shader.CreateInput("input", Sdf.ValueTypeNames.Float4).ConnectToSource(texture_shader.ConnectableAPI(), "rgba")
-                std_surf_shader.CreateInput(input_name, Sdf.ValueTypeNames.Float).ConnectToSource(range_shader.ConnectableAPI(), "r")
-
-            elif tex_type == "opacity":
-                std_surf_shader.CreateInput(input_name, Sdf.ValueTypeNames.Float3).ConnectToSource(
-                    texture_shader.ConnectableAPI(),
-                    "rgb",
-                )
-
-            elif tex_type == "displacement":
-                range_path = f"{material_prim.GetPath()}/arnold_{tex_type}Range"
-                range_shader = self._arnold_initialize_range_shader(range_path)
-                range_shader.CreateInput("input", Sdf.ValueTypeNames.Float4).ConnectToSource(texture_shader.ConnectableAPI(), "rgba")
-                if not bump2d_shader:
-                    bump2d_shader = self._arnold_initialize_bump2d_shader(bump2d_path)
-                bump_map_input = bump2d_shader.GetInput("bump_map")
-                if not bump_map_input:
-                    bump_map_input = bump2d_shader.CreateInput("bump_map", Sdf.ValueTypeNames.Float)
-                bump_map_input.ConnectToSource(range_shader.ConnectableAPI(), "r")
-
-            elif tex_type == "normal":
-                normal_map_path = f"{material_prim.GetPath()}/arnold_NormalMap"
-                normal_map_shader = self._arnold_initialize_normal_map_shader(normal_map_path)
-                normal_map_shader.CreateInput("input", Sdf.ValueTypeNames.Float3).ConnectToSource(texture_shader.ConnectableAPI(), "vector")
-                if not bump2d_shader:
-                    bump2d_shader = self._arnold_initialize_bump2d_shader(bump2d_path)
-                normal_input = bump2d_shader.GetInput("normal")
-                if not normal_input:
-                    normal_input = bump2d_shader.CreateInput("normal", Sdf.ValueTypeNames.Float3)
-                normal_input.ConnectToSource(normal_map_shader.ConnectableAPI(), "vector")
-
-        if bump2d_shader:
-            std_surf_shader.CreateInput('normal', Sdf.ValueTypeNames.Float3).ConnectToSource(bump2d_shader.ConnectableAPI(), "vector")
-
-
-    ###  mtlx ###
-    def _mtlx_create_material(
-        self,
-        parent_path: str,
-        enable_transmission: bool = False,
-        texture_format_override: Optional[str] = None,
-    ) -> UsdShade.Material:
-        """Create a MaterialX material network under the parent path.
-
-        Args:
-            parent_path: Parent path where the material should be created.
-            enable_transmission: Whether to enable transmission inputs.
-            texture_format_override: Optional texture format override.
-
-        Returns:
-            UsdShade.Material: The created MaterialX material.
-        """
-        shader_path = f'{parent_path}/mtlx_mtlxstandard_surface1'
-        shader_usdshade = UsdShade.Shader.Define(self.stage, shader_path)
-        material_prim = self.stage.GetPrimAtPath(parent_path)
-        material_usdshade = UsdShade.Material.Define(self.stage, material_prim.GetPath())
-        material_usdshade.CreateOutput("mtlx:surface", Sdf.ValueTypeNames.Token).ConnectToSource(shader_usdshade.ConnectableAPI(), "surface")
-
-        self._mtlx_initialize_standard_surface_shader(shader_usdshade)
-        self._mtlx_fill_texture_file_paths(
-            material_prim,
-            shader_usdshade,
-            texture_format_override=texture_format_override,
-        )
-        if enable_transmission:
-            self._mtlx_enable_transmission(shader_usdshade)
-
-        return material_usdshade
-
-
-    def _mtlx_initialize_standard_surface_shader(
-        self,
-        shader_usdshade: UsdShade.Shader,
-    ) -> None:
-        """Initialize MaterialX standard_surface inputs.
-
-        Args:
-            shader_usdshade: MaterialX shader prim to initialize.
-        """
-        shader_usdshade.CreateIdAttr("ND_standard_surface_surfaceshader")
-
-        shader_usdshade.CreateInput('base', Sdf.ValueTypeNames.Float).Set(1)
-        shader_usdshade.CreateInput('base_color', Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f(0.8, 0.8, 0.8))
-        shader_usdshade.CreateInput('coat', Sdf.ValueTypeNames.Float).Set(0)
-        shader_usdshade.CreateInput('coat_roughness', Sdf.ValueTypeNames.Float).Set(0.1)
-        shader_usdshade.CreateInput('emission', Sdf.ValueTypeNames.Float).Set(0)
-        shader_usdshade.CreateInput('emission_color', Sdf.ValueTypeNames.Float3).Set((1, 1, 1))
-        shader_usdshade.CreateInput('metalness', Sdf.ValueTypeNames.Float).Set(0)
-        shader_usdshade.CreateInput('specular', Sdf.ValueTypeNames.Float).Set(1)
-        shader_usdshade.CreateInput('specular_color', Sdf.ValueTypeNames.Float3).Set((1, 1, 1))
-        shader_usdshade.CreateInput('specular_IOR', Sdf.ValueTypeNames.Float).Set(1.5)
-        shader_usdshade.CreateInput('specular_roughness', Sdf.ValueTypeNames.Float).Set(0.2)
-        shader_usdshade.CreateInput('transmission', Sdf.ValueTypeNames.Float).Set(0)
-        shader_usdshade.CreateInput('thin_walled', Sdf.ValueTypeNames.Int).Set(0)
-        shader_usdshade.CreateInput('opacity',  Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f(1, 1, 1))
-
-
-    def _mtlx_initialize_image_shader(
-        self,
-        image_path: str,
-        signature: str = "color3",
-    ) -> UsdShade.Shader:
-        """Create and initialize a MaterialX image shader.
-
-        Args:
-            image_path: Prim path for the image shader.
-            signature: MaterialX signature for the image shader.
-
-        Returns:
-            UsdShade.Shader: The created image shader.
-        """
-        image_shader = UsdShade.Shader.Define(self.stage, image_path)
-        image_shader.CreateIdAttr(f"ND_image_{signature}")
-        image_shader.CreateInput("file", Sdf.ValueTypeNames.Asset)
-        return image_shader
-
-
-    def _mtlx_initialize_color_correct_shader(
-        self,
-        color_correct_path: str,
-        signature: str = "color3",
-    ) -> UsdShade.Shader:
-        """Create and initialize a MaterialX color correct shader.
-
-        Args:
-            color_correct_path: Prim path for the color correct shader.
-            signature: MaterialX signature for the node.
-
-        Returns:
-            UsdShade.Shader: The created color correct shader.
-        """
-        color_correct_shader = UsdShade.Shader.Define(self.stage, color_correct_path)
-        color_correct_shader.CreateIdAttr(f"ND_colorcorrect_{signature}")
-
-        return color_correct_shader
-
-    def _mtlx_initialize_range_shader(
-        self,
-        range_path: str,
-        signature: str = "color3",
-    ) -> UsdShade.Shader:
-        """Create and initialize a MaterialX range shader.
-
-        Args:
-            range_path: Prim path for the range shader.
-            signature: MaterialX signature for the node.
-
-        Returns:
-            UsdShade.Shader: The created range shader.
-        """
-        range_shader = UsdShade.Shader.Define(self.stage, range_path)
-        range_shader.CreateIdAttr(f"ND_range_{signature}")
-        return range_shader
-
-
-    def _mtlx_initialize_normal_map_shader(
-        self,
-        normal_map_path: str,
-    ) -> UsdShade.Shader:
-        """Create and initialize a MaterialX normal map shader.
-
-        Args:
-            normal_map_path: Prim path for the normal map shader.
-
-        Returns:
-            UsdShade.Shader: The created normal map shader.
-        """
-        normal_map_shader = UsdShade.Shader.Define(self.stage, normal_map_path)
-        normal_map_shader.CreateIdAttr("ND_normalmap")
-
-        return normal_map_shader
-
-    def _mtlx_initialize_bump2d_shader(
-        self,
-        bump2d_path: str,
-    ) -> UsdShade.Shader:
-        """Create and initialize a MaterialX bump2d shader.
-
-        Args:
-            bump2d_path: Prim path for the bump shader.
-
-        Returns:
-            UsdShade.Shader: The created bump shader.
-        """
-        bump2d_shader = UsdShade.Shader.Define(self.stage, bump2d_path)
-        bump2d_shader.CreateIdAttr("ND_bump_vector3")
-
-        bump_height_input = bump2d_shader.CreateInput("bump_height", Sdf.ValueTypeNames.Float)
-        bump_height_input.Set(1)
-        bump_map_input = bump2d_shader.CreateInput("bump_map", Sdf.ValueTypeNames.Float)
-        bump_map_input.Set(0)
-        normal_input = bump2d_shader.CreateInput("normal", Sdf.ValueTypeNames.Float3)
-        normal_input.Set((0, 0, 0))
-
-        return bump2d_shader
-
-
-    def _mtlx_enable_transmission(self, shader_usdshade: UsdShade.Shader) -> None:
-        """Enable transmission inputs on the MaterialX shader.
-
-        Args:
-            shader_usdshade: MaterialX shader prim to update.
-        """
-        shader_usdshade.GetInput('transmission').Set(0.9)
-        shader_usdshade.GetInput('thin_walled').Set(1)
-
-
-    def _mtlx_fill_texture_file_paths(
-        self,
-        material_prim: Usd.Prim,
-        std_surf_shader: UsdShade.Shader,
-        texture_format_override: Optional[str] = None,
-    ) -> None:
-        """Wire texture file paths into the MaterialX shader network.
-
-        Args:
-            material_prim: Material prim that owns the shader network.
-            std_surf_shader: Standard surface shader to connect.
-            texture_format_override: Optional texture format override.
-        """
-        mtlx_image_signature = {
-            'basecolor': "color3",
-            'normal': "vector3",
-            'metalness': "float",
-            'opacity': "color3",
-            'roughness': "float",
-            'displacement': "float",
-        }
-
-        bump2d_shader = None
-
-        for tex_type, tex_dict in self.material_dict.items():
-            tex_type = _normalize_slot_name(tex_type)
-            input_name = MTLX_INPUTS.get(tex_type)
-            if not input_name:
-                logger.warning("Texture slot '%s' not supported for mtlx.", tex_type)
-                continue
-
-            tex_filepath = tex_dict.get("path")
-            if not tex_filepath:
-                logger.warning("Texture slot '%s' missing path; skipping.", tex_type)
-                continue
-
-            tex_filepath = _apply_texture_format_override(tex_filepath, texture_format_override)
-
-            # create 'ND_image_<signature>' prim
-            texture_prim_path = f'{material_prim.GetPath()}/mtlx_{tex_type}Texture'
-            texture_shader = self._mtlx_initialize_image_shader(texture_prim_path, signature=mtlx_image_signature[tex_type])
-            texture_shader.GetInput("file").Set(tex_filepath)
-
-            if tex_type == "basecolor":
-                color_correct_path = f"{material_prim.GetPath()}/mtlx_{tex_type}ColorCorrect"
-                color_correct_shader = self._mtlx_initialize_color_correct_shader(color_correct_path)
-                color_correct_shader.CreateInput("in", Sdf.ValueTypeNames.Color3f).ConnectToSource(
-                    texture_shader.ConnectableAPI(), "out")
-                std_surf_shader.CreateInput(input_name, Sdf.ValueTypeNames.Color3f).ConnectToSource(
-                    color_correct_shader.ConnectableAPI(), "out")
-
-            elif tex_type == "metalness":
-                # disable metalness if material is transmissive like glass:
-                if self.is_transmissive:
-                    continue
-                range_path = f"{material_prim.GetPath()}/mtlx_{tex_type}Range"
-                range_shader = self._mtlx_initialize_range_shader(range_path, signature="float")
-                range_shader.CreateInput("in", Sdf.ValueTypeNames.Float).ConnectToSource(
-                    texture_shader.ConnectableAPI(), "out")
-                std_surf_shader.CreateInput(input_name, Sdf.ValueTypeNames.Float).ConnectToSource(
-                    range_shader.ConnectableAPI(), "out")
-
-            elif tex_type == "roughness":
-                range_path = f"{material_prim.GetPath()}/mtlx_{tex_type}Range"
-                range_shader = self._mtlx_initialize_range_shader(range_path, signature="float")
-                range_shader.CreateInput("in", Sdf.ValueTypeNames.Float).ConnectToSource(
-                    texture_shader.ConnectableAPI(), "out")
-                std_surf_shader.CreateInput(input_name, Sdf.ValueTypeNames.Float).ConnectToSource(
-                    range_shader.ConnectableAPI(), "out")
-
-            elif tex_type == "opacity":
-                std_surf_shader.CreateInput(input_name, Sdf.ValueTypeNames.Color3f).ConnectToSource(
-                    texture_shader.ConnectableAPI(),
-                    "out",
-                )
-
-            ###### BUMP MAP + NORMAL MAPS AREN'T SUPPORTED IN MTLX
-            # elif tex_type in ['height']:
-            #     range_path = f"{material_prim.GetPath()}/{tex_type}Range"
-            #     range_shader = self._mtlx_initialize_range_shader(range_path)
-            #     range_shader.CreateInput("in", Sdf.ValueTypeNames.Float4).ConnectToSource(
-            #         texture_shader.ConnectableAPI(), "out")
-            #     if not bump2d_shader:
-            #         bump2d_shader = self._mtlx_initialize_bump2d_shader(bump2d_path)
-            #     bump2d_shader.CreateInput("height", Sdf.ValueTypeNames.Float).ConnectToSource(
-            #         range_shader.ConnectableAPI(), "out")
-
-            elif tex_type == "normal":
-                normal_map_path = f"{material_prim.GetPath()}/mtlx_NormalMap"
-                normal_map_shader = self._mtlx_initialize_normal_map_shader(normal_map_path)
-                normal_map_shader.CreateInput("in", Sdf.ValueTypeNames.Float3).ConnectToSource(
-                    texture_shader.ConnectableAPI(), "out")
-                # if not bump2d_shader:
-                #     bump2d_shader = self._mtlx_initialize_bump2d_shader(bump2d_path)
-                std_surf_shader.CreateInput("normal", Sdf.ValueTypeNames.Float3).ConnectToSource(
-                    normal_map_shader.ConnectableAPI(), "out")
-            elif tex_type == "displacement":
-                # Displacement not supported for MTLX in this pipeline yet.
-                continue
-
-        if bump2d_shader:
-            std_surf_shader.CreateInput('normal', Sdf.ValueTypeNames.Float3).ConnectToSource(
-                bump2d_shader.ConnectableAPI(), "out")
-
-
-    def _create_collect_prim(
-        self,
-        parent_primpath: str,
-        create_usd_preview: bool = False,
-        create_arnold: bool = False,
-        create_mtlx: bool = False,
-        enable_transmission: bool = False,
-        texture_format_overrides: Optional[Mapping[str, str]] = None,
-    ):
-        """Create a collect material prim on the stage.
-
-        Args:
-            parent_primpath: Parent prim path to create the collect material under.
-            create_usd_preview: Whether to create UsdPreviewSurface network.
-            create_arnold: Whether to create Arnold network.
-            create_mtlx: Whether to create MaterialX network.
-            enable_transmission: Whether to enable transmission inputs.
-            texture_format_overrides: Optional per-renderer texture format overrides.
-
-        Returns:
-            UsdShade.Material: The collect material prim.
-        """
-        # parent = self.stage.GetPrimAtPath(parent_primpath)
-        # if not parent or not parent.IsDefined():
-        #     self.stage.DefinePrim(parent_primpath, 'Scope')
-
-        collect_prim_path = f'{parent_primpath}/mat_{self.material_name}_collect'
+            prim_name = sanitized
+        collect_prim_path = f"{self.parent_primpath}/{prim_name}"
         collect_usd_material = UsdShade.Material.Define(self.stage, collect_prim_path)
         collect_usd_material.CreateInput("inputnum", Sdf.ValueTypeNames.Int).Set(2)
-
-        overrides = texture_format_overrides or {}
-        if create_usd_preview:
-            # Create the USD Preview Shader under the collect material
-            usd_preview_material = self._create_usd_preview_material(
-                collect_prim_path,
-                texture_format_override=_texture_format_override_for(RENDERER_USD_PREVIEW, overrides),
-            )
-            usd_preview_shader = usd_preview_material.GetSurfaceOutput().GetConnectedSource()[0]
-            collect_usd_material.CreateOutput("surface", Sdf.ValueTypeNames.Token).ConnectToSource(usd_preview_shader, "surface")
-
-        if create_arnold:
-            # Create the Arnold Shader under the collect material
-            arnold_material = self._arnold_create_material(
-                collect_prim_path,
-                enable_transmission=enable_transmission,
-                texture_format_override=_texture_format_override_for(RENDERER_ARNOLD, overrides),
-            )
-            arnold_shader = arnold_material.GetOutput("arnold:surface").GetConnectedSource()[0]
-            collect_usd_material.CreateOutput("arnold:surface", Sdf.ValueTypeNames.Token).ConnectToSource(arnold_shader, "surface")
-
-        if create_mtlx:
-            # Create the mtlx Shader under the collect material
-            mtlx_material = self._mtlx_create_material(
-                collect_prim_path,
-                enable_transmission=enable_transmission,
-                texture_format_override=_texture_format_override_for(RENDERER_MTLX, overrides),
-            )
-            mtlx_shader = mtlx_material.GetOutput("mtlx:surface").GetConnectedSource()[0]
-            collect_usd_material.CreateOutput("mtlx:surface", Sdf.ValueTypeNames.Token).ConnectToSource(mtlx_shader, "surface")
-
+        collect_usd_material.GetPrim().SetCustomDataByKey("source_material_name", self.material_name)
+        collect_usd_material.GetPrim().SetMetadata("displayName", self.material_name)
         return collect_usd_material
 
-
+    def _build_context(self) -> MaterialBuildContext:
+        return MaterialBuildContext(
+            stage=self.stage,
+            material_dict=self.material_dict,
+            is_transmissive=self.is_transmissive,
+            texture_format_overrides=self.texture_format_overrides,
+            logger=logger,
+        )
 
     def run(self) -> None:
         """Create the collect material and requested shader networks."""
-        self._create_collect_prim(parent_primpath=self.parent_primpath,
-                                  create_usd_preview=self.create_usd_preview,
-                                  create_arnold=self.create_arnold,
-                                  create_mtlx=self.create_mtlx,
-                                  enable_transmission=self.is_transmissive,
-                                  texture_format_overrides=self.texture_format_overrides,
-                                  )
+        collect_usd_material = self._create_collect_material()
+        collect_path = str(collect_usd_material.GetPath())
+        context = self._build_context()
+
+        if self.create_usd_preview:
+            usd_preview_shader = UsdPreviewBuilder(context).build(collect_path)
+            collect_usd_material.CreateSurfaceOutput().ConnectToSource(
+                usd_preview_shader.ConnectableAPI(), "surface"
+            )
+
+        if self.create_arnold:
+            arnold_shader = ArnoldBuilder(context).build(collect_path)
+            collect_usd_material.CreateOutput("arnold:surface", Sdf.ValueTypeNames.Token).ConnectToSource(
+                arnold_shader.ConnectableAPI(), "surface"
+            )
+
+        if self.create_openpbr and self.create_mtlx:
+            logger.warning("OpenPBR enabled; skipping MaterialX standard surface output.")
+            self.create_mtlx = False
+
+        if self.create_mtlx:
+            mtlx_shader = MtlxBuilder(context).build(collect_path)
+            collect_usd_material.CreateOutput("mtlx:surface", Sdf.ValueTypeNames.Token).ConnectToSource(
+                mtlx_shader.ConnectableAPI(), "surface"
+            )
+
+        if self.create_openpbr:
+            openpbr_shader = OpenPbrBuilder(context).build(collect_path)
+            collect_usd_material.CreateOutput("mtlx:surface", Sdf.ValueTypeNames.Token).ConnectToSource(
+                openpbr_shader.ConnectableAPI(), "surface"
+            )
 
 
 
@@ -1039,8 +200,15 @@ class USDShaderAssign:
 
         for mat_prim in found_mats:
             # 2. cleaning material name:
-            mat_name = mat_prim.GetName().replace('_ShaderSG', '')
-            mat_name = mat_name.replace('mat_', '').replace('_collect', '')
+            source_name = mat_prim.GetCustomDataByKey("source_material_name")
+            if source_name:
+                mat_name = str(source_name)
+            else:
+                mat_name = mat_prim.GetName().replace('_ShaderSG', '')
+                if mat_name.startswith("mat_"):
+                    mat_name = mat_name[len("mat_") :]
+                if mat_name.endswith("_collect"):
+                    mat_name = mat_name[: -len("_collect")]
             mesh_parent_prim = self.stage.GetPrimAtPath(mesh_parent_path)
 
             # 3. collect all meshes that have the mat name as part of its name:
@@ -1105,12 +273,13 @@ def create_shaded_asset_publish(
     material_dict_list: MaterialTextureList,
     stage: Optional[Usd.Stage] = None,
     geo_file: Optional[str] = None,
-    parent_path: str = "/ASSET",
+    parent_path: str = "/Asset",
     layer_save_path: Optional[str] = None,
     main_layer_name: str = "main.usda",
     create_usd_preview: bool = True,
     create_arnold: bool = False,
     create_mtlx: bool = True,
+    create_openpbr: bool = False,
     texture_format_overrides: Optional[Mapping[str, str]] = None,
 ) -> None:
     """Create USD layers for materials and optional geometry.
@@ -1125,7 +294,8 @@ def create_shaded_asset_publish(
         create_usd_preview: Whether to create UsdPreviewSurface materials.
         create_arnold: Whether to create Arnold materials.
         create_mtlx: Whether to create MaterialX materials.
-        texture_format_overrides: Optional per-renderer texture format overrides (usd_preview, arnold, mtlx).
+        create_openpbr: Whether to create MaterialX OpenPBR materials.
+        texture_format_overrides: Optional per-renderer texture format overrides (usd_preview, arnold, mtlx, openpbr).
     """
     if not layer_save_path:
         layer_save_path = f"{tempfile.gettempdir()}/temp_usd_export"
@@ -1155,7 +325,10 @@ def create_shaded_asset_publish(
         # payload geo:
         stage.SetEditTarget(layer_root)
         geo_prim = stage.DefinePrim(f'{parent_path}', 'Xform')
-        mesh_rel_path = os.path.relpath(geo_file, layer_save_path)
+        try:
+            mesh_rel_path = os.path.relpath(geo_file, layer_save_path)
+        except ValueError:
+            mesh_rel_path = os.path.abspath(geo_file)
         geo_prim.GetPayloads().AddPayload(mesh_rel_path, f"{parent_path}/mesh/")
 
         # # set kinds for geo prims:
@@ -1169,6 +342,7 @@ def create_shaded_asset_publish(
     # create material_dict_list:
     stage.SetEditTarget(layer_mats)
     material_primitive_path = f"{parent_path}/material"
+    UsdGeom.Scope.Define(stage, material_primitive_path)
 
     for material_dict in material_dict_list:
         material_name = next(
@@ -1183,6 +357,7 @@ def create_shaded_asset_publish(
             create_usd_preview=create_usd_preview,
             create_arnold=create_arnold,
             create_mtlx=create_mtlx,
+            create_openpbr=create_openpbr,
             texture_format_overrides=texture_format_overrides,
         )
 

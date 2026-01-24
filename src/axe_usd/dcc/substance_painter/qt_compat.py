@@ -1,21 +1,29 @@
 """
 Qt compatibility layer for Substance Painter.
 
-Supports PySide2 (SP < 10.1) and PySide6 (SP >= 10.1).
+Supports PySide2 (SP < 10.1.0) and PySide6 (SP >= 10.1.0).
 """
 from __future__ import annotations
 
-try:
-    from PySide6 import QtCore, QtGui, QtWidgets  # type: ignore
-    PYSIDE_VERSION = 6
-except Exception:
+import substance_painter as sp
+
+use_pyside2 = sp.application.version_info() < (10, 1, 0)
+
+if use_pyside2:
     from PySide2 import QtCore, QtGui, QtWidgets  # type: ignore
+
     PYSIDE_VERSION = 2
+else:
+    from PySide6 import QtCore, QtGui, QtWidgets  # type: ignore
+
+    PYSIDE_VERSION = 6
 
 Qt = QtCore.Qt
 
 QIcon = QtGui.QIcon
 QPalette = QtGui.QPalette
+QDesktopServices = QtGui.QDesktopServices
+QUrl = QtCore.QUrl
 
 QCheckBox = QtWidgets.QCheckBox
 QDialog = QtWidgets.QDialog
@@ -39,6 +47,8 @@ __all__ = [
     "Qt",
     "QIcon",
     "QPalette",
+    "QDesktopServices",
+    "QUrl",
     "QCheckBox",
     "QDialog",
     "QFileDialog",

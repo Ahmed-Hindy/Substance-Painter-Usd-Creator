@@ -37,6 +37,7 @@ def test_export_publish_calls_writer():
         usdpreview=True,
         arnold=False,
         materialx=False,
+        openpbr=False,
         primitive_path="/root",
         publish_directory=Path("publish"),
         save_geometry=False,

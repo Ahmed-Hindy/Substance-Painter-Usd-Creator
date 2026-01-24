@@ -10,7 +10,8 @@ class ExportSettings:
     Attributes:
         usdpreview: Whether to emit UsdPreviewSurface materials.
         arnold: Whether to emit Arnold materials.
-        materialx: Whether to emit MaterialX materials.
+        materialx: Whether to emit MaterialX standard surface materials.
+        openpbr: Whether to emit MaterialX OpenPBR materials.
         primitive_path: Root prim path for published assets.
         publish_directory: Output directory for USD layers.
         save_geometry: Whether to export mesh geometry.
@@ -21,6 +22,7 @@ class ExportSettings:
     usdpreview: bool
     arnold: bool
     materialx: bool
+    openpbr: bool
     primitive_path: str
     publish_directory: Path
     save_geometry: bool

@@ -7,8 +7,9 @@ This plugin allows you to export materials and geometry from Adobe Substance Pai
 ## Features
 - Export Substance Painter materials as USD with shader networks for:
   - USD Preview Surface
-  - Arnold Standard Surface
-  - MaterialX (WIP)
+  - Arnold Standard Surface (optional)
+  - MaterialX Standard Surface (legacy)
+  - MaterialX OpenPBR
 - Export mesh geometry to USD
 - Customizable export location and primitive path
 - Simple UI for export settings
@@ -42,9 +43,9 @@ If you previously installed `AxeFX_usd_plugin.py`, `sp_usd_creator/`, `axe_usd/`
 2. Click on Menu Bar -> `Plugins` -> `USD Export Plugin` to open the plugin UI.
    - If the plugin is not visible, ensure it is installed in the correct directory.
 3. Configure the export settings:
-   - **Render Engines**: Select the render engines you want to export (USD Preview, Arnold, MaterialX).
+   - **Render Engines**: Select the render engines you want to export (USD Preview, OpenPBR, MaterialX standard surface, Arnold optional).
    - **Publish Directory**: Set the directory where USD files will be created (e.g., `<export_folder>`).
-   - **Primitive Path**: Set the path for the root node in the USD file (e.g., `/RootNode/Materials`).
+   - **Primitive Path**: Set the root prim path for the asset (e.g., `/RootNode`). Materials are written under `<root>/material`.
    - **Save Geometry**: Check this option to export mesh geometry as a separate USD file (e.g., `mesh.usd`).
 4. Export the textures normally in Substance Painter. The plugin will run automatically after the export process.
 5. The plugin will create a `.usda` file with the specified materials and optionally a `.usd` mesh file if geometry export is enabled.
@@ -58,9 +59,9 @@ If you previously installed `AxeFX_usd_plugin.py`, `sp_usd_creator/`, `axe_usd/`
 ### Exporting Materials and Geometry
 
 1. Open the plugin UI and configure the following settings:
-   - **Render Engines**: Enable `USD Preview` and `Arnold`.
+   - **Render Engines**: Enable `USD Preview` and `OpenPBR`.
    - **Publish Directory**: Set to `<export_folder>`.
-   - **Primitive Path**: Set to `/RootNode/Materials`.
+   - **Primitive Path**: Set to `/RootNode`.
    - **Save Geometry**: Check this option to export mesh geometry.
 
 2. Export textures in Substance Painter. The plugin will:
@@ -83,20 +84,20 @@ The following is an example of the generated `.usda` file for a material named `
 
 def "RootNode"
 {
-    def Scope "Materials"
+    def Scope "material"
     {
-        def Material "_02_Body_collect"
+        def Material "_02_Body"
         {
             int inputs:inputnum = 2
-            token outputs:surface.connect = </RootNode/Materials/_02_Body_collect/UsdPreviewNodeGraph/UsdPreviewSurface.outputs:surface>
+            token outputs:surface.connect = </RootNode/material/_02_Body/UsdPreviewNodeGraph/UsdPreviewSurface.outputs:surface>
 
             def NodeGraph "UsdPreviewNodeGraph"
             {
                 def Shader "UsdPreviewSurface"
                 {
                     uniform token info:id = "UsdPreviewSurface"
-                    float3 inputs:diffuseColor.connect = </RootNode/Materials/_02_Body_collect/UsdPreviewNodeGraph/albedoTexture.outputs:rgb>
-                    float3 inputs:roughness.connect = </RootNode/Materials/_02_Body_collect/UsdPreviewNodeGraph/roughnessTexture.outputs:r>
+                    float3 inputs:diffuseColor.connect = </RootNode/material/_02_Body/UsdPreviewNodeGraph/albedoTexture.outputs:rgb>
+                    float3 inputs:roughness.connect = </RootNode/material/_02_Body/UsdPreviewNodeGraph/roughnessTexture.outputs:r>
                     token outputs:surface
                 }
 
@@ -104,7 +105,7 @@ def "RootNode"
                 {
                     uniform token info:id = "UsdUVTexture"
                     asset inputs:file = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/02_Body_Base_color.png@
-                    float2 inputs:st.connect = </RootNode/Materials/_02_Body_collect/UsdPreviewNodeGraph/TexCoordReader.outputs:result>
+                    float2 inputs:st.connect = </RootNode/material/_02_Body/UsdPreviewNodeGraph/TexCoordReader.outputs:result>
                     float3 outputs:rgb
                 }
 
@@ -119,7 +120,7 @@ def "RootNode"
                 {
                     uniform token info:id = "UsdUVTexture"
                     asset inputs:file = @F:/Users/Ahmed Hindy/Documents/Adobe/Adobe Substance 3D Painter/export/02_Body_Roughness.png@
-                    float2 inputs:st.connect = </RootNode/Materials/_02_Body_collect/UsdPreviewNodeGraph/TexCoordReader.outputs:result>
+                    float2 inputs:st.connect = </RootNode/material/_02_Body/UsdPreviewNodeGraph/TexCoordReader.outputs:result>
                     float3 outputs:r
                 }
             }
