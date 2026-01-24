@@ -16,6 +16,7 @@ def test_pxr_writer_exports_layers(tmp_path):
         usdpreview=True,
         arnold=False,
         materialx=False,
+        openpbr=False,
         primitive_path="/Asset",
         publish_directory=Path(tmp_path),
         save_geometry=False,

@@ -55,8 +55,9 @@ DEFAULT_DIALOGUE_DICT = {
     "publish_location": "<export_folder>",
     "primitive_path": "/Asset",
     "enable_usdpreview": True,
-    "enable_arnold": True,
+    "enable_arnold": False,
     "enable_materialx": True,
+    "enable_openpbr": False,
     "enable_save_geometry": True,
 }
 
@@ -75,7 +76,8 @@ class USDSettings:
     Attributes:
         usdpreview (bool): Include UsdPreviewSurface shader.
         arnold (bool): Include Arnold standard_surface shader.
-        materialx (bool): Include MaterialX shader.
+        materialx (bool): Include MaterialX standard_surface shader.
+        openpbr (bool): Include MaterialX OpenPBR shader.
         primitive_path (str): USD prim path for material_dict_list.
         publish_directory (str): Directory for output USD layers.
         save_geometry (bool): Whether to export mesh geometry.
@@ -87,6 +89,7 @@ class USDSettings:
     primitive_path: str
     publish_directory: str
     save_geometry: bool
+    openpbr: bool
 
 
 class MeshExporter:
@@ -193,11 +196,14 @@ class USDExporterView(QDialog):
         self.usdpreview.setChecked(DEFAULT_DIALOGUE_DICT["enable_usdpreview"])
         self.arnold = QCheckBox("Arnold")
         self.arnold.setChecked(DEFAULT_DIALOGUE_DICT["enable_arnold"])
-        self.materialx = QCheckBox("MaterialX")
+        self.materialx = QCheckBox("MaterialX (Standard Surface)")
         self.materialx.setChecked(DEFAULT_DIALOGUE_DICT["enable_materialx"])
+        self.openpbr = QCheckBox("OpenPBR (MaterialX)")
+        self.openpbr.setChecked(DEFAULT_DIALOGUE_DICT["enable_openpbr"])
         engine_layout.addWidget(self.usdpreview)
         engine_layout.addWidget(self.arnold)
         engine_layout.addWidget(self.materialx)
+        engine_layout.addWidget(self.openpbr)
         engine_box.setLayout(engine_layout)
         engine_box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
         content_layout.addWidget(engine_box)
@@ -375,6 +381,7 @@ class USDExporterView(QDialog):
             primitive_path,
             publish_dir,
             self.geom.isChecked(),
+            self.openpbr.isChecked(),
         )
 
 
@@ -464,6 +471,7 @@ def on_post_export(context: ExportContext) -> None:
         usdpreview=raw.usdpreview,
         arnold=raw.arnold,
         materialx=raw.materialx,
+        openpbr=raw.openpbr,
         primitive_path=primitive_path,
         publish_directory=Path(publish_dir),
         save_geometry=raw.save_geometry,

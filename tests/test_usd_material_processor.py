@@ -156,6 +156,71 @@ def test_mtlx_metalness_is_float(tmp_path):
     assert std_shader.GetInput("metalness").GetTypeName() == pxr.Sdf.ValueTypeNames.Float
 
 
+def test_openpbr_surface_id(tmp_path):
+    """Ensure OpenPBR surface shader is authored with the correct ID."""
+    material_dict_list = [
+        {
+            "basecolor": {
+                "mat_name": "MatA",
+                "path": "C:/tex/MatA_BaseColor.exr",
+            }
+        }
+    ]
+
+    material_processor.create_shaded_asset_publish(
+        material_dict_list=material_dict_list,
+        stage=None,
+        geo_file=None,
+        parent_path="/Asset",
+        layer_save_path=str(tmp_path),
+        main_layer_name="main.usda",
+        create_usd_preview=False,
+        create_arnold=False,
+        create_mtlx=False,
+        create_openpbr=True,
+    )
+
+    stage = pxr.Usd.Stage.Open(str(tmp_path / "main.usda"))
+    shader_prim = stage.GetPrimAtPath("/Asset/material/MatA/openpbr_surface1")
+    shader = pxr.UsdShade.Shader(shader_prim)
+    assert shader.GetIdAttr().Get() == "ND_open_pbr_surface_surfaceshader"
+
+
+def test_openpbr_input_names(tmp_path):
+    """Ensure OpenPBR uses base_metalness and geometry_normal inputs."""
+    material_dict_list = [
+        {
+            "metalness": {
+                "mat_name": "MatA",
+                "path": "C:/tex/MatA_Metalness.exr",
+            },
+            "normal": {
+                "mat_name": "MatA",
+                "path": "C:/tex/MatA_Normal.exr",
+            },
+        }
+    ]
+
+    material_processor.create_shaded_asset_publish(
+        material_dict_list=material_dict_list,
+        stage=None,
+        geo_file=None,
+        parent_path="/Asset",
+        layer_save_path=str(tmp_path),
+        main_layer_name="main.usda",
+        create_usd_preview=False,
+        create_arnold=False,
+        create_mtlx=False,
+        create_openpbr=True,
+    )
+
+    stage = pxr.Usd.Stage.Open(str(tmp_path / "main.usda"))
+    shader_prim = stage.GetPrimAtPath("/Asset/material/MatA/openpbr_surface1")
+    shader = pxr.UsdShade.Shader(shader_prim)
+    assert shader.GetInput("base_metalness") is not None
+    assert shader.GetInput("geometry_normal") is not None
+
+
 def test_assign_material_raises_for_non_material():
     stage = pxr.Usd.Stage.CreateInMemory()
     prim = stage.DefinePrim("/NotMaterial", "Xform")

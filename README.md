@@ -7,8 +7,9 @@ This plugin allows you to export materials and geometry from Adobe Substance Pai
 ## Features
 - Export Substance Painter materials as USD with shader networks for:
   - USD Preview Surface
-  - Arnold Standard Surface
-  - MaterialX (WIP)
+  - Arnold Standard Surface (optional)
+  - MaterialX Standard Surface (legacy)
+  - MaterialX OpenPBR
 - Export mesh geometry to USD
 - Customizable export location and primitive path
 - Simple UI for export settings
@@ -42,7 +43,7 @@ If you previously installed `AxeFX_usd_plugin.py`, `sp_usd_creator/`, `axe_usd/`
 2. Click on Menu Bar -> `Plugins` -> `USD Export Plugin` to open the plugin UI.
    - If the plugin is not visible, ensure it is installed in the correct directory.
 3. Configure the export settings:
-   - **Render Engines**: Select the render engines you want to export (USD Preview, Arnold, MaterialX).
+   - **Render Engines**: Select the render engines you want to export (USD Preview, OpenPBR, MaterialX standard surface, Arnold optional).
    - **Publish Directory**: Set the directory where USD files will be created (e.g., `<export_folder>`).
    - **Primitive Path**: Set the root prim path for the asset (e.g., `/RootNode`). Materials are written under `<root>/material`.
    - **Save Geometry**: Check this option to export mesh geometry as a separate USD file (e.g., `mesh.usd`).
@@ -58,7 +59,7 @@ If you previously installed `AxeFX_usd_plugin.py`, `sp_usd_creator/`, `axe_usd/`
 ### Exporting Materials and Geometry
 
 1. Open the plugin UI and configure the following settings:
-   - **Render Engines**: Enable `USD Preview` and `Arnold`.
+   - **Render Engines**: Enable `USD Preview` and `OpenPBR`.
    - **Publish Directory**: Set to `<export_folder>`.
    - **Primitive Path**: Set to `/RootNode`.
    - **Save Geometry**: Check this option to export mesh geometry.

@@ -56,7 +56,8 @@ The Substance Painter plugins folder should contain:
 You can override texture formats per renderer by passing `texture_format_overrides` in
 `ExportSettings`. Keys are `usd_preview`, `arnold`, and `mtlx`, and values can be file
 extensions with or without a leading dot. Overrides replace existing suffixes and are
-appended when the texture path has no suffix.
+appended when the texture path has no suffix. Keys are `usd_preview`, `arnold`, `mtlx`,
+and `openpbr`. When no override is provided, non-USDPreview renderers default to `png`.
 
 Example:
 ```python
@@ -64,6 +65,7 @@ settings = ExportSettings(
     usdpreview=True,
     arnold=True,
     materialx=True,
+    openpbr=False,
     primitive_path="/Asset",
     publish_directory=Path("publish"),
     save_geometry=False,
@@ -71,6 +73,7 @@ settings = ExportSettings(
         "usd_preview": "jpg",
         "arnold": ".exr",
         "mtlx": "png",
+        "openpbr": "png",
     },
 )
 ```

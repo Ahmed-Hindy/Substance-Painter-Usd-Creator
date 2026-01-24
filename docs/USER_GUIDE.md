@@ -25,7 +25,7 @@ If you previously installed `AxeFX_usd_plugin.py`, `sp_usd_creator/`, `axe_usd/`
 1. Open Substance Painter.
 2. Menu: `Plugins` -> `USD Exporter`.
 3. Configure:
-   - Render Engines: USD Preview, Arnold, MaterialX.
+   - Render Engines: USD Preview, OpenPBR, MaterialX standard surface, Arnold optional.
    - Publish Directory: target folder for USD outputs.
    - Primitive Path: root prim for the asset (e.g., `/Asset`). Materials are written under `<root>/material`.
    - Save Geometry: exports mesh as `layers/mesh.usd` if enabled.
@@ -53,7 +53,8 @@ Tokens are matched as standalone words (non-alphanumeric boundaries), so unrelat
 ## Notes
 - USD Preview uses `metallic`, Arnold/MaterialX use `metalness`. The plugin normalizes this for you.
 - The publish directory can include `<export_folder>` to substitute the active texture export folder.
-- Advanced: per-renderer texture format overrides (`usd_preview`, `arnold`, `mtlx`) are available via the API (see `docs/DEVELOPER_GUIDE.md`).
+- By default, non-USDPreview renderers use `png` texture overrides unless customized via the API.
+- Advanced: per-renderer texture format overrides (`usd_preview`, `arnold`, `mtlx`, `openpbr`) are available via the API (see `docs/DEVELOPER_GUIDE.md`).
 
 ## Troubleshooting
 - Plugin not showing up:

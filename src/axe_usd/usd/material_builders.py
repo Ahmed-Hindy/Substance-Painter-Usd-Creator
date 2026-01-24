@@ -13,6 +13,7 @@ from .types import MaterialTextureDict
 RENDERER_USD_PREVIEW = "usd_preview"
 RENDERER_ARNOLD = "arnold"
 RENDERER_MTLX = "mtlx"
+RENDERER_OPENPBR = "openpbr"
 
 USD_PREVIEW_INPUTS = {
     "basecolor": "diffuseColor",
@@ -39,6 +40,15 @@ MTLX_INPUTS = {
     "metalness": "metalness",
     "roughness": "specular_roughness",
     "normal": "normal",
+    "opacity": "opacity",
+    "displacement": "displacement",
+}
+
+OPENPBR_INPUTS = {
+    "basecolor": "base_color",
+    "metalness": "base_metalness",
+    "roughness": "specular_roughness",
+    "normal": "geometry_normal",
     "opacity": "opacity",
     "displacement": "displacement",
 }
@@ -153,7 +163,7 @@ class ArnoldBuilder:
         shader.CreateInput("aov_id8", Sdf.ValueTypeNames.Float3).Set((0, 0, 0))
         shader.CreateInput("base", Sdf.ValueTypeNames.Float).Set(1)
         shader.CreateInput("base_color", Sdf.ValueTypeNames.Float3).Set((0.8, 0.8, 0.8))
-        shader.CreateInput("metalness", Sdf.ValueTypeNames.Float).Set(0)
+        shader.CreateInput("base_metalness", Sdf.ValueTypeNames.Float).Set(0)
         shader.CreateInput("specular", Sdf.ValueTypeNames.Float).Set(1)
         shader.CreateInput("specular_color", Sdf.ValueTypeNames.Float3).Set((1, 1, 1))
         shader.CreateInput("specular_roughness", Sdf.ValueTypeNames.Float).Set(0.2)
@@ -501,7 +511,151 @@ class MtlxBuilder:
                     texture_shader.ConnectableAPI(),
                     "out",
                 )
-                std_surf_shader.CreateInput("normal", Sdf.ValueTypeNames.Float3).ConnectToSource(
+                std_surf_shader.CreateInput(input_name, Sdf.ValueTypeNames.Float3).ConnectToSource(
+                    normal_map_shader.ConnectableAPI(),
+                    "out",
+                )
+            elif slot == "displacement":
+                continue
+
+
+class OpenPbrBuilder:
+    def __init__(self, context: MaterialBuildContext) -> None:
+        self._context = context
+
+    def build(self, collect_path: str) -> UsdShade.Shader:
+        stage = self._context.stage
+        override = self._context.texture_format_overrides.for_renderer(RENDERER_OPENPBR)
+
+        shader_path = f"{collect_path}/openpbr_surface1"
+        shader = UsdShade.Shader.Define(stage, shader_path)
+        shader.CreateIdAttr("ND_open_pbr_surface_surfaceshader")
+
+        self._initialize_surface(shader)
+        self._wire_textures(collect_path, shader, override)
+
+        if self._context.is_transmissive:
+            self._enable_transmission(shader)
+
+        return shader
+
+    def _initialize_surface(self, shader: UsdShade.Shader) -> None:
+        shader.CreateInput("base", Sdf.ValueTypeNames.Float).Set(1)
+        shader.CreateInput("base_color", Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f(0.8, 0.8, 0.8))
+        shader.CreateInput("coat", Sdf.ValueTypeNames.Float).Set(0)
+        shader.CreateInput("coat_roughness", Sdf.ValueTypeNames.Float).Set(0.1)
+        shader.CreateInput("emission", Sdf.ValueTypeNames.Float).Set(0)
+        shader.CreateInput("emission_color", Sdf.ValueTypeNames.Float3).Set((1, 1, 1))
+        shader.CreateInput("metalness", Sdf.ValueTypeNames.Float).Set(0)
+        shader.CreateInput("specular", Sdf.ValueTypeNames.Float).Set(1)
+        shader.CreateInput("specular_color", Sdf.ValueTypeNames.Float3).Set((1, 1, 1))
+        shader.CreateInput("specular_IOR", Sdf.ValueTypeNames.Float).Set(1.5)
+        shader.CreateInput("specular_roughness", Sdf.ValueTypeNames.Float).Set(0.2)
+        shader.CreateInput("transmission", Sdf.ValueTypeNames.Float).Set(0)
+        shader.CreateInput("thin_walled", Sdf.ValueTypeNames.Int).Set(0)
+        shader.CreateInput("opacity", Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f(1, 1, 1))
+
+    def _initialize_image_shader(self, image_path: str, signature: str = "color3") -> UsdShade.Shader:
+        shader = UsdShade.Shader.Define(self._context.stage, image_path)
+        shader.CreateIdAttr(f"ND_image_{signature}")
+        shader.CreateInput("file", Sdf.ValueTypeNames.Asset)
+        return shader
+
+    def _initialize_color_correct_shader(
+        self,
+        color_correct_path: str,
+        signature: str = "color3",
+    ) -> UsdShade.Shader:
+        shader = UsdShade.Shader.Define(self._context.stage, color_correct_path)
+        shader.CreateIdAttr(f"ND_colorcorrect_{signature}")
+        return shader
+
+    def _initialize_range_shader(self, range_path: str, signature: str = "color3") -> UsdShade.Shader:
+        shader = UsdShade.Shader.Define(self._context.stage, range_path)
+        shader.CreateIdAttr(f"ND_range_{signature}")
+        return shader
+
+    def _initialize_normal_map_shader(self, normal_map_path: str) -> UsdShade.Shader:
+        shader = UsdShade.Shader.Define(self._context.stage, normal_map_path)
+        shader.CreateIdAttr("ND_normalmap")
+        return shader
+
+    def _enable_transmission(self, shader: UsdShade.Shader) -> None:
+        shader.GetInput("transmission").Set(0.9)
+        shader.GetInput("thin_walled").Set(1)
+
+    def _wire_textures(
+        self,
+        collect_path: str,
+        std_surf_shader: UsdShade.Shader,
+        override: Optional[str],
+    ) -> None:
+        image_signature = {
+            "basecolor": "color3",
+            "normal": "vector3",
+            "metalness": "float",
+            "opacity": "color3",
+            "roughness": "float",
+            "displacement": "float",
+        }
+
+        for slot, input_name, path in _iter_textures(self._context, OPENPBR_INPUTS, "openpbr"):
+            tex_filepath = apply_texture_format_override(path, override)
+            texture_prim_path = f"{collect_path}/openpbr_{slot}Texture"
+            texture_shader = self._initialize_image_shader(
+                texture_prim_path,
+                signature=image_signature[slot],
+            )
+            texture_shader.GetInput("file").Set(tex_filepath)
+
+            if slot == "basecolor":
+                color_correct_path = f"{collect_path}/openpbr_{slot}ColorCorrect"
+                color_correct_shader = self._initialize_color_correct_shader(color_correct_path)
+                color_correct_shader.CreateInput("in", Sdf.ValueTypeNames.Color3f).ConnectToSource(
+                    texture_shader.ConnectableAPI(),
+                    "out",
+                )
+                std_surf_shader.CreateInput(input_name, Sdf.ValueTypeNames.Color3f).ConnectToSource(
+                    color_correct_shader.ConnectableAPI(),
+                    "out",
+                )
+            elif slot == "metalness":
+                if self._context.is_transmissive:
+                    continue
+                range_path = f"{collect_path}/openpbr_{slot}Range"
+                range_shader = self._initialize_range_shader(range_path, signature="float")
+                range_shader.CreateInput("in", Sdf.ValueTypeNames.Float).ConnectToSource(
+                    texture_shader.ConnectableAPI(),
+                    "out",
+                )
+                std_surf_shader.CreateInput(input_name, Sdf.ValueTypeNames.Float).ConnectToSource(
+                    range_shader.ConnectableAPI(),
+                    "out",
+                )
+            elif slot == "roughness":
+                range_path = f"{collect_path}/openpbr_{slot}Range"
+                range_shader = self._initialize_range_shader(range_path, signature="float")
+                range_shader.CreateInput("in", Sdf.ValueTypeNames.Float).ConnectToSource(
+                    texture_shader.ConnectableAPI(),
+                    "out",
+                )
+                std_surf_shader.CreateInput(input_name, Sdf.ValueTypeNames.Float).ConnectToSource(
+                    range_shader.ConnectableAPI(),
+                    "out",
+                )
+            elif slot == "opacity":
+                std_surf_shader.CreateInput(input_name, Sdf.ValueTypeNames.Color3f).ConnectToSource(
+                    texture_shader.ConnectableAPI(),
+                    "out",
+                )
+            elif slot == "normal":
+                normal_map_path = f"{collect_path}/openpbr_NormalMap"
+                normal_map_shader = self._initialize_normal_map_shader(normal_map_path)
+                normal_map_shader.CreateInput("in", Sdf.ValueTypeNames.Float3).ConnectToSource(
+                    texture_shader.ConnectableAPI(),
+                    "out",
+                )
+                std_surf_shader.CreateInput(input_name, Sdf.ValueTypeNames.Float3).ConnectToSource(
                     normal_map_shader.ConnectableAPI(),
                     "out",
                 )

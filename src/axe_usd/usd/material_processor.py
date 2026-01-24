@@ -11,7 +11,7 @@ from typing import Iterable, Mapping, Optional
 from pxr import Sdf, Tf, Usd, UsdGeom, UsdShade
 
 from . import utils as usd_utils
-from .material_builders import ArnoldBuilder, MaterialBuildContext, MtlxBuilder, UsdPreviewBuilder
+from .material_builders import ArnoldBuilder, MaterialBuildContext, MtlxBuilder, OpenPbrBuilder, UsdPreviewBuilder
 from .material_model import TextureFormatOverrides, is_transmissive_material, normalize_material_dict
 from .types import MaterialTextureDict, MaterialTextureList
 
@@ -30,7 +30,8 @@ class USDShaderCreate:
         create_usd_preview: Whether to create UsdPreviewSurface materials.
         create_arnold: Whether to create Arnold materials.
         create_mtlx: Whether to create MaterialX materials.
-        texture_format_overrides: Optional per-renderer texture format overrides (usd_preview, arnold, mtlx).
+        create_openpbr: Whether to create MaterialX OpenPBR materials.
+        texture_format_overrides: Optional per-renderer texture format overrides (usd_preview, arnold, mtlx, openpbr).
         is_transmissive: Whether the material is treated as transmissive.
     """
 
@@ -43,6 +44,7 @@ class USDShaderCreate:
         create_usd_preview: bool = False,
         create_arnold: bool = False,
         create_mtlx: bool = False,
+        create_openpbr: bool = False,
         texture_format_overrides: Optional[Mapping[str, str]] = None,
     ) -> None:
         """Initialize the shader creator and build the materials.
@@ -55,7 +57,8 @@ class USDShaderCreate:
             create_usd_preview: Whether to create UsdPreviewSurface materials.
             create_arnold: Whether to create Arnold materials.
             create_mtlx: Whether to create MaterialX materials.
-            texture_format_overrides: Optional per-renderer texture format overrides (usd_preview, arnold, mtlx).
+            create_openpbr: Whether to create MaterialX OpenPBR materials.
+            texture_format_overrides: Optional per-renderer texture format overrides (usd_preview, arnold, mtlx, openpbr).
         """
         self.stage = stage
         self.material_dict = normalize_material_dict(material_dict, logger=logger)
@@ -64,6 +67,7 @@ class USDShaderCreate:
         self.create_usd_preview = create_usd_preview
         self.create_arnold = create_arnold
         self.create_mtlx = create_mtlx
+        self.create_openpbr = create_openpbr
         self.texture_format_overrides = TextureFormatOverrides.from_mapping(texture_format_overrides)
 
         self.is_transmissive = is_transmissive_material(self.material_name)
@@ -118,10 +122,20 @@ class USDShaderCreate:
                 arnold_shader.ConnectableAPI(), "surface"
             )
 
+        if self.create_openpbr and self.create_mtlx:
+            logger.warning("OpenPBR enabled; skipping MaterialX standard surface output.")
+            self.create_mtlx = False
+
         if self.create_mtlx:
             mtlx_shader = MtlxBuilder(context).build(collect_path)
             collect_usd_material.CreateOutput("mtlx:surface", Sdf.ValueTypeNames.Token).ConnectToSource(
                 mtlx_shader.ConnectableAPI(), "surface"
+            )
+
+        if self.create_openpbr:
+            openpbr_shader = OpenPbrBuilder(context).build(collect_path)
+            collect_usd_material.CreateOutput("mtlx:surface", Sdf.ValueTypeNames.Token).ConnectToSource(
+                openpbr_shader.ConnectableAPI(), "surface"
             )
 
 
@@ -265,6 +279,7 @@ def create_shaded_asset_publish(
     create_usd_preview: bool = True,
     create_arnold: bool = False,
     create_mtlx: bool = True,
+    create_openpbr: bool = False,
     texture_format_overrides: Optional[Mapping[str, str]] = None,
 ) -> None:
     """Create USD layers for materials and optional geometry.
@@ -279,7 +294,8 @@ def create_shaded_asset_publish(
         create_usd_preview: Whether to create UsdPreviewSurface materials.
         create_arnold: Whether to create Arnold materials.
         create_mtlx: Whether to create MaterialX materials.
-        texture_format_overrides: Optional per-renderer texture format overrides (usd_preview, arnold, mtlx).
+        create_openpbr: Whether to create MaterialX OpenPBR materials.
+        texture_format_overrides: Optional per-renderer texture format overrides (usd_preview, arnold, mtlx, openpbr).
     """
     if not layer_save_path:
         layer_save_path = f"{tempfile.gettempdir()}/temp_usd_export"
@@ -341,6 +357,7 @@ def create_shaded_asset_publish(
             create_usd_preview=create_usd_preview,
             create_arnold=create_arnold,
             create_mtlx=create_mtlx,
+            create_openpbr=create_openpbr,
             texture_format_overrides=texture_format_overrides,
         )
 

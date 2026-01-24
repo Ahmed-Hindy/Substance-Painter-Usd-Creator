@@ -70,4 +70,8 @@ class TextureFormatOverrides:
         return cls(normalized)
 
     def for_renderer(self, renderer: str) -> Optional[str]:
-        return self.overrides.get(renderer)
+        if renderer == "usd_preview":
+            return self.overrides.get(renderer)
+        if renderer in self.overrides:
+            return self.overrides.get(renderer)
+        return "png"

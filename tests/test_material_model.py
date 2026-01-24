@@ -44,4 +44,13 @@ def test_texture_format_overrides_normalizes_keys():
 
     assert overrides.for_renderer("usd_preview") == "jpg"
     assert overrides.for_renderer("arnold") == ".tif"
-    assert overrides.for_renderer("mtlx") is None
+    assert overrides.for_renderer("mtlx") == "png"
+
+
+def test_texture_format_overrides_default_to_png():
+    overrides = TextureFormatOverrides.from_mapping(None)
+
+    assert overrides.for_renderer("usd_preview") is None
+    assert overrides.for_renderer("arnold") == "png"
+    assert overrides.for_renderer("mtlx") == "png"
+    assert overrides.for_renderer("openpbr") == "png"
