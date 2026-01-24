@@ -8,7 +8,7 @@ import os
 import tempfile
 from typing import Iterable, Mapping, Optional
 
-from pxr import Sdf, Usd, UsdGeom, UsdShade
+from pxr import Sdf, Tf, Usd, UsdGeom, UsdShade
 
 from . import utils as usd_utils
 from .material_builders import ArnoldBuilder, MaterialBuildContext, MtlxBuilder, UsdPreviewBuilder
@@ -39,7 +39,7 @@ class USDShaderCreate:
         stage: Usd.Stage,
         material_name: str,
         material_dict: MaterialTextureDict,
-        parent_primpath: str = "/root/material",
+        parent_primpath: str = "/Asset/material",
         create_usd_preview: bool = False,
         create_arnold: bool = False,
         create_mtlx: bool = False,
@@ -73,9 +73,22 @@ class USDShaderCreate:
         self.run()
 
     def _create_collect_material(self) -> UsdShade.Material:
-        collect_prim_path = f"{self.parent_primpath}/mat_{self.material_name}_collect"
+        UsdGeom.Scope.Define(self.stage, self.parent_primpath)
+        prim_name = self.material_name or "Material"
+        if not Sdf.Path.IsValidIdentifier(prim_name):
+            prim_name = f"_{prim_name}"
+            sanitized = Tf.MakeValidIdentifier(prim_name)
+            logger.debug(
+                "Material name '%s' is not a valid USD identifier; using '%s'.",
+                prim_name,
+                sanitized,
+            )
+            prim_name = sanitized
+        collect_prim_path = f"{self.parent_primpath}/{prim_name}"
         collect_usd_material = UsdShade.Material.Define(self.stage, collect_prim_path)
         collect_usd_material.CreateInput("inputnum", Sdf.ValueTypeNames.Int).Set(2)
+        collect_usd_material.GetPrim().SetCustomDataByKey("source_material_name", self.material_name)
+        collect_usd_material.GetPrim().SetMetadata("displayName", self.material_name)
         return collect_usd_material
 
     def _build_context(self) -> MaterialBuildContext:
@@ -173,8 +186,15 @@ class USDShaderAssign:
 
         for mat_prim in found_mats:
             # 2. cleaning material name:
-            mat_name = mat_prim.GetName().replace('_ShaderSG', '')
-            mat_name = mat_name.replace('mat_', '').replace('_collect', '')
+            source_name = mat_prim.GetCustomDataByKey("source_material_name")
+            if source_name:
+                mat_name = str(source_name)
+            else:
+                mat_name = mat_prim.GetName().replace('_ShaderSG', '')
+                if mat_name.startswith("mat_"):
+                    mat_name = mat_name[len("mat_") :]
+                if mat_name.endswith("_collect"):
+                    mat_name = mat_name[: -len("_collect")]
             mesh_parent_prim = self.stage.GetPrimAtPath(mesh_parent_path)
 
             # 3. collect all meshes that have the mat name as part of its name:
@@ -239,7 +259,7 @@ def create_shaded_asset_publish(
     material_dict_list: MaterialTextureList,
     stage: Optional[Usd.Stage] = None,
     geo_file: Optional[str] = None,
-    parent_path: str = "/ASSET",
+    parent_path: str = "/Asset",
     layer_save_path: Optional[str] = None,
     main_layer_name: str = "main.usda",
     create_usd_preview: bool = True,
@@ -289,7 +309,10 @@ def create_shaded_asset_publish(
         # payload geo:
         stage.SetEditTarget(layer_root)
         geo_prim = stage.DefinePrim(f'{parent_path}', 'Xform')
-        mesh_rel_path = os.path.relpath(geo_file, layer_save_path)
+        try:
+            mesh_rel_path = os.path.relpath(geo_file, layer_save_path)
+        except ValueError:
+            mesh_rel_path = os.path.abspath(geo_file)
         geo_prim.GetPayloads().AddPayload(mesh_rel_path, f"{parent_path}/mesh/")
 
         # # set kinds for geo prims:
@@ -303,6 +326,7 @@ def create_shaded_asset_publish(
     # create material_dict_list:
     stage.SetEditTarget(layer_mats)
     material_primitive_path = f"{parent_path}/material"
+    UsdGeom.Scope.Define(stage, material_primitive_path)
 
     for material_dict in material_dict_list:
         material_name = next(

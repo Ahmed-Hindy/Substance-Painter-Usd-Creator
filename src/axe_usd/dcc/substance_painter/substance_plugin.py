@@ -25,9 +25,11 @@ from .qt_compat import (
     QSizePolicy,
     QVBoxLayout,
     QWidget,
+    QDesktopServices,
     QIcon,
     QPalette,
     Qt,
+    QUrl,
 )
 
 from ...core.exporter import export_publish
@@ -45,12 +47,13 @@ import substance_painter.ui
 
 # Configure logging
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+if not logger.handlers:
+    logger.addHandler(logging.NullHandler())
 
 DEFAULT_DIALOGUE_DICT = {
     "title": "USD Exporter",
     "publish_location": "<export_folder>",
-    "primitive_path": "/root",
+    "primitive_path": "/Asset",
     "enable_usdpreview": True,
     "enable_arnold": True,
     "enable_materialx": True,
@@ -61,24 +64,7 @@ DEFAULT_DIALOGUE_DICT = {
 plugin_widgets = []
 usd_exported_qdialog = None
 callbacks_registered = False
-
-
-def _is_widget_valid(widget) -> bool:
-    """Return True when the Qt widget reference is still valid.
-
-    Args:
-        widget: Qt widget instance or None.
-
-    Returns:
-        bool: True if the widget is valid or unavailable to validate.
-    """
-    if widget is None:
-        return False
-    try:
-        from shiboken2 import isValid
-    except Exception:
-        return True
-    return isValid(widget)
+last_export_dir: Optional[Path] = None
 
 
 @dataclass
@@ -239,6 +225,11 @@ class USDExporterView(QDialog):
         self.pub_browse.clicked.connect(self._browse_publish_directory)
         self.pub_browse.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
         pub_row.addWidget(self.pub_browse, 0)
+        self.pub_open = QPushButton("Open Folder")
+        self.pub_open.setToolTip("Open the publish folder in your file browser")
+        self.pub_open.clicked.connect(self._open_publish_directory)
+        self.pub_open.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+        pub_row.addWidget(self.pub_open, 0)
         pub_row_widget = QWidget()
         pub_row_widget.setLayout(pub_row)
         paths_layout.addRow("Publish Directory", pub_row_widget)
@@ -249,12 +240,12 @@ class USDExporterView(QDialog):
         self.prim = QLineEdit()
         self.prim.setMinimumWidth(320)
         self.prim.setPlaceholderText(DEFAULT_DIALOGUE_DICT["primitive_path"])
-        self.prim.setToolTip("USD prim path where material_dict_list will be created")
+        self.prim.setToolTip("Root prim path for the asset; materials go under <root>/material")
         self.prim.setClearButtonEnabled(True)
         self.prim.editingFinished.connect(self._validate_prim_path)
         paths_layout.addRow("Primitive Path", self.prim)
 
-        prim_hint = self._make_hint_label("Example: /root or /root/materials")
+        prim_hint = self._make_hint_label("Example: /Asset or /Scene/Asset")
         paths_layout.addRow("", prim_hint)
 
         paths_box.setLayout(paths_layout)
@@ -339,6 +330,33 @@ class USDExporterView(QDialog):
         if selected:
             self.pub.setText(selected)
 
+    def _resolve_publish_directory(self) -> Optional[Path]:
+        publish_dir = self.pub.text().strip() or DEFAULT_DIALOGUE_DICT["publish_location"]
+        if "<export_folder>" in publish_dir:
+            if last_export_dir is None:
+                QMessageBox.warning(
+                    self,
+                    "Publish Folder",
+                    "Export once to resolve <export_folder> before opening the folder.",
+                )
+                return None
+            publish_dir = publish_dir.replace("<export_folder>", str(last_export_dir))
+        return Path(publish_dir)
+
+    def _open_publish_directory(self) -> None:
+        """Open the resolved publish directory in the file browser."""
+        publish_dir = self._resolve_publish_directory()
+        if not publish_dir:
+            return
+        if not publish_dir.exists():
+            QMessageBox.information(
+                self,
+                "Publish Folder",
+                f"Folder does not exist yet:\n{publish_dir}",
+            )
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(publish_dir)))
+
     def get_settings(self) -> USDSettings:
         """
         Read UI state into USDSettings.
@@ -396,32 +414,89 @@ def on_post_export(context: ExportContext) -> None:
         context: Substance Painter export context.
     """
     print("ExportTexturesEnded emitted!!!")
-    if not _is_widget_valid(usd_exported_qdialog):
+    if usd_exported_qdialog is None:
         logger.warning("USD Export UI is not available; skipping export.")
         return
     if not context.textures:
         logger.warning("No textures exported; skipping USD publish.")
+        QMessageBox.information(
+            usd_exported_qdialog,
+            "USD Exporter",
+            "No textures were exported. USD publish skipped.",
+        )
         return
 
-    first_tex = next(iter(context.textures.values()))[0]
-    export_dir = Path(first_tex).parent
+    empty_sets = [key for key, paths in context.textures.items() if not paths]
+    if empty_sets:
+        for key in empty_sets:
+            logger.warning("Texture set '%s' exported no files; skipping.", key)
+        QMessageBox.warning(
+            usd_exported_qdialog,
+            "USD Exporter",
+            "Some texture sets exported no files and were skipped.",
+        )
+
+    first_path = next((paths[0] for paths in context.textures.values() if paths), None)
+    if not first_path:
+        logger.warning("No exported texture files found; skipping USD publish.")
+        QMessageBox.information(
+            usd_exported_qdialog,
+            "USD Exporter",
+            "No texture files were exported. USD publish skipped.",
+        )
+        return
+    export_dir = Path(first_path).parent
+    global last_export_dir
+    last_export_dir = export_dir
 
     raw = usd_exported_qdialog.get_settings()
+    primitive_path = raw.primitive_path
+    if not primitive_path.startswith("/"):
+        logger.warning("Primitive path must start with '/': %s", primitive_path)
+        QMessageBox.warning(
+            usd_exported_qdialog,
+            "Invalid Primitive Path",
+            "Primitive path must start with '/'.",
+        )
+        return
     publish_dir = raw.publish_directory.replace("<export_folder>", str(export_dir))
     settings = ExportSettings(
         usdpreview=raw.usdpreview,
         arnold=raw.arnold,
         materialx=raw.materialx,
-        primitive_path=raw.primitive_path,
+        primitive_path=primitive_path,
         publish_directory=Path(publish_dir),
         save_geometry=raw.save_geometry,
     )
     materials = parse_textures(context.textures)
+    if not materials:
+        logger.warning("No recognized textures found; skipping USD publish.")
+        QMessageBox.information(
+            usd_exported_qdialog,
+            "USD Exporter",
+            "No recognized textures were found. USD publish skipped.",
+        )
+        return
 
     geo_file = None
     if settings.save_geometry:
         geo_file = MeshExporter(settings).export_mesh()
-    export_publish(materials, settings, geo_file, PxrUsdWriter())
+        if geo_file is None:
+            logger.warning("Mesh export failed; exporting materials only.")
+            QMessageBox.warning(
+                usd_exported_qdialog,
+                "USD Exporter",
+                "Mesh export failed. Exporting materials only.",
+            )
+    try:
+        export_publish(materials, settings, geo_file, PxrUsdWriter())
+    except Exception as exc:
+        logger.exception("USD export failed: %s", exc)
+        QMessageBox.critical(
+            usd_exported_qdialog,
+            "USD Exporter",
+            f"USD export failed:\n{exc}",
+        )
 
 
 def close_plugin() -> None:

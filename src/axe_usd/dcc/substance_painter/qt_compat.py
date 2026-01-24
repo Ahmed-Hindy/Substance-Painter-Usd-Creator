@@ -22,6 +22,8 @@ Qt = QtCore.Qt
 
 QIcon = QtGui.QIcon
 QPalette = QtGui.QPalette
+QDesktopServices = QtGui.QDesktopServices
+QUrl = QtCore.QUrl
 
 QCheckBox = QtWidgets.QCheckBox
 QDialog = QtWidgets.QDialog
@@ -45,6 +47,8 @@ __all__ = [
     "Qt",
     "QIcon",
     "QPalette",
+    "QDesktopServices",
+    "QUrl",
     "QCheckBox",
     "QDialog",
     "QFileDialog",

@@ -27,7 +27,7 @@ If you previously installed `AxeFX_usd_plugin.py`, `sp_usd_creator/`, `axe_usd/`
 3. Configure:
    - Render Engines: USD Preview, Arnold, MaterialX.
    - Publish Directory: target folder for USD outputs.
-   - Primitive Path: root prim for materials (e.g., `/RootNode/Materials`).
+   - Primitive Path: root prim for the asset (e.g., `/Asset`). Materials are written under `<root>/material`.
    - Save Geometry: exports mesh as `layers/mesh.usd` if enabled.
 4. Export textures normally in Substance Painter. After export finishes, the plugin writes USD files.
 

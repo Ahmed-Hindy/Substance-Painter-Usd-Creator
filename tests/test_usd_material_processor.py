@@ -28,7 +28,7 @@ def test_create_shaded_asset_publish_creates_layers(tmp_path):
         material_dict_list=material_dict_list,
         stage=None,
         geo_file=None,
-        parent_path="/ASSET",
+        parent_path="/Asset",
         layer_save_path=str(tmp_path),
         main_layer_name="main.usda",
         create_usd_preview=True,
@@ -56,7 +56,7 @@ def test_usd_preview_texture_override_applies(tmp_path):
         material_dict_list=material_dict_list,
         stage=None,
         geo_file=None,
-        parent_path="/ASSET",
+        parent_path="/Asset",
         layer_save_path=str(tmp_path),
         main_layer_name="main.usda",
         create_usd_preview=True,
@@ -67,7 +67,7 @@ def test_usd_preview_texture_override_applies(tmp_path):
 
     stage = pxr.Usd.Stage.Open(str(tmp_path / "main.usda"))
     texture_prim = stage.GetPrimAtPath(
-        "/ASSET/material/mat_MatA_collect/UsdPreviewMaterial/UsdPreviewNodeGraph/basecolorTexture"
+        "/Asset/material/MatA/UsdPreviewMaterial/UsdPreviewNodeGraph/basecolorTexture"
     )
     texture_shader = pxr.UsdShade.Shader(texture_prim)
     assert _asset_path_value(texture_shader.GetInput("file")) == "C:/tex/MatA_BaseColor.jpg"
@@ -88,7 +88,7 @@ def test_renderer_specific_format_overrides(tmp_path):
         material_dict_list=material_dict_list,
         stage=None,
         geo_file=None,
-        parent_path="/ASSET",
+        parent_path="/Asset",
         layer_save_path=str(tmp_path),
         main_layer_name="main.usda",
         create_usd_preview=True,
@@ -104,16 +104,16 @@ def test_renderer_specific_format_overrides(tmp_path):
     stage = pxr.Usd.Stage.Open(str(tmp_path / "main.usda"))
 
     usd_preview_prim = stage.GetPrimAtPath(
-        "/ASSET/material/mat_MatA_collect/UsdPreviewMaterial/UsdPreviewNodeGraph/basecolorTexture"
+        "/Asset/material/MatA/UsdPreviewMaterial/UsdPreviewNodeGraph/basecolorTexture"
     )
     usd_preview_shader = pxr.UsdShade.Shader(usd_preview_prim)
     assert _asset_path_value(usd_preview_shader.GetInput("file")) == "C:/tex/MatA_BaseColor.jpg"
 
-    arnold_prim = stage.GetPrimAtPath("/ASSET/material/mat_MatA_collect/arnold_basecolorTexture")
+    arnold_prim = stage.GetPrimAtPath("/Asset/material/MatA/arnold_basecolorTexture")
     arnold_shader = pxr.UsdShade.Shader(arnold_prim)
     assert _asset_path_value(arnold_shader.GetInput("filename")) == "C:/tex/MatA_BaseColor.tif"
 
-    mtlx_prim = stage.GetPrimAtPath("/ASSET/material/mat_MatA_collect/mtlx_basecolorTexture")
+    mtlx_prim = stage.GetPrimAtPath("/Asset/material/MatA/mtlx_basecolorTexture")
     mtlx_shader = pxr.UsdShade.Shader(mtlx_prim)
     assert _asset_path_value(mtlx_shader.GetInput("file")) == "C:/tex/MatA_BaseColor.png"
 
@@ -133,7 +133,7 @@ def test_mtlx_metalness_is_float(tmp_path):
         material_dict_list=material_dict_list,
         stage=None,
         geo_file=None,
-        parent_path="/ASSET",
+        parent_path="/Asset",
         layer_save_path=str(tmp_path),
         main_layer_name="main.usda",
         create_usd_preview=False,
@@ -142,16 +142,16 @@ def test_mtlx_metalness_is_float(tmp_path):
     )
 
     stage = pxr.Usd.Stage.Open(str(tmp_path / "main.usda"))
-    image_prim = stage.GetPrimAtPath("/ASSET/material/mat_MatA_collect/mtlx_metalnessTexture")
+    image_prim = stage.GetPrimAtPath("/Asset/material/MatA/mtlx_metalnessTexture")
     image_shader = pxr.UsdShade.Shader(image_prim)
     assert image_shader.GetIdAttr().Get() == "ND_image_float"
 
-    range_prim = stage.GetPrimAtPath("/ASSET/material/mat_MatA_collect/mtlx_metalnessRange")
+    range_prim = stage.GetPrimAtPath("/Asset/material/MatA/mtlx_metalnessRange")
     range_shader = pxr.UsdShade.Shader(range_prim)
     assert range_shader.GetIdAttr().Get() == "ND_range_float"
     assert range_shader.GetInput("in").GetTypeName() == pxr.Sdf.ValueTypeNames.Float
 
-    std_prim = stage.GetPrimAtPath("/ASSET/material/mat_MatA_collect/mtlx_mtlxstandard_surface1")
+    std_prim = stage.GetPrimAtPath("/Asset/material/MatA/mtlx_mtlxstandard_surface1")
     std_shader = pxr.UsdShade.Shader(std_prim)
     assert std_shader.GetInput("metalness").GetTypeName() == pxr.Sdf.ValueTypeNames.Float
 
@@ -173,16 +173,16 @@ def test_assign_material_binds_mesh():
         material_dict={
             "basecolor": {"mat_name": "MatA", "path": "C:/tex/MatA_BaseColor.png"}
         },
-        parent_primpath="/ASSET/material",
+        parent_primpath="/Asset/material",
         create_usd_preview=True,
         create_arnold=False,
         create_mtlx=False,
     )
-    mesh = pxr.UsdGeom.Mesh.Define(stage, "/ASSET/mesh/Mesh_MatA")
+    mesh = pxr.UsdGeom.Mesh.Define(stage, "/Asset/mesh/Mesh_MatA")
 
     material_processor.USDShaderAssign(stage).run(
-        mats_parent_path="/ASSET/material",
-        mesh_parent_path="/ASSET",
+        mats_parent_path="/Asset/material",
+        mesh_parent_path="/Asset",
     )
 
     binding = pxr.UsdShade.MaterialBindingAPI(mesh).GetDirectBinding().GetMaterial()
