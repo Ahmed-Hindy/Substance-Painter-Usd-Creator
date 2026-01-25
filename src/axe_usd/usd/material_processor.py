@@ -308,13 +308,21 @@ def create_shaded_asset_publish(
     create_openpbr: bool = False,
     texture_format_overrides: Optional[Mapping[str, str]] = None,
 ) -> None:
-    """Create USD layers for materials and optional geometry.
+    """Create ASWF-compliant USD asset with materials and optional geometry.
+
+    Follows https://github.com/usd-wg/assets/blob/main/docs/asset-structure-guidelines.md
+
+    Creates structure:
+    - /<AssetName>: Root Xform with Kind=component, assetInfo, class inheritance
+    - /<AssetName>/geo: Geometry scope (if geo_file provided)
+    - /<AssetName>/mtl: Material scope
+    - /__class__/<AssetName>: Class prim for inheritance
 
     Args:
         material_dict_list: Material texture dictionaries to publish.
         stage: Optional existing USD stage to author into.
         geo_file: Optional geometry USD file to payload.
-        parent_path: Root prim path for the published asset.
+        parent_path: Root prim path for the published asset (e.g., "/Asset").
         layer_save_path: Directory to save the USD layers.
         main_layer_name: File name for the main layer.
         create_usd_preview: Whether to create UsdPreviewSurface materials.
@@ -323,17 +331,36 @@ def create_shaded_asset_publish(
         create_openpbr: Whether to create MaterialX OpenPBR materials.
         texture_format_overrides: Optional per-renderer texture format overrides (usd_preview, arnold, mtlx, openpbr).
     """
+    from .asset_structure import (
+        initialize_component_asset,
+        add_standard_scopes,
+        add_payload,
+    )
+
     if not layer_save_path:
         layer_save_path = f"{tempfile.gettempdir()}/temp_usd_export"
         os.makedirs(layer_save_path, exist_ok=True)
     layer_save_path = str(layer_save_path)
     os.makedirs(f"{layer_save_path}/layers", exist_ok=True)
 
-    # create stage:
+    # Extract asset name from parent_path (e.g., "/Asset" -> "Asset")
+    asset_name = parent_path.strip("/").split("/")[-1]
+
+    # Create stage with ASWF-compliant structure
     if not stage:
         stage = Usd.Stage.CreateNew(f"{layer_save_path}/{main_layer_name}")
 
-    # create layers:
+    # Initialize ASWF-compliant component asset (Kind, assetInfo, class inheritance)
+    root_prim = initialize_component_asset(
+        stage, asset_name, asset_identifier=f"./{main_layer_name}"
+    )
+
+    # Add standard geo/mtl scopes
+    scopes = add_standard_scopes(stage, root_prim)
+    geo_scope = scopes["geo"]
+    mtl_scope = scopes["mtl"]
+
+    # Create sublayers for materials and assignments
     layer_root = stage.GetRootLayer()
 
     layer_mats_path_abs = f"{layer_save_path}/layers/layer_mats.usda"
@@ -346,27 +373,20 @@ def create_shaded_asset_publish(
     layer_assign = Sdf.Layer.CreateNew(layer_assign_path_abs)
     layer_root.subLayerPaths.append(layer_assign_rel_paths)
 
+    # Add geometry payload if provided
     if geo_file:
-        # payload geo:
         stage.SetEditTarget(layer_root)
-        geo_prim = stage.DefinePrim(f"{parent_path}", "Xform")
         try:
             mesh_rel_path = os.path.relpath(geo_file, layer_save_path)
         except ValueError:
             mesh_rel_path = os.path.abspath(geo_file)
-        geo_prim.GetPayloads().AddPayload(mesh_rel_path, f"{parent_path}/mesh/")
 
-        # # set kinds for geo prims:
-        # for asset_name_prim in geo_prim.GetChildren():
-        #     asset_name_prim.SetMetadata('kind', 'group')
-        #     for child_prim in asset_name_prim.GetChildren():
-        #         if child_prim.IsA(UsdGeom.Xform):
-        #             child_prim.SetMetadata('kind', 'component')
+        # Use the geo scope's prim for payload reference
+        geo_scope.GetPayloads().AddPayload(mesh_rel_path, f"{parent_path}/mesh/")
 
-    # create material_dict_list:
+    # Create materials in mtl scope
     stage.SetEditTarget(layer_mats)
-    material_primitive_path = f"{parent_path}/material"
-    UsdGeom.Scope.Define(stage, material_primitive_path)
+    material_primitive_path = mtl_scope.GetPath().pathString  # Use the /Asset/mtl path
 
     for material_dict in material_dict_list:
         material_name = next(
@@ -385,19 +405,22 @@ def create_shaded_asset_publish(
             texture_format_overrides=texture_format_overrides,
         )
 
+    # Assign materials to geometry if present
     if geo_file:
-        # assign material_dict_list:
         stage.SetEditTarget(layer_assign)
         USDShaderAssign(stage).run(
-            mats_parent_path=material_primitive_path, mesh_parent_path=parent_path
+            mats_parent_path=material_primitive_path,
+            mesh_parent_path=geo_scope.GetPath().pathString,  # Assign to /Asset/geo
         )
 
-    # Save all layers:
+    # Save all layers
     layer_mats.Save()
     layer_assign.Save()
     layer_root.Save()
 
     logger.info(
-        "Finished creating USD asset: '%s/%s'.", layer_save_path, main_layer_name
+        "Finished creating ASWF-compliant USD asset: '%s/%s' (Kind: component, assetInfo set).",
+        layer_save_path,
+        main_layer_name,
     )
     logger.info("Success")
