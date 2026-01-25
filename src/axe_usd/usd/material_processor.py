@@ -5,7 +5,9 @@ Copyright Ahmed Hindy. Please mention the author if you found any part of this c
 
 import logging
 import os
+import shutil
 import tempfile
+from pathlib import Path
 from typing import Iterable, Mapping, Optional
 
 from pxr import Sdf, Tf, Usd, UsdGeom, UsdShade
@@ -219,6 +221,9 @@ class USDShaderAssign:
             mats_parent_prim, prim_type=UsdShade.Material, recursive=False
         )
         if not check:
+            # If no materials are found (e.g. they are in sub-scopes), try a recursive search
+            # Or just warn if truly nothing found.
+            # ASWF structure: /mtl/Scope/Material? Usually just /mtl/Material.
             logger.warning(
                 "No UsdShade.Material found under prim: '%s'.", mats_parent_path
             )
@@ -245,7 +250,7 @@ class USDShaderAssign:
                 recursive=True,
             )
             if not asset_prims:
-                logger.warning("No meshes found with name: %s", mat_name)
+                logger.warning("No meshes found with name like: %s", mat_name)
                 continue
 
             asset_names = [x.GetName() for x in asset_prims]
@@ -295,6 +300,58 @@ class USDMeshConfigure:
             logger.debug("Set attribute %s to %s (Type: %s)", attrName, value, typeName)
 
 
+def _relocate_textures(
+    material_dict_list: MaterialTextureList,
+    maps_dir: Path,
+) -> MaterialTextureList:
+    """Copy textures to the maps directory and update paths.
+
+    Args:
+        material_dict_list: List of material dictionaries with source paths.
+        maps_dir: Destination directory for textures.
+
+    Returns:
+        MaterialTextureList: Updated list with relative paths to copied textures.
+    """
+    updated_list = []
+
+    for mat_dict in material_dict_list:
+        new_mat_dict = {}
+        for slot, info in mat_dict.items():
+            source_path = Path(info["path"])
+            if not source_path.exists():
+                logger.warning(f"Texture not found: {source_path}")
+                new_mat_dict[slot] = info
+                continue
+
+            # Create destination path
+            dest_name = source_path.name
+            dest_path = maps_dir / dest_name
+
+            # Copy file
+            try:
+                if (
+                    not dest_path.exists()
+                    or dest_path.stat().st_mtime < source_path.stat().st_mtime
+                ):
+                    shutil.copy2(source_path, dest_path)
+                    logger.debug(f"Copied texture: {source_path} -> {dest_path}")
+            except Exception as e:
+                logger.error(f"Failed to copy texture {source_path}: {e}")
+
+            new_info = info.copy()
+            # Use absolute path to ensure correct resolution during authoring
+            # Ideally relative, but requires knowing the layer context strictly.
+            # Using resolved path to be safe.
+            new_info["path"] = str(dest_path.resolve())
+
+            new_mat_dict[slot] = new_info
+
+        updated_list.append(new_mat_dict)
+
+    return updated_list
+
+
 def create_shaded_asset_publish(
     material_dict_list: MaterialTextureList,
     stage: Optional[Usd.Stage] = None,
@@ -307,31 +364,28 @@ def create_shaded_asset_publish(
     create_mtlx: bool = True,
     create_openpbr: bool = False,
     texture_format_overrides: Optional[Mapping[str, str]] = None,
-    use_aswf_structure: bool = True,
 ) -> None:
-    """Create USD asset with materials and optional geometry.
+    """Create ASWF-compliant USD asset with materials and optional geometry.
 
     Follows https://github.com/usd-wg/assets/blob/main/docs/asset-structure-guidelines.md
 
-    Creates ASWF-compliant structure by default:
-    - File structure: AssetName.usd, payload.usd, geo.usd, mtl.usd, /maps/
-    - Prim structure: /__class__/Asset, /Asset (Kind=component), /Asset/geo, /Asset/mtl
+    Creates structure:
+    - Files: AssetName.usd, payload.usd, geo.usd, mtl.usd, /maps/
+    - Prims: /__class__/Asset, /Asset (Kind=component), /Asset/geo, /Asset/mtl
 
     Args:
         material_dict_list: Material texture dictionaries to publish.
-        stage: Optional existing USD stage to author into (legacy mode only).
+        stage: Ignored (legacy argument, kept for signature compatibility).
         geo_file: Optional geometry USD file to reference.
-        parent_path: Root prim path for the asset (e.g., "/Asset").
+        parent_path: Root prim path for the published asset (e.g., "/Asset").
         layer_save_path: Output directory.
-        main_layer_name: Main file name (ignored in ASWF mode).
+        main_layer_name: Ignored (uses AssetName.usd).
         create_usd_preview: Whether to create UsdPreviewSurface materials.
         create_arnold: Whether to create Arnold materials.
         create_mtlx: Whether to create MaterialX materials.
         create_openpbr: Whether to create MaterialX OpenPBR materials.
         texture_format_overrides: Optional per-renderer texture format overrides.
-        use_aswf_structure: Use ASWF file structure (default True). Set False for legacy /layers/ structure.
     """
-    from pathlib import Path
     from .asset_files import (
         create_asset_file_structure,
         create_asset_usd_file,
@@ -348,133 +402,78 @@ def create_shaded_asset_publish(
     # Extract asset name from parent_path (e.g., "/Asset" -> "Asset")
     asset_name = parent_path.strip("/").split("/")[-1]
 
-    if use_aswf_structure:
-        # ASWF-compliant file structure
-        output_dir = Path(layer_save_path)
-        paths = create_asset_file_structure(output_dir, asset_name)
+    # ASWF-compliant file structure
+    output_dir = Path(layer_save_path)
+    paths = create_asset_file_structure(output_dir, asset_name)
 
-        # Create geo.usd
-        create_geo_usd_file(paths, asset_name, Path(geo_file) if geo_file else None)
+    # 1. Relocate textures to /maps/
+    updated_materials = _relocate_textures(material_dict_list, paths.maps_dir)
 
-        # Create payload.usd (references geo.usd)
-        create_payload_usd_file(paths, asset_name)
-
-        # Create mtl.usd and author materials
-        mtl_stage = create_mtl_usd_file(paths, asset_name)
-        material_primitive_path = f"/{asset_name}/mtl"
-
-        for material_dict in material_dict_list:
-            material_name = next(
-                (info["mat_name"] for info in material_dict.values()),
-                "UnknownMaterialName",
-            )
-            USDShaderCreate(
-                stage=mtl_stage,
-                material_name=material_name,
-                material_dict=material_dict,
-                parent_primpath=material_primitive_path,
-                create_usd_preview=create_usd_preview,
-                create_arnold=create_arnold,
-                create_mtlx=create_mtlx,
-                create_openpbr=create_openpbr,
-                texture_format_overrides=texture_format_overrides,
-            )
-        mtl_stage.Save()
-
-        # Create Asset.usd (main entry point)
-        create_asset_usd_file(paths, asset_name)
-
-        logger.info(
-            "Created ASWF-compliant USD asset: '%s/%s/%s.usd'",
-            layer_save_path,
-            asset_name,
-            asset_name,
-        )
-        logger.info(
-            "Structure: %s.usd, payload.usd, geo.usd, mtl.usd, /maps/", asset_name
-        )
-
-    else:
-        # Legacy /layers/ structure (for backwards compatibility)
-        from .asset_structure import initialize_component_asset, add_standard_scopes
-
-        os.makedirs(f"{layer_save_path}/layers", exist_ok=True)
-
-        # Create stage with ASWF-compliant prim structure
-        if not stage:
-            stage = Usd.Stage.CreateNew(f"{layer_save_path}/{main_layer_name}")
-
-        # Initialize ASWF-compliant component asset
-        root_prim = initialize_component_asset(
-            stage, asset_name, asset_identifier=f"./{main_layer_name}"
-        )
-
-        # Add standard geo/mtl scopes
-        scopes = add_standard_scopes(stage, root_prim)
-        geo_scope = scopes["geo"]
-        mtl_scope = scopes["mtl"]
-
-        # Create sublayers
-        layer_root = stage.GetRootLayer()
-
-        layer_mats_path_abs = f"{layer_save_path}/layers/layer_mats.usda"
-        layer_mats_rel_paths = os.path.relpath(layer_mats_path_abs, layer_save_path)
-        layer_mats = Sdf.Layer.CreateNew(layer_mats_path_abs)
-        layer_root.subLayerPaths.append(layer_mats_rel_paths)
-
-        layer_assign_path_abs = f"{layer_save_path}/layers/layer_assign.usda"
-        layer_assign_rel_paths = os.path.relpath(layer_assign_path_abs, layer_save_path)
-        layer_assign = Sdf.Layer.CreateNew(layer_assign_path_abs)
-        layer_root.subLayerPaths.append(layer_assign_rel_paths)
-
-        # Add geometry payload if provided
-        if geo_file:
-            stage.SetEditTarget(layer_root)
+    # 2. Handle geometry file (copy/reference)
+    final_geo_path = None
+    if geo_file:
+        source_geo_path = Path(geo_file)
+        if source_geo_path.exists():
+            # Copy source geometry to Asset/geometry.usd to ensure self-contained asset
+            # This avoids referencing files in legacy /layers/ folder
+            dest_geo_path = paths.root_dir / "geometry.usd"
             try:
-                mesh_rel_path = os.path.relpath(geo_file, layer_save_path)
-            except ValueError:
-                mesh_rel_path = os.path.abspath(geo_file)
+                shutil.copy2(source_geo_path, dest_geo_path)
+                logger.info(f"Copied geometry: {source_geo_path} -> {dest_geo_path}")
+                final_geo_path = dest_geo_path
+            except Exception as e:
+                logger.error(f"Failed to copy geometry: {e}")
+                # Fallback to source path if copy fails
+                final_geo_path = source_geo_path
+        else:
+            logger.warning(f"Geometry file not found: {geo_file}")
 
-            geo_scope.GetPayloads().AddPayload(mesh_rel_path, f"{parent_path}/mesh/")
+    # 3. Create geo.usd (referencing local geometry.usd)
+    create_geo_usd_file(paths, asset_name, final_geo_path)
 
-        # Create materials in mtl scope
-        stage.SetEditTarget(layer_mats)
-        material_primitive_path = mtl_scope.GetPath().pathString
+    # 4. Create payload.usd (references geo.usd)
+    create_payload_usd_file(paths, asset_name)
 
-        for material_dict in material_dict_list:
-            material_name = next(
-                (info["mat_name"] for info in material_dict.values()),
-                "UnknownMaterialName",
-            )
-            USDShaderCreate(
-                stage=stage,
-                material_name=material_name,
-                material_dict=material_dict,
-                parent_primpath=material_primitive_path,
-                create_usd_preview=create_usd_preview,
-                create_arnold=create_arnold,
-                create_mtlx=create_mtlx,
-                create_openpbr=create_openpbr,
-                texture_format_overrides=texture_format_overrides,
-            )
+    # 5. Create mtl.usd and author materials
+    mtl_stage = create_mtl_usd_file(paths, asset_name)
+    material_primitive_path = f"/{asset_name}/mtl"
 
-        # Assign materials to geometry if present
-        if geo_file:
-            stage.SetEditTarget(layer_assign)
-            USDShaderAssign(stage).run(
-                mats_parent_path=material_primitive_path,
-                mesh_parent_path=geo_scope.GetPath().pathString,
-            )
-
-        # Save all layers
-        layer_mats.Save()
-        layer_assign.Save()
-        layer_root.Save()
-
-        logger.info(
-            "Created USD asset (legacy structure): '%s/%s'",
-            layer_save_path,
-            main_layer_name,
+    for material_dict in updated_materials:
+        material_name = next(
+            (info["mat_name"] for info in material_dict.values()),
+            "UnknownMaterialName",
         )
+        USDShaderCreate(
+            stage=mtl_stage,
+            material_name=material_name,
+            material_dict=material_dict,
+            parent_primpath=material_primitive_path,
+            create_usd_preview=create_usd_preview,
+            create_arnold=create_arnold,
+            create_mtlx=create_mtlx,
+            create_openpbr=create_openpbr,
+            texture_format_overrides=texture_format_overrides,
+        )
+    mtl_stage.Save()
 
+    # 6. Create Asset.usd (main entry point)
+    asset_stage = create_asset_usd_file(paths, asset_name)
+
+    # 7. Bind materials to geometry in Asset.usd
+    if final_geo_path:
+        logger.info("Binding materials to geometry...")
+        assigner = USDShaderAssign(asset_stage)
+        assigner.run(
+            mats_parent_path=f"/{asset_name}/mtl",
+            mesh_parent_path=f"/{asset_name}/geo",  # Geometry is under /geo scope via payload
+        )
+        asset_stage.Save()
+
+    logger.info(
+        "Created ASWF-compliant USD asset: '%s/%s/%s.usd'",
+        layer_save_path,
+        asset_name,
+        asset_name,
+    )
+    logger.info("Structure: %s.usd, payload.usd, geo.usd, mtl.usd, /maps/", asset_name)
     logger.info("Success")

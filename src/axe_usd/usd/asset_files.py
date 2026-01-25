@@ -177,6 +177,7 @@ def create_geo_usd_file(
 
         geo_scope.GetPrim().GetPayloads().AddPayload(ref_path)
 
+    stage.SetDefaultPrim(root)
     stage.Save()
     return stage
 
