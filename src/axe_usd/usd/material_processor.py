@@ -328,22 +328,31 @@ def _relocate_textures(
             dest_name = source_path.name
             dest_path = maps_dir / dest_name
 
-            # Copy file
+            # Move file to maps directory (avoid duplication)
             try:
                 if (
                     not dest_path.exists()
                     or dest_path.stat().st_mtime < source_path.stat().st_mtime
                 ):
-                    shutil.copy2(source_path, dest_path)
-                    logger.debug(f"Copied texture: {source_path} -> {dest_path}")
+                    shutil.move(str(source_path), str(dest_path))
+                    logger.debug(f"Moved texture: {source_path} -> {dest_path}")
             except Exception as e:
-                logger.error(f"Failed to copy texture {source_path}: {e}")
+                logger.error(f"Failed to move texture {source_path}: {e}")
 
             new_info = info.copy()
-            # Use absolute path to ensure correct resolution during authoring
-            # Ideally relative, but requires knowing the layer context strictly.
-            # Using resolved path to be safe.
-            new_info["path"] = str(dest_path.resolve())
+            # Calculate relative path from the asset root (where mtl.usd lives)
+            # maps_dir is <Asset>/maps, so parent is <Asset>
+            # dest_path is <Asset>/maps/texture.png
+            try:
+                # relative_to computation
+                rel_path = dest_path.relative_to(maps_dir.parent)
+                # Ensure forward slashes for USD using as_posix()
+                # Prepend ./ to be explicit about relative path
+                new_info["path"] = f"./{rel_path.as_posix()}"
+            except ValueError:
+                # Fallback if paths are on different drives (unlikely here as we moved it)
+                logger.warning(f"Could not compute relative path for {dest_path}")
+                new_info["path"] = dest_path.as_posix()
 
             new_mat_dict[slot] = new_info
 
@@ -409,21 +418,17 @@ def create_shaded_asset_publish(
     # 1. Relocate textures to /maps/
     updated_materials = _relocate_textures(material_dict_list, paths.maps_dir)
 
-    # 2. Handle geometry file (copy source to Asset/geometry.usd)
+    # 2. Handle geometry file
     has_geometry = False
     if geo_file:
-        source_geo_path = Path(geo_file)
-        if source_geo_path.exists():
-            # Copy source geometry to Asset/geometry.usd to ensure self-contained asset
-            dest_geo_path = paths.geometry_file
-            try:
-                shutil.copy2(source_geo_path, dest_geo_path)
-                logger.info(f"Copied geometry: {source_geo_path} -> {dest_geo_path}")
-                has_geometry = True
-            except Exception as e:
-                logger.error(f"Failed to copy geometry: {e}")
+        geo_path = Path(geo_file)
+        # Verify the file exists at the expected location (Asset/geometry.usd)
+        # Since the plugin now exports directly to this path
+        if geo_path.exists():
+            has_geometry = True
+            logger.info(f"Using geometry file: {geo_path}")
         else:
-            logger.warning(f"Geometry file not found: {geo_file}")
+            logger.warning(f"Geometry file not found at expected path: {geo_path}")
 
     # 3. Create geo.usd (referencing local geometry.usd)
     create_geo_usd_file(paths, asset_name, has_geometry=has_geometry)

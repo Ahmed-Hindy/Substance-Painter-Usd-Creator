@@ -2,6 +2,7 @@
 
 Copyright Ahmed Hindy. Please mention the author if you found any part of this code useful.
 """
+
 import json
 import logging
 from dataclasses import dataclass
@@ -123,8 +124,13 @@ class MeshExporter:
         Args:
             settings: Export settings for determining output paths.
         """
-        publish_paths = build_publish_paths(settings.publish_directory, settings.main_layer_name)
-        self.mesh_path = publish_paths.layers_dir / "mesh.usd"
+        # Extract asset name from settings (e.g. primitive_path="/Asset" -> "Asset")
+        asset_name = settings.primitive_path.strip("/").split("/")[-1]
+
+        publish_paths = build_publish_paths(
+            settings.publish_directory, settings.main_layer_name, asset_name
+        )
+        self.mesh_path = publish_paths.geometry_path
 
     def export_mesh(self) -> Optional[Path]:
         """Call Substance Painter's USD mesh exporter.
@@ -140,10 +146,14 @@ class MeshExporter:
         if not substance_painter.export.scene_is_triangulated():
             export_option = substance_painter.export.MeshExportOption.TriangulatedMesh
         if substance_painter.export.scene_has_tessellation():
-            export_option = substance_painter.export.MeshExportOption.TessellationNormalsBaseMesh
+            export_option = (
+                substance_painter.export.MeshExportOption.TessellationNormalsBaseMesh
+            )
 
         try:
-            export_result = substance_painter.export.export_mesh(str(self.mesh_path), export_option)
+            export_result = substance_painter.export.export_mesh(
+                str(self.mesh_path), export_option
+            )
 
             # In case of error, display a human readable message:
             if export_result.status != substance_painter.export.ExportStatus.Success:
@@ -285,13 +295,17 @@ class USDExporterView(QDialog):
         pub_row_widget.setLayout(pub_row)
         paths_layout.addRow("Publish Directory", pub_row_widget)
 
-        pub_hint = self._make_hint_label("Tip: <export_folder> uses the texture export folder.")
+        pub_hint = self._make_hint_label(
+            "Tip: <export_folder> uses the texture export folder."
+        )
         paths_layout.addRow("", pub_hint)
 
         self.prim = QLineEdit()
         self.prim.setMinimumWidth(320)
         self.prim.setPlaceholderText(DEFAULT_DIALOGUE_DICT["primitive_path"])
-        self.prim.setToolTip("Root prim path for the asset; materials go under <root>/material")
+        self.prim.setToolTip(
+            "Root prim path for the asset; materials go under <root>/material"
+        )
         self.prim.setClearButtonEnabled(True)
         self.prim.editingFinished.connect(self._validate_prim_path)
         self.prim.textChanged.connect(self._update_path_validation)
@@ -330,7 +344,9 @@ class USDExporterView(QDialog):
 
         self.override_usdpreview = QLineEdit()
         self.override_usdpreview.setPlaceholderText("auto")
-        self.override_usdpreview.setToolTip("Override USD Preview texture format (e.g., jpg)")
+        self.override_usdpreview.setToolTip(
+            "Override USD Preview texture format (e.g., jpg)"
+        )
         self.override_usdpreview.textChanged.connect(self._sync_preset_combo)
         advanced_layout.addRow("USD Preview Format", self.override_usdpreview)
 
@@ -370,6 +386,7 @@ class USDExporterView(QDialog):
         self._refresh_preset_combo()
         self._sync_preset_combo()
         self._update_path_validation()
+
     def _validate_prim_path(self):
         """Validate the primitive path input field."""
         self._update_path_validation()
@@ -435,7 +452,9 @@ class USDExporterView(QDialog):
         hint.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
         return hint
 
-    def _apply_icon_only_button(self, button: QToolButton, icon_type: QStyle.StandardPixmap) -> None:
+    def _apply_icon_only_button(
+        self, button: QToolButton, icon_type: QStyle.StandardPixmap
+    ) -> None:
         """Apply a standard icon to a tool button."""
         app = QApplication.instance()
         style = app.style()
@@ -490,7 +509,9 @@ class USDExporterView(QDialog):
                 f"Could not save presets to:\n{PRESET_PATH}\n\n{exc}",
             )
 
-    def _matches_builtin_preset(self, data: Dict[str, object], preset: Dict[str, object]) -> bool:
+    def _matches_builtin_preset(
+        self, data: Dict[str, object], preset: Dict[str, object]
+    ) -> bool:
         for key in ("usdpreview", "arnold", "materialx", "openpbr"):
             if bool(data.get(key)) != bool(preset.get(key)):
                 return False
@@ -558,8 +579,13 @@ class USDExporterView(QDialog):
             self.openpbr.setChecked(bool(data.get("openpbr", False)))
             self.geom.setChecked(bool(data.get("save_geometry", True)))
 
-            primitive_path = str(data.get("primitive_path") or DEFAULT_DIALOGUE_DICT["primitive_path"])
-            publish_dir = str(data.get("publish_directory") or DEFAULT_DIALOGUE_DICT["publish_location"])
+            primitive_path = str(
+                data.get("primitive_path") or DEFAULT_DIALOGUE_DICT["primitive_path"]
+            )
+            publish_dir = str(
+                data.get("publish_directory")
+                or DEFAULT_DIALOGUE_DICT["publish_location"]
+            )
             self.prim.setText(primitive_path)
             self.pub.setText(publish_dir)
 
@@ -620,7 +646,9 @@ class USDExporterView(QDialog):
             self.pub.setText(selected)
 
     def _resolve_publish_directory(self) -> Optional[Path]:
-        publish_dir = self.pub.text().strip() or DEFAULT_DIALOGUE_DICT["publish_location"]
+        publish_dir = (
+            self.pub.text().strip() or DEFAULT_DIALOGUE_DICT["publish_location"]
+        )
         if "<export_folder>" in publish_dir:
             if last_export_dir is None:
                 QMessageBox.warning(
@@ -654,8 +682,12 @@ class USDExporterView(QDialog):
             USDSettings: Settings collected from the dialog.
         """
         # Use default publish location if user leaves the field blank
-        publish_dir = self.pub.text().strip() or DEFAULT_DIALOGUE_DICT["publish_location"]
-        primitive_path = self.prim.text().strip() or DEFAULT_DIALOGUE_DICT["primitive_path"]
+        publish_dir = (
+            self.pub.text().strip() or DEFAULT_DIALOGUE_DICT["publish_location"]
+        )
+        primitive_path = (
+            self.prim.text().strip() or DEFAULT_DIALOGUE_DICT["primitive_path"]
+        )
 
         return USDSettings(
             self.usdpreview.isChecked(),
