@@ -62,6 +62,7 @@ def test_usd_preview_texture_override_applies(tmp_path):
         create_usd_preview=True,
         create_arnold=False,
         create_mtlx=False,
+        use_aswf_structure=False,
         texture_format_overrides={"usd_preview": "jpg"},
     )
 
@@ -97,6 +98,7 @@ def test_renderer_specific_format_overrides(tmp_path):
         create_usd_preview=True,
         create_arnold=True,
         create_mtlx=True,
+        use_aswf_structure=False,
         texture_format_overrides={
             "usd_preview": "jpg",
             "arnold": "tif",
