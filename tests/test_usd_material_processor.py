@@ -43,6 +43,7 @@ def test_create_shaded_asset_publish_creates_layers(tmp_path):
     assert (asset_dir / "mtl.usd").exists()
     assert (asset_dir / "payload.usd").exists()
     assert (asset_dir / "geo.usd").exists()
+    # Note: geometry.usd only created if geo_file input provided, which is None here.
 
 
 def test_usd_preview_texture_override_applies(tmp_path):

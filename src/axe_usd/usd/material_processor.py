@@ -370,13 +370,13 @@ def create_shaded_asset_publish(
     Follows https://github.com/usd-wg/assets/blob/main/docs/asset-structure-guidelines.md
 
     Creates structure:
-    - Files: AssetName.usd, payload.usd, geo.usd, mtl.usd, /maps/
+    - Files: AssetName.usd, payload.usd, geo.usd, geometry.usd, mtl.usd, /maps/
     - Prims: /__class__/Asset, /Asset (Kind=component), /Asset/geo, /Asset/mtl
 
     Args:
         material_dict_list: Material texture dictionaries to publish.
         stage: Ignored (legacy argument, kept for signature compatibility).
-        geo_file: Optional geometry USD file to reference.
+        geo_file: Optional geometry USD file to reference (source).
         parent_path: Root prim path for the published asset (e.g., "/Asset").
         layer_save_path: Output directory.
         main_layer_name: Ignored (uses AssetName.usd).
@@ -409,27 +409,24 @@ def create_shaded_asset_publish(
     # 1. Relocate textures to /maps/
     updated_materials = _relocate_textures(material_dict_list, paths.maps_dir)
 
-    # 2. Handle geometry file (copy/reference)
-    final_geo_path = None
+    # 2. Handle geometry file (copy source to Asset/geometry.usd)
+    has_geometry = False
     if geo_file:
         source_geo_path = Path(geo_file)
         if source_geo_path.exists():
             # Copy source geometry to Asset/geometry.usd to ensure self-contained asset
-            # This avoids referencing files in legacy /layers/ folder
-            dest_geo_path = paths.root_dir / "geometry.usd"
+            dest_geo_path = paths.geometry_file
             try:
                 shutil.copy2(source_geo_path, dest_geo_path)
                 logger.info(f"Copied geometry: {source_geo_path} -> {dest_geo_path}")
-                final_geo_path = dest_geo_path
+                has_geometry = True
             except Exception as e:
                 logger.error(f"Failed to copy geometry: {e}")
-                # Fallback to source path if copy fails
-                final_geo_path = source_geo_path
         else:
             logger.warning(f"Geometry file not found: {geo_file}")
 
     # 3. Create geo.usd (referencing local geometry.usd)
-    create_geo_usd_file(paths, asset_name, final_geo_path)
+    create_geo_usd_file(paths, asset_name, has_geometry=has_geometry)
 
     # 4. Create payload.usd (references geo.usd)
     create_payload_usd_file(paths, asset_name)
@@ -460,7 +457,7 @@ def create_shaded_asset_publish(
     asset_stage = create_asset_usd_file(paths, asset_name)
 
     # 7. Bind materials to geometry in Asset.usd
-    if final_geo_path:
+    if has_geometry:
         logger.info("Binding materials to geometry...")
         assigner = USDShaderAssign(asset_stage)
         assigner.run(
@@ -475,5 +472,8 @@ def create_shaded_asset_publish(
         asset_name,
         asset_name,
     )
-    logger.info("Structure: %s.usd, payload.usd, geo.usd, mtl.usd, /maps/", asset_name)
+    logger.info(
+        "Structure: %s.usd, payload.usd, geo.usd, geometry.usd, mtl.usd, /maps/",
+        asset_name,
+    )
     logger.info("Success")

@@ -20,7 +20,8 @@ class AssetFilePaths:
         /AssetName/
             AssetName.usd       # Main entry point (references payload + mtl)
             payload.usd         # References geo.usd
-            geo.usd             # Geometry layer
+            geo.usd             # Geometry interface (references geometry.usd)
+            geometry.usd        # Heavy geometry data (copied from source)
             mtl.usd             # Material library
             /maps/              # Texture maps
     """
@@ -28,7 +29,8 @@ class AssetFilePaths:
     root_dir: Path  # /AssetName/
     asset_file: Path  # /AssetName/AssetName.usd
     payload_file: Path  # /AssetName/payload.usd
-    geo_file: Path  # /AssetName/geo.usd
+    geo_file: Path  # /AssetName/geo.usd (interface)
+    geometry_file: Path  # /AssetName/geometry.usd (heavy data)
     mtl_file: Path  # /AssetName/mtl.usd
     maps_dir: Path  # /AssetName/maps/
 
@@ -65,6 +67,7 @@ def create_asset_file_structure(
         asset_file=asset_root / f"{asset_name}.usd",
         payload_file=asset_root / "payload.usd",
         geo_file=asset_root / "geo.usd",
+        geometry_file=asset_root / "geometry.usd",
         mtl_file=asset_root / "mtl.usd",
         maps_dir=maps_dir,
     )
@@ -81,6 +84,7 @@ def create_asset_usd_file(
     - /AssetName (root Xform, Kind=component, assetInfo, inherits)
     - References payload.usd into /AssetName
     - References mtl.usd into /AssetName/mtl
+    - Material bindings (if authored here)
 
     Args:
         paths: Asset file paths.
@@ -117,29 +121,27 @@ def create_asset_usd_file(
 def create_payload_usd_file(
     paths: AssetFilePaths,
     asset_name: str,
-    geo_usd_path: Optional[Path] = None,
 ) -> Usd.Stage:
     """Create payload.usd that references geo.usd.
 
     Args:
         paths: Asset file paths.
         asset_name: Name of the asset.
-        geo_usd_path: Optional path to geometry USD (if different from paths.geo_file).
 
     Returns:
         Usd.Stage: The created payload stage.
     """
-    if geo_usd_path is None:
-        geo_usd_path = paths.geo_file
-
     stage = Usd.Stage.CreateNew(str(paths.payload_file))
 
     # Define root and geo scope
     root = stage.DefinePrim(f"/{asset_name}")
     geo_scope = UsdGeom.Scope.Define(stage, f"/{asset_name}/geo")
 
-    # Reference geometry file
+    # Reference geometry interface file
     geo_scope.GetPrim().GetReferences().AddReference("./geo.usd")
+
+    # Set defaultPrim just in case
+    stage.SetDefaultPrim(root)
 
     stage.Save()
     return stage
@@ -148,14 +150,16 @@ def create_payload_usd_file(
 def create_geo_usd_file(
     paths: AssetFilePaths,
     asset_name: str,
-    source_geo_file: Optional[Path] = None,
+    has_geometry: bool = True,
 ) -> Usd.Stage:
-    """Create geo.usd with geometry.
+    """Create geo.usd geometry interface.
+
+    References the actual geometry data file (geometry.usd).
 
     Args:
         paths: Asset file paths.
         asset_name: Name of the asset.
-        source_geo_file: Optional path to source geometry file to reference.
+        has_geometry: Whether geometry.usd exists/should be referenced.
 
     Returns:
         Usd.Stage: The created geometry stage.
@@ -166,16 +170,10 @@ def create_geo_usd_file(
     root = stage.DefinePrim(f"/{asset_name}")
     geo_scope = UsdGeom.Scope.Define(stage, f"/{asset_name}/geo")
 
-    # If source geometry provided, add as payload
-    if source_geo_file:
-        # Make path relative to geo.usd if possible
-        try:
-            rel_path = source_geo_file.relative_to(paths.root_dir)
-            ref_path = f"./{rel_path.as_posix()}"
-        except ValueError:
-            ref_path = str(source_geo_file.as_posix())
-
-        geo_scope.GetPrim().GetPayloads().AddPayload(ref_path)
+    # Payload reference to the heavy data file
+    # Strictly relative path "./geometry.usd"
+    if has_geometry:
+        geo_scope.GetPrim().GetPayloads().AddPayload("./geometry.usd")
 
     stage.SetDefaultPrim(root)
     stage.Save()
