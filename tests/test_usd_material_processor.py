@@ -34,6 +34,7 @@ def test_create_shaded_asset_publish_creates_layers(tmp_path):
         create_usd_preview=True,
         create_arnold=False,
         create_mtlx=False,
+    use_aswf_structure=False,
     )
 
     assert (tmp_path / "main.usda").exists()
@@ -152,6 +153,7 @@ def test_mtlx_metalness_is_float(tmp_path):
         create_usd_preview=False,
         create_arnold=False,
         create_mtlx=True,
+    use_aswf_structure=False,
     )
 
     stage = pxr.Usd.Stage.Open(str(tmp_path / "main.usda"))
@@ -260,6 +262,7 @@ def test_assign_material_binds_mesh():
         create_usd_preview=True,
         create_arnold=False,
         create_mtlx=False,
+    use_aswf_structure=False,
     )
     mesh = pxr.UsdGeom.Mesh.Define(stage, "/Asset/mesh/Mesh_MatA")
 
