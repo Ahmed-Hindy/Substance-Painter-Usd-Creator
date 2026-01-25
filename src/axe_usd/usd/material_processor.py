@@ -10,9 +10,21 @@ from typing import Iterable, Mapping, Optional
 
 from pxr import Sdf, Tf, Usd, UsdGeom, UsdShade
 
+from ..core.exceptions import MaterialAssignmentError
+
 from . import utils as usd_utils
-from .material_builders import ArnoldBuilder, MaterialBuildContext, MtlxBuilder, OpenPbrBuilder, UsdPreviewBuilder
-from .material_model import TextureFormatOverrides, is_transmissive_material, normalize_material_dict
+from .material_builders import (
+    ArnoldBuilder,
+    MaterialBuildContext,
+    MtlxBuilder,
+    OpenPbrBuilder,
+    UsdPreviewBuilder,
+)
+from .material_model import (
+    TextureFormatOverrides,
+    is_transmissive_material,
+    normalize_material_dict,
+)
 from .types import MaterialTextureDict, MaterialTextureList
 
 # Configure module-level logger
@@ -68,7 +80,9 @@ class USDShaderCreate:
         self.create_arnold = create_arnold
         self.create_mtlx = create_mtlx
         self.create_openpbr = create_openpbr
-        self.texture_format_overrides = TextureFormatOverrides.from_mapping(texture_format_overrides)
+        self.texture_format_overrides = TextureFormatOverrides.from_mapping(
+            texture_format_overrides
+        )
 
         self.is_transmissive = is_transmissive_material(self.material_name)
         if self.is_transmissive:
@@ -91,7 +105,9 @@ class USDShaderCreate:
         collect_prim_path = f"{self.parent_primpath}/{prim_name}"
         collect_usd_material = UsdShade.Material.Define(self.stage, collect_prim_path)
         collect_usd_material.CreateInput("inputnum", Sdf.ValueTypeNames.Int).Set(2)
-        collect_usd_material.GetPrim().SetCustomDataByKey("source_material_name", self.material_name)
+        collect_usd_material.GetPrim().SetCustomDataByKey(
+            "source_material_name", self.material_name
+        )
         collect_usd_material.GetPrim().SetMetadata("displayName", self.material_name)
         return collect_usd_material
 
@@ -118,39 +134,44 @@ class USDShaderCreate:
 
         if self.create_arnold:
             arnold_shader = ArnoldBuilder(context).build(collect_path)
-            collect_usd_material.CreateOutput("arnold:surface", Sdf.ValueTypeNames.Token).ConnectToSource(
-                arnold_shader.ConnectableAPI(), "surface"
-            )
+            collect_usd_material.CreateOutput(
+                "arnold:surface", Sdf.ValueTypeNames.Token
+            ).ConnectToSource(arnold_shader.ConnectableAPI(), "surface")
 
         if self.create_openpbr and self.create_mtlx:
-            logger.warning("OpenPBR enabled; skipping MaterialX standard surface output.")
+            logger.warning(
+                "OpenPBR enabled; skipping MaterialX standard surface output."
+            )
             self.create_mtlx = False
 
         if self.create_mtlx:
             mtlx_shader = MtlxBuilder(context).build(collect_path)
-            collect_usd_material.CreateOutput("mtlx:surface", Sdf.ValueTypeNames.Token).ConnectToSource(
-                mtlx_shader.ConnectableAPI(), "surface"
-            )
+            collect_usd_material.CreateOutput(
+                "mtlx:surface", Sdf.ValueTypeNames.Token
+            ).ConnectToSource(mtlx_shader.ConnectableAPI(), "surface")
 
         if self.create_openpbr:
             openpbr_shader = OpenPbrBuilder(context).build(collect_path)
-            collect_usd_material.CreateOutput("mtlx:surface", Sdf.ValueTypeNames.Token).ConnectToSource(
-                openpbr_shader.ConnectableAPI(), "surface"
-            )
-
+            collect_usd_material.CreateOutput(
+                "mtlx:surface", Sdf.ValueTypeNames.Token
+            ).ConnectToSource(openpbr_shader.ConnectableAPI(), "surface")
 
 
 class USDShaderAssign:
     """Assign USD materials to matching mesh prims."""
 
-    def __init__(self, stage: Usd.Stage) -> None:
+    def __init__(self, stage: Usd.Stage, naming_convention=None) -> None:
         """Initialize the material assigner.
 
         Args:
             stage: USD stage to update.
+            naming_convention: Optional naming convention for cleaning material names.
+                             If None, uses the default convention.
         """
-        self.stage = stage
+        from .naming import NamingConvention
 
+        self.stage = stage
+        self.naming_convention = naming_convention or NamingConvention()
 
     def assign_material_to_primitives(
         self,
@@ -164,23 +185,25 @@ class USDShaderAssign:
             prims_to_assign_to: Prims that should receive the material.
 
         Raises:
-            ValueError: If the provided material is not a UsdShade.Material.
+            MaterialAssignmentError: If the provided material is not a UsdShade.Material.
         """
         if (
             not material_prim
             or not material_prim.IsValid()
             or not material_prim.IsA(UsdShade.Material)
         ):
-            raise ValueError(f"New material is not a <UsdShade.Material> object, instead it's a {type(material_prim)}.")
+            raise MaterialAssignmentError(
+                "Invalid material type for assignment",
+                details={
+                    "material_type": type(material_prim).__name__,
+                    "is_valid": material_prim.IsValid() if material_prim else False,
+                },
+            )
 
         material = UsdShade.Material(material_prim)
 
-        # if not prims_to_assign_to or not isinstance(prims_to_assign_to, list(Usd.Prim)):
-        #     raise ValueError(f"primitives are not a <list(Usd.Prim)> object, instead it's a {type(prims_to_assign_to)}.")
-
         for prim in prims_to_assign_to:
             UsdShade.MaterialBindingAPI(prim).Bind(material)
-
 
     def run(self, mats_parent_path: str, mesh_parent_path: str) -> None:
         """Bind materials to meshes with matching names.
@@ -192,10 +215,13 @@ class USDShaderAssign:
         mats_parent_prim = self.stage.GetPrimAtPath(mats_parent_path)
 
         # 1. get list of Materials under a parent prim:
-        check, found_mats = usd_utils.collect_prims_of_type(mats_parent_prim, prim_type=UsdShade.Material,
-                                                            recursive=False)
+        check, found_mats = usd_utils.collect_prims_of_type(
+            mats_parent_prim, prim_type=UsdShade.Material, recursive=False
+        )
         if not check:
-            logger.warning("No UsdShade.Material found under prim: '%s'.", mats_parent_path)
+            logger.warning(
+                "No UsdShade.Material found under prim: '%s'.", mats_parent_path
+            )
             return
 
         for mat_prim in found_mats:
@@ -204,16 +230,20 @@ class USDShaderAssign:
             if source_name:
                 mat_name = str(source_name)
             else:
-                mat_name = mat_prim.GetName().replace('_ShaderSG', '')
-                if mat_name.startswith("mat_"):
-                    mat_name = mat_name[len("mat_") :]
-                if mat_name.endswith("_collect"):
-                    mat_name = mat_name[: -len("_collect")]
+                # Use naming convention to clean material name
+                mat_name = self.naming_convention.clean_material_name(
+                    mat_prim.GetName()
+                )
+
             mesh_parent_prim = self.stage.GetPrimAtPath(mesh_parent_path)
 
             # 3. collect all meshes that have the mat name as part of its name:
-            check, asset_prims = usd_utils.collect_prims_of_type(mesh_parent_prim, prim_type=UsdGeom.Mesh,
-                                                                 contains_str=mat_name, recursive=True)
+            check, asset_prims = usd_utils.collect_prims_of_type(
+                mesh_parent_prim,
+                prim_type=UsdGeom.Mesh,
+                contains_str=mat_name,
+                recursive=True,
+            )
             if not asset_prims:
                 logger.warning("No meshes found with name: %s", mat_name)
                 continue
@@ -221,11 +251,8 @@ class USDShaderAssign:
             asset_names = [x.GetName() for x in asset_prims]
             logger.debug("mat_name: %s, asset_names: %s", mat_name, asset_names[0])
 
-
-
             # 4. assign the material to the list of mesh prims:
             self.assign_material_to_primitives(mat_prim, asset_prims)
-
 
 
 class USDMeshConfigure:
@@ -236,6 +263,7 @@ class USDMeshConfigure:
         TODO: Add Karma render settings for caustics and double sided.
         TODO: Set subdiv schema to "__none__".
     """
+
     def __init__(self, stage: Usd.Stage) -> None:
         """Initialize the mesh configurator.
 
@@ -265,8 +293,6 @@ class USDMeshConfigure:
             # Set the attribute value.
             attr.Set(value)
             logger.debug("Set attribute %s to %s (Type: %s)", attrName, value, typeName)
-
-
 
 
 def create_shaded_asset_publish(
@@ -320,11 +346,10 @@ def create_shaded_asset_publish(
     layer_assign = Sdf.Layer.CreateNew(layer_assign_path_abs)
     layer_root.subLayerPaths.append(layer_assign_rel_paths)
 
-
     if geo_file:
         # payload geo:
         stage.SetEditTarget(layer_root)
-        geo_prim = stage.DefinePrim(f'{parent_path}', 'Xform')
+        geo_prim = stage.DefinePrim(f"{parent_path}", "Xform")
         try:
             mesh_rel_path = os.path.relpath(geo_file, layer_save_path)
         except ValueError:
@@ -337,7 +362,6 @@ def create_shaded_asset_publish(
         #     for child_prim in asset_name_prim.GetChildren():
         #         if child_prim.IsA(UsdGeom.Xform):
         #             child_prim.SetMetadata('kind', 'component')
-
 
     # create material_dict_list:
     stage.SetEditTarget(layer_mats)
@@ -361,18 +385,19 @@ def create_shaded_asset_publish(
             texture_format_overrides=texture_format_overrides,
         )
 
-
     if geo_file:
         # assign material_dict_list:
         stage.SetEditTarget(layer_assign)
-        USDShaderAssign(stage).run(mats_parent_path=material_primitive_path, mesh_parent_path=parent_path)
+        USDShaderAssign(stage).run(
+            mats_parent_path=material_primitive_path, mesh_parent_path=parent_path
+        )
 
     # Save all layers:
     layer_mats.Save()
     layer_assign.Save()
     layer_root.Save()
 
-    logger.info("Finished creating USD asset: '%s/%s'.", layer_save_path, main_layer_name)
+    logger.info(
+        "Finished creating USD asset: '%s/%s'.", layer_save_path, main_layer_name
+    )
     logger.info("Success")
-
-

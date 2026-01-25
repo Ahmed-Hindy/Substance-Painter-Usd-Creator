@@ -70,7 +70,10 @@ def test_usd_preview_texture_override_applies(tmp_path):
         "/Asset/material/MatA/UsdPreviewMaterial/UsdPreviewNodeGraph/basecolorTexture"
     )
     texture_shader = pxr.UsdShade.Shader(texture_prim)
-    assert _asset_path_value(texture_shader.GetInput("file")) == "C:/tex/MatA_BaseColor.jpg"
+    assert (
+        _asset_path_value(texture_shader.GetInput("file"))
+        == "C:/tex/MatA_BaseColor.jpg"
+    )
 
 
 def test_renderer_specific_format_overrides(tmp_path):
@@ -107,15 +110,23 @@ def test_renderer_specific_format_overrides(tmp_path):
         "/Asset/material/MatA/UsdPreviewMaterial/UsdPreviewNodeGraph/basecolorTexture"
     )
     usd_preview_shader = pxr.UsdShade.Shader(usd_preview_prim)
-    assert _asset_path_value(usd_preview_shader.GetInput("file")) == "C:/tex/MatA_BaseColor.jpg"
+    assert (
+        _asset_path_value(usd_preview_shader.GetInput("file"))
+        == "C:/tex/MatA_BaseColor.jpg"
+    )
 
     arnold_prim = stage.GetPrimAtPath("/Asset/material/MatA/arnold_basecolorTexture")
     arnold_shader = pxr.UsdShade.Shader(arnold_prim)
-    assert _asset_path_value(arnold_shader.GetInput("filename")) == "C:/tex/MatA_BaseColor.tif"
+    assert (
+        _asset_path_value(arnold_shader.GetInput("filename"))
+        == "C:/tex/MatA_BaseColor.tif"
+    )
 
     mtlx_prim = stage.GetPrimAtPath("/Asset/material/MatA/mtlx_basecolorTexture")
     mtlx_shader = pxr.UsdShade.Shader(mtlx_prim)
-    assert _asset_path_value(mtlx_shader.GetInput("file")) == "C:/tex/MatA_BaseColor.png"
+    assert (
+        _asset_path_value(mtlx_shader.GetInput("file")) == "C:/tex/MatA_BaseColor.png"
+    )
 
 
 def test_mtlx_metalness_is_float(tmp_path):
@@ -153,7 +164,9 @@ def test_mtlx_metalness_is_float(tmp_path):
 
     std_prim = stage.GetPrimAtPath("/Asset/material/MatA/mtlx_mtlxstandard_surface1")
     std_shader = pxr.UsdShade.Shader(std_prim)
-    assert std_shader.GetInput("metalness").GetTypeName() == pxr.Sdf.ValueTypeNames.Float
+    assert (
+        std_shader.GetInput("metalness").GetTypeName() == pxr.Sdf.ValueTypeNames.Float
+    )
 
 
 def test_openpbr_surface_id(tmp_path):
@@ -222,11 +235,14 @@ def test_openpbr_input_names(tmp_path):
 
 
 def test_assign_material_raises_for_non_material():
+    """assign_material_to_primitives raises MaterialAssignmentError for non-materials."""
+    from axe_usd.core.exceptions import MaterialAssignmentError
+
     stage = pxr.Usd.Stage.CreateInMemory()
     prim = stage.DefinePrim("/NotMaterial", "Xform")
     assigner = material_processor.USDShaderAssign(stage)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(MaterialAssignmentError):
         assigner.assign_material_to_primitives(prim, [])
 
 

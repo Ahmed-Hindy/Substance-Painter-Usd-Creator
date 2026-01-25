@@ -26,6 +26,8 @@ QDesktopServices = QtGui.QDesktopServices
 QUrl = QtCore.QUrl
 
 QCheckBox = QtWidgets.QCheckBox
+QComboBox = QtWidgets.QComboBox
+QApplication = QtWidgets.QApplication
 QDialog = QtWidgets.QDialog
 QFileDialog = QtWidgets.QFileDialog
 QFormLayout = QtWidgets.QFormLayout
@@ -37,8 +39,11 @@ QLineEdit = QtWidgets.QLineEdit
 QMessageBox = QtWidgets.QMessageBox
 QMenuBar = QtWidgets.QMenuBar
 QPushButton = QtWidgets.QPushButton
+QToolButton = QtWidgets.QToolButton
+QInputDialog = QtWidgets.QInputDialog
 QScrollArea = QtWidgets.QScrollArea
 QSizePolicy = QtWidgets.QSizePolicy
+QStyle = QtWidgets.QStyle
 QVBoxLayout = QtWidgets.QVBoxLayout
 QWidget = QtWidgets.QWidget
 
@@ -50,6 +55,8 @@ __all__ = [
     "QDesktopServices",
     "QUrl",
     "QCheckBox",
+    "QComboBox",
+    "QApplication",
     "QDialog",
     "QFileDialog",
     "QFormLayout",
@@ -61,8 +68,11 @@ __all__ = [
     "QMessageBox",
     "QMenuBar",
     "QPushButton",
+    "QToolButton",
+    "QInputDialog",
     "QScrollArea",
     "QSizePolicy",
+    "QStyle",
     "QVBoxLayout",
     "QWidget",
 ]

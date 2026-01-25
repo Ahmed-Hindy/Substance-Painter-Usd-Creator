@@ -2,27 +2,32 @@
 
 Copyright Ahmed Hindy. Please mention the author if you found any part of this code useful.
 """
+import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping, Optional, Protocol, Sequence, Tuple
+from typing import Dict, Mapping, Optional, Protocol, Sequence, Tuple
 
 from ...version import get_version
 from .qt_compat import (
     QCheckBox,
+    QComboBox,
     QDialog,
     QFileDialog,
     QFormLayout,
     QFrame,
     QGroupBox,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QMessageBox,
     QMenuBar,
     QPushButton,
+    QToolButton,
     QScrollArea,
     QSizePolicy,
+    QStyle,
     QVBoxLayout,
     QWidget,
     QDesktopServices,
@@ -30,6 +35,7 @@ from .qt_compat import (
     QPalette,
     Qt,
     QUrl,
+    QApplication,
 )
 
 from ...core.exporter import export_publish
@@ -50,6 +56,9 @@ logger = logging.getLogger(__name__)
 if not logger.handlers:
     logger.addHandler(logging.NullHandler())
 
+PRESET_PATH = Path.home() / ".axe_usd" / "presets.json"
+CUSTOM_PRESET_LABEL = "Custom"
+
 DEFAULT_DIALOGUE_DICT = {
     "title": "USD Exporter",
     "publish_location": "<export_folder>",
@@ -59,6 +68,13 @@ DEFAULT_DIALOGUE_DICT = {
     "enable_materialx": True,
     "enable_openpbr": False,
     "enable_save_geometry": True,
+}
+
+LOG_LEVELS = {
+    "Error": logging.ERROR,
+    "Warning": logging.WARNING,
+    "Info": logging.INFO,
+    "Debug": logging.DEBUG,
 }
 
 # Hold references to UI widgets
@@ -81,6 +97,8 @@ class USDSettings:
         primitive_path (str): USD prim path for material_dict_list.
         publish_directory (str): Directory for output USD layers.
         save_geometry (bool): Whether to export mesh geometry.
+        texture_format_overrides (Dict[str, str]): Optional per-renderer overrides.
+        log_level (str): Logging verbosity.
     """
 
     usdpreview: bool
@@ -90,6 +108,8 @@ class USDSettings:
     publish_directory: str
     save_geometry: bool
     openpbr: bool
+    texture_format_overrides: Dict[str, str]
+    log_level: str
 
 
 class MeshExporter:
@@ -151,6 +171,7 @@ class USDExporterView(QDialog):
         self.setWindowIcon(QIcon())
         self.setMinimumSize(520, 240)
         self._plugin_version = get_version()
+        self._preset_sync_blocked = False
 
         root_layout = QVBoxLayout()
         root_layout.setContentsMargins(10, 10, 10, 10)
@@ -187,6 +208,22 @@ class USDExporterView(QDialog):
         content.setLayout(content_layout)
         scroll_area.setWidget(content)
 
+        preset_row = QHBoxLayout()
+        preset_row.setContentsMargins(0, 0, 0, 0)
+        preset_row.setSpacing(6)
+        preset_label = QLabel("Preset")
+        self.preset_combo = QComboBox()
+        self.preset_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.preset_combo.currentTextChanged.connect(self._on_preset_changed)
+        self.save_preset_btn = QPushButton("Save Preset")
+        self.save_preset_btn.clicked.connect(self._save_preset_prompt)
+        preset_row.addWidget(preset_label)
+        preset_row.addWidget(self.preset_combo, 1)
+        preset_row.addWidget(self.save_preset_btn, 0)
+        preset_row_widget = QWidget()
+        preset_row_widget.setLayout(preset_row)
+        content_layout.addWidget(preset_row_widget)
+
         engine_box = QGroupBox("Render Engines")
         engine_box.setFlat(True)
         engine_layout = QVBoxLayout()
@@ -200,6 +237,10 @@ class USDExporterView(QDialog):
         self.materialx.setChecked(DEFAULT_DIALOGUE_DICT["enable_materialx"])
         self.openpbr = QCheckBox("OpenPBR (MaterialX)")
         self.openpbr.setChecked(DEFAULT_DIALOGUE_DICT["enable_openpbr"])
+        self.usdpreview.toggled.connect(self._sync_preset_combo)
+        self.arnold.toggled.connect(self._sync_preset_combo)
+        self.materialx.toggled.connect(self._sync_preset_combo)
+        self.openpbr.toggled.connect(self._sync_preset_combo)
         engine_layout.addWidget(self.usdpreview)
         engine_layout.addWidget(self.arnold)
         engine_layout.addWidget(self.materialx)
@@ -222,6 +263,8 @@ class USDExporterView(QDialog):
         self.pub.setPlaceholderText(DEFAULT_DIALOGUE_DICT["publish_location"])
         self.pub.setToolTip("Use <export_folder> token to insert texture folder path")
         self.pub.setClearButtonEnabled(True)
+        self.pub.textChanged.connect(self._update_path_validation)
+        self.pub.textChanged.connect(self._sync_preset_combo)
         pub_row = QHBoxLayout()
         pub_row.setContentsMargins(0, 0, 0, 0)
         pub_row.setSpacing(6)
@@ -231,10 +274,12 @@ class USDExporterView(QDialog):
         self.pub_browse.clicked.connect(self._browse_publish_directory)
         self.pub_browse.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
         pub_row.addWidget(self.pub_browse, 0)
-        self.pub_open = QPushButton("Open Folder")
+        self.pub_open = QToolButton()
         self.pub_open.setToolTip("Open the publish folder in your file browser")
         self.pub_open.clicked.connect(self._open_publish_directory)
         self.pub_open.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+        self._apply_icon_only_button(self.pub_open, QStyle.SP_DirOpenIcon)
+        self.pub_open.setFixedSize(28, 24)
         pub_row.addWidget(self.pub_open, 0)
         pub_row_widget = QWidget()
         pub_row_widget.setLayout(pub_row)
@@ -249,9 +294,11 @@ class USDExporterView(QDialog):
         self.prim.setToolTip("Root prim path for the asset; materials go under <root>/material")
         self.prim.setClearButtonEnabled(True)
         self.prim.editingFinished.connect(self._validate_prim_path)
+        self.prim.textChanged.connect(self._update_path_validation)
+        self.prim.textChanged.connect(self._sync_preset_combo)
         paths_layout.addRow("Primitive Path", self.prim)
 
-        prim_hint = self._make_hint_label("Example: /Asset or /Scene/Asset")
+        prim_hint = self._make_hint_label("Example: '/Asset' or '/Scene/Asset'")
         paths_layout.addRow("", prim_hint)
 
         paths_box.setLayout(paths_layout)
@@ -266,19 +313,101 @@ class USDExporterView(QDialog):
         self.geom = QCheckBox("Include Geometry in USD")
         self.geom.setToolTip("Exports mesh geometry to USD if supported")
         self.geom.setChecked(DEFAULT_DIALOGUE_DICT["enable_save_geometry"])
+        self.geom.toggled.connect(self._sync_preset_combo)
         options_layout.addWidget(self.geom)
         options_box.setLayout(options_layout)
         options_box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
         content_layout.addWidget(options_box)
 
+        advanced_box = QGroupBox("Advanced")
+        advanced_box.setCheckable(True)
+        advanced_box.setChecked(False)
+        advanced_container = QWidget()
+        advanced_layout = QFormLayout()
+        advanced_layout.setContentsMargins(8, 6, 8, 8)
+        advanced_layout.setSpacing(4)
+        advanced_container.setLayout(advanced_layout)
+
+        self.override_usdpreview = QLineEdit()
+        self.override_usdpreview.setPlaceholderText("auto")
+        self.override_usdpreview.setToolTip("Override USD Preview texture format (e.g., jpg)")
+        self.override_usdpreview.textChanged.connect(self._sync_preset_combo)
+        advanced_layout.addRow("USD Preview Format", self.override_usdpreview)
+
+        self.override_arnold = QLineEdit()
+        self.override_arnold.setPlaceholderText("png")
+        self.override_arnold.setToolTip("Override Arnold texture format (e.g., exr)")
+        self.override_arnold.textChanged.connect(self._sync_preset_combo)
+        advanced_layout.addRow("Arnold Format", self.override_arnold)
+
+        self.override_mtlx = QLineEdit()
+        self.override_mtlx.setPlaceholderText("png")
+        self.override_mtlx.setToolTip("Override MaterialX texture format (e.g., png)")
+        self.override_mtlx.textChanged.connect(self._sync_preset_combo)
+        advanced_layout.addRow("MaterialX Format", self.override_mtlx)
+
+        self.override_openpbr = QLineEdit()
+        self.override_openpbr.setPlaceholderText("png")
+        self.override_openpbr.setToolTip("Override OpenPBR texture format (e.g., png)")
+        self.override_openpbr.textChanged.connect(self._sync_preset_combo)
+        advanced_layout.addRow("OpenPBR Format", self.override_openpbr)
+
+        self.log_level_combo = QComboBox()
+        self.log_level_combo.addItems(list(LOG_LEVELS.keys()))
+        self.log_level_combo.setCurrentText("Info")
+        self.log_level_combo.currentTextChanged.connect(self._sync_preset_combo)
+        advanced_layout.addRow("Logging Verbosity", self.log_level_combo)
+
+        advanced_box_layout = QVBoxLayout()
+        advanced_box_layout.setContentsMargins(0, 0, 0, 0)
+        advanced_box_layout.addWidget(advanced_container)
+        advanced_box.setLayout(advanced_box_layout)
+        advanced_container.setVisible(False)
+        advanced_box.toggled.connect(advanced_container.setVisible)
+        content_layout.addWidget(advanced_box)
+
+        self._presets = self._load_presets()
+        self._refresh_preset_combo()
+        self._sync_preset_combo()
+        self._update_path_validation()
     def _validate_prim_path(self):
         """Validate the primitive path input field."""
-        text = self.prim.text()
-        if not text.startswith("/"):
-            QMessageBox.warning(self, "Invalid Path", "Primitive path must start with '/'")
-            self.prim.setStyleSheet("border:1px solid red")
+        self._update_path_validation()
+
+    def _set_field_status(self, field: QLineEdit, status: str) -> None:
+        colors = {
+            "ok": "#2e7d32",
+            "warn": "#f9a825",
+            "error": "#c62828",
+        }
+        color = colors.get(status)
+        if not color:
+            field.setStyleSheet("")
+            return
+        field.setStyleSheet(f"border:1px solid {color}")
+
+    def _update_path_validation(self) -> None:
+        prim_path = self.prim.text().strip()
+        if not prim_path:
+            self._set_field_status(self.prim, "error")
+        elif not prim_path.startswith("/"):
+            self._set_field_status(self.prim, "error")
+        elif "//" in prim_path:
+            self._set_field_status(self.prim, "warn")
         else:
-            self.prim.setStyleSheet("")
+            self._set_field_status(self.prim, "ok")
+
+        publish_dir = self.pub.text().strip()
+        if not publish_dir:
+            self._set_field_status(self.pub, "error")
+        elif "<export_folder>" in publish_dir:
+            self._set_field_status(self.pub, "warn")
+        else:
+            path = Path(publish_dir)
+            if path.exists():
+                self._set_field_status(self.pub, "ok")
+            else:
+                self._set_field_status(self.pub, "warn")
 
     def _make_hint_label(self, text: str) -> QLabel:
         """Create a hint label styled for the dialog.
@@ -305,6 +434,160 @@ class USDExporterView(QDialog):
         hint.setPalette(pal)
         hint.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
         return hint
+
+    def _apply_icon_only_button(self, button: QToolButton, icon_type: QStyle.StandardPixmap) -> None:
+        """Apply a standard icon to a tool button."""
+        app = QApplication.instance()
+        style = app.style()
+        button.setIcon(style.standardIcon(icon_type))
+        button.setToolButtonStyle(Qt.ToolButtonIconOnly)
+
+    def _builtin_presets(self) -> Dict[str, Dict[str, object]]:
+        return {
+            "USD Preview Only": {
+                "usdpreview": True,
+                "arnold": False,
+                "materialx": False,
+                "openpbr": False,
+            },
+            "OpenPBR Only": {
+                "usdpreview": False,
+                "arnold": False,
+                "materialx": False,
+                "openpbr": True,
+            },
+            "Full": {
+                "usdpreview": True,
+                "arnold": True,
+                "materialx": True,
+                "openpbr": True,
+            },
+        }
+
+    def _load_presets(self) -> Dict[str, Dict[str, object]]:
+        if not PRESET_PATH.exists():
+            return {}
+        try:
+            with PRESET_PATH.open("r", encoding="utf-8") as handle:
+                data = json.load(handle)
+        except Exception as exc:
+            logger.warning("Failed to load presets: %s", exc)
+            return {}
+        if not isinstance(data, dict):
+            return {}
+        return data
+
+    def _save_presets(self) -> None:
+        try:
+            PRESET_PATH.parent.mkdir(parents=True, exist_ok=True)
+            with PRESET_PATH.open("w", encoding="utf-8") as handle:
+                json.dump(self._presets, handle, indent=2)
+        except Exception as exc:
+            logger.error("Failed to save presets: %s", exc)
+            QMessageBox.warning(
+                self,
+                "Preset Save Failed",
+                f"Could not save presets to:\n{PRESET_PATH}\n\n{exc}",
+            )
+
+    def _matches_builtin_preset(self, data: Dict[str, object], preset: Dict[str, object]) -> bool:
+        for key in ("usdpreview", "arnold", "materialx", "openpbr"):
+            if bool(data.get(key)) != bool(preset.get(key)):
+                return False
+        return True
+
+    def _find_matching_preset(self, data: Dict[str, object]) -> Optional[str]:
+        for name, preset in self._presets.items():
+            if preset == data:
+                return name
+        for name, preset in self._builtin_presets().items():
+            if self._matches_builtin_preset(data, preset):
+                return name
+        return None
+
+    def _refresh_preset_combo(self) -> None:
+        self.preset_combo.blockSignals(True)
+        self.preset_combo.clear()
+        self.preset_combo.addItem(CUSTOM_PRESET_LABEL)
+        for name in self._builtin_presets().keys():
+            self.preset_combo.addItem(name)
+        if self._presets:
+            self.preset_combo.insertSeparator(self.preset_combo.count())
+            for name in sorted(self._presets.keys()):
+                self.preset_combo.addItem(name)
+        self.preset_combo.blockSignals(False)
+
+    def _sync_preset_combo(self) -> None:
+        if self._preset_sync_blocked:
+            return
+        data = self._collect_preset_data()
+        name = self._find_matching_preset(data) or CUSTOM_PRESET_LABEL
+        self.preset_combo.blockSignals(True)
+        index = self.preset_combo.findText(name)
+        if index >= 0:
+            self.preset_combo.setCurrentIndex(index)
+        self.preset_combo.blockSignals(False)
+
+    def _on_preset_changed(self, name: str) -> None:
+        preset = self._builtin_presets().get(name)
+        if preset is None:
+            preset = self._presets.get(name)
+        if not preset:
+            return
+        self._apply_preset_data(preset)
+
+    def _collect_preset_data(self) -> Dict[str, object]:
+        return {
+            "usdpreview": self.usdpreview.isChecked(),
+            "arnold": self.arnold.isChecked(),
+            "materialx": self.materialx.isChecked(),
+            "openpbr": self.openpbr.isChecked(),
+            "primitive_path": self.prim.text().strip(),
+            "publish_directory": self.pub.text().strip(),
+            "save_geometry": self.geom.isChecked(),
+            "texture_format_overrides": self._collect_overrides(),
+            "log_level": self.log_level_combo.currentText(),
+        }
+
+    def _apply_preset_data(self, data: Dict[str, object]) -> None:
+        self._preset_sync_blocked = True
+        try:
+            self.usdpreview.setChecked(bool(data.get("usdpreview", True)))
+            self.arnold.setChecked(bool(data.get("arnold", False)))
+            self.materialx.setChecked(bool(data.get("materialx", True)))
+            self.openpbr.setChecked(bool(data.get("openpbr", False)))
+            self.geom.setChecked(bool(data.get("save_geometry", True)))
+
+            primitive_path = str(data.get("primitive_path") or DEFAULT_DIALOGUE_DICT["primitive_path"])
+            publish_dir = str(data.get("publish_directory") or DEFAULT_DIALOGUE_DICT["publish_location"])
+            self.prim.setText(primitive_path)
+            self.pub.setText(publish_dir)
+
+            overrides = data.get("texture_format_overrides") or {}
+            if isinstance(overrides, dict):
+                self.override_usdpreview.setText(str(overrides.get("usd_preview", "")))
+                self.override_arnold.setText(str(overrides.get("arnold", "")))
+                self.override_mtlx.setText(str(overrides.get("mtlx", "")))
+                self.override_openpbr.setText(str(overrides.get("openpbr", "")))
+
+            log_level = data.get("log_level")
+            if log_level in LOG_LEVELS:
+                self.log_level_combo.setCurrentText(str(log_level))
+        finally:
+            self._preset_sync_blocked = False
+
+        self._update_path_validation()
+        self._sync_preset_combo()
+
+    def _save_preset_prompt(self) -> None:
+        name, ok = QInputDialog.getText(self, "Save Preset", "Preset name:")
+        name = name.strip()
+        if not ok or not name:
+            return
+        self._presets[name] = self._collect_preset_data()
+        self._save_presets()
+        self._refresh_preset_combo()
+        self.preset_combo.setCurrentText(name)
 
     def _show_help(self) -> None:
         """Show a short help dialog."""
@@ -382,7 +665,25 @@ class USDExporterView(QDialog):
             publish_dir,
             self.geom.isChecked(),
             self.openpbr.isChecked(),
+            self._collect_overrides(),
+            self.log_level_combo.currentText(),
         )
+
+    def _collect_overrides(self) -> Dict[str, str]:
+        overrides: Dict[str, str] = {}
+        usd_preview = self.override_usdpreview.text().strip()
+        arnold = self.override_arnold.text().strip()
+        mtlx = self.override_mtlx.text().strip()
+        openpbr = self.override_openpbr.text().strip()
+        if usd_preview:
+            overrides["usd_preview"] = usd_preview
+        if arnold:
+            overrides["arnold"] = arnold
+        if mtlx:
+            overrides["mtlx"] = mtlx
+        if openpbr:
+            overrides["openpbr"] = openpbr
+        return overrides
 
 
 # Entry-point functions required by Substance Painter
@@ -457,6 +758,9 @@ def on_post_export(context: ExportContext) -> None:
     last_export_dir = export_dir
 
     raw = usd_exported_qdialog.get_settings()
+    log_level = LOG_LEVELS.get(raw.log_level)
+    if log_level is not None:
+        logger.setLevel(log_level)
     primitive_path = raw.primitive_path
     if not primitive_path.startswith("/"):
         logger.warning("Primitive path must start with '/': %s", primitive_path)
@@ -475,6 +779,7 @@ def on_post_export(context: ExportContext) -> None:
         primitive_path=primitive_path,
         publish_directory=Path(publish_dir),
         save_geometry=raw.save_geometry,
+        texture_format_overrides=raw.texture_format_overrides or None,
     )
     materials = parse_textures(context.textures)
     if not materials:
@@ -503,8 +808,14 @@ def on_post_export(context: ExportContext) -> None:
         QMessageBox.critical(
             usd_exported_qdialog,
             "USD Exporter",
-            f"USD export failed:\n{exc}",
+            f"USD export failed:\n{exc}\n\nCheck the logs for more details.",
         )
+        return
+    QMessageBox.information(
+        usd_exported_qdialog,
+        "USD Exporter",
+        f"USD export complete.\n\nPublish folder:\n{settings.publish_directory}",
+    )
 
 
 def close_plugin() -> None:
