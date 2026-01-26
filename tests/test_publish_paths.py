@@ -8,7 +8,7 @@ def test_build_publish_paths_from_directory():
     paths = build_publish_paths(Path("publish"), "main.usda")
     assert paths.root_dir == Path("publish")
     assert paths.root_dir == Path("publish")
-    assert paths.geometry_path == Path("publish/geometry.usd")
+    assert paths.geometry_path == Path("publish/geo.usdc")
 
 
 def test_build_publish_paths_from_file():

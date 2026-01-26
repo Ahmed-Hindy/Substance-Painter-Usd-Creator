@@ -49,7 +49,7 @@ class PublishPaths:
 
     Attributes:
         root_dir: Root publish directory.
-        geometry_path: Path to the geometry file (geometry.usd).
+        geometry_path: Path to the geometry layer file (geo.usdc).
     """
 
     root_dir: Path

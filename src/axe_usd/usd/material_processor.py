@@ -28,6 +28,11 @@ from .material_model import (
     normalize_material_dict,
 )
 from .types import MaterialTextureDict, MaterialTextureList
+from .asset_files import (
+    MTL_LIBRARY_ROOT,
+    MTL_VARIANT_DEFAULT,
+    MTL_VARIANT_SET,
+)
 
 # Configure module-level logger
 logger = logging.getLogger(__name__)
@@ -223,7 +228,7 @@ class USDShaderAssign:
         if not check:
             # If no materials are found (e.g. they are in sub-scopes), try a recursive search
             # Or just warn if truly nothing found.
-            # ASWF structure: /mtl/Scope/Material? Usually just /mtl/Material.
+            # Standard structure: /mtl/Scope/Material? Usually just /mtl/Material.
             logger.warning(
                 "No UsdShade.Material found under prim: '%s'.", mats_parent_path
             )
@@ -340,7 +345,7 @@ def _relocate_textures(
                 logger.error(f"Failed to move texture {source_path}: {e}")
 
             new_info = info.copy()
-            # Calculate relative path from the asset root (where mtl.usd lives)
+            # Calculate relative path from the asset root (where mtl.usdc lives)
             # maps_dir is <Asset>/maps, so parent is <Asset>
             # dest_path is <Asset>/maps/texture.png
             try:
@@ -361,6 +366,100 @@ def _relocate_textures(
     return updated_list
 
 
+def _collect_mesh_paths(stage: Usd.Stage, root_path: str) -> list[str]:
+    mesh_paths: list[str] = []
+    for prim in stage.Traverse():
+        if prim.IsA(UsdGeom.Mesh):
+            path = str(prim.GetPath())
+            if root_path and not path.startswith(root_path):
+                continue
+            mesh_paths.append(path)
+    return mesh_paths
+
+
+def _collect_material_prims(stage: Usd.Stage, parent_path: str) -> list[Usd.Prim]:
+    parent = stage.GetPrimAtPath(parent_path)
+    if not parent or not parent.IsValid():
+        return []
+    check, found = usd_utils.collect_prims_of_type(
+        parent, prim_type=UsdShade.Material, recursive=True
+    )
+    if not check:
+        return []
+    return found
+
+
+def _bind_materials_in_variant(
+    asset_file: Path, mtl_file: Path, asset_name: str
+) -> None:
+    asset_stage = Usd.Stage.Open(str(asset_file))
+    if not asset_stage:
+        logger.warning("Failed to open asset stage for binding: %s", asset_file)
+        return
+
+    mtl_stage = Usd.Stage.Open(str(mtl_file))
+    if not mtl_stage:
+        logger.warning("Failed to open material stage for binding: %s", mtl_file)
+        return
+
+    root_path = f"/{asset_name}"
+    root_prim = mtl_stage.GetPrimAtPath(root_path)
+    if not root_prim or not root_prim.IsValid():
+        logger.warning("Missing root prim for material binding: %s", root_path)
+        return
+
+    variant_set = root_prim.GetVariantSets().GetVariantSet(MTL_VARIANT_SET)
+    if not variant_set or not variant_set.IsValid():
+        variant_set = root_prim.GetVariantSets().AddVariantSet(MTL_VARIANT_SET)
+    if MTL_VARIANT_DEFAULT not in variant_set.GetVariantNames():
+        variant_set.AddVariant(MTL_VARIANT_DEFAULT)
+    variant_set.SetVariantSelection(MTL_VARIANT_DEFAULT)
+
+    material_prims = _collect_material_prims(
+        mtl_stage, f"/{MTL_LIBRARY_ROOT}/mtl"
+    )
+    if not material_prims:
+        logger.warning("No materials found to bind in %s", mtl_file)
+        return
+
+    render_root = f"/{asset_name}/geo/render"
+    mesh_paths = _collect_mesh_paths(asset_stage, render_root)
+
+    with variant_set.GetVariantEditContext():
+        from .naming import NamingConvention
+
+        if not mesh_paths:
+            logger.warning("No meshes found for material binding under %s.", render_root)
+            return
+
+        naming = NamingConvention()
+        for material_prim in material_prims:
+            source_name = material_prim.GetCustomDataByKey("source_material_name")
+            raw_name = str(source_name) if source_name else material_prim.GetName()
+            cleaned = naming.clean_material_name(raw_name)
+            matches = [
+                path for path in mesh_paths if cleaned in path.rsplit("/", 1)[-1]
+            ]
+            if not matches:
+                logger.warning("No meshes found with name like: %s", cleaned)
+                continue
+
+            material = UsdShade.Material.Get(
+                mtl_stage, f"/{asset_name}/mtl/{material_prim.GetName()}"
+            )
+            if not material or not material.GetPrim().IsValid():
+                logger.warning(
+                    "Material not found for binding: %s", material_prim.GetName()
+                )
+                continue
+
+            for mesh_path in matches:
+                mesh_prim = mtl_stage.OverridePrim(mesh_path)
+                UsdShade.MaterialBindingAPI(mesh_prim).Bind(material)
+
+    mtl_stage.Save()
+
+
 def create_shaded_asset_publish(
     material_dict_list: MaterialTextureList,
     stage: Optional[Usd.Stage] = None,
@@ -374,13 +473,11 @@ def create_shaded_asset_publish(
     create_openpbr: bool = False,
     texture_format_overrides: Optional[Mapping[str, str]] = None,
 ) -> None:
-    """Create ASWF-compliant USD asset with materials and optional geometry.
-
-    Follows https://github.com/usd-wg/assets/blob/main/docs/asset-structure-guidelines.md
+    """Create a component-builder USD asset with materials and optional geometry.
 
     Creates structure:
-    - Files: AssetName.usd, payload.usd, geo.usd, geometry.usd, mtl.usd, /maps/
-    - Prims: /__class__/Asset, /Asset (Kind=component), /Asset/geo, /Asset/mtl
+    - Files: AssetName.usd, payload.usdc, geo.usdc, mtl.usdc, /textures/
+    - Prims: /__class__/Asset, /Asset (Kind=component)
 
     Args:
         material_dict_list: Material texture dictionaries to publish.
@@ -411,36 +508,38 @@ def create_shaded_asset_publish(
     # Extract asset name from parent_path (e.g., "/Asset" -> "Asset")
     asset_name = parent_path.strip("/").split("/")[-1]
 
-    # ASWF-compliant file structure
+    # Component-builder file structure
     output_dir = Path(layer_save_path)
     paths = create_asset_file_structure(output_dir, asset_name)
 
-    # 1. Relocate textures to /maps/
-    updated_materials = _relocate_textures(material_dict_list, paths.maps_dir)
-
-    # 2. Handle geometry file
+    # 1. Handle geometry file
     has_geometry = False
     if geo_file:
         geo_path = Path(geo_file)
-        # Verify the file exists at the expected location (Asset/geometry.usd)
-        # Since the plugin now exports directly to this path
         if geo_path.exists():
-            has_geometry = True
-            logger.info(f"Using geometry file: {geo_path}")
+            if geo_path.resolve() == paths.geo_file.resolve():
+                has_geometry = True
+                logger.info(f"Using geometry file: {geo_path}")
+            else:
+                logger.warning(
+                    "Geometry file is not at the expected path (%s): %s",
+                    paths.geo_file,
+                    geo_path,
+                )
         else:
             logger.warning(f"Geometry file not found at expected path: {geo_path}")
 
-    # 3. Create geo.usd (referencing local geometry.usd)
-    create_geo_usd_file(paths, asset_name, has_geometry=has_geometry)
+    # 2. Create geo.usdc scaffold (does not overwrite existing files)
+    create_geo_usd_file(paths, asset_name)
 
-    # 4. Create payload.usd (references geo.usd)
+    # 3. Create payload.usdc (references mtl.usdc and geo.usdc)
     create_payload_usd_file(paths, asset_name)
 
-    # 5. Create mtl.usd and author materials
+    # 4. Create mtl.usdc and author materials
     mtl_stage = create_mtl_usd_file(paths, asset_name)
-    material_primitive_path = f"/{asset_name}/mtl"
+    material_primitive_path = f"/{MTL_LIBRARY_ROOT}/mtl"
 
-    for material_dict in updated_materials:
+    for material_dict in material_dict_list:
         material_name = next(
             (info["mat_name"] for info in material_dict.values()),
             "UnknownMaterialName",
@@ -458,27 +557,22 @@ def create_shaded_asset_publish(
         )
     mtl_stage.Save()
 
-    # 6. Create Asset.usd (main entry point)
-    asset_stage = create_asset_usd_file(paths, asset_name)
+    # 5. Create Asset.usd (main entry point)
+    create_asset_usd_file(paths, asset_name)
 
-    # 7. Bind materials to geometry in Asset.usd
+    # 6. Bind materials inside mtl.usdc variant if geometry is available
     if has_geometry:
-        logger.info("Binding materials to geometry...")
-        assigner = USDShaderAssign(asset_stage)
-        assigner.run(
-            mats_parent_path=f"/{asset_name}/mtl",
-            mesh_parent_path=f"/{asset_name}/geo",  # Geometry is under /geo scope via payload
-        )
-        asset_stage.Save()
+        logger.info("Binding materials to geometry via mtl variant...")
+        _bind_materials_in_variant(paths.asset_file, paths.mtl_file, asset_name)
 
     logger.info(
-        "Created ASWF-compliant USD asset: '%s/%s/%s.usd'",
+        "Created component USD asset: '%s/%s/%s.usd'",
         layer_save_path,
         asset_name,
         asset_name,
     )
     logger.info(
-        "Structure: %s.usd, payload.usd, geo.usd, geometry.usd, mtl.usd, /maps/",
+        "Structure: %s.usd, payload.usdc, geo.usdc, mtl.usdc, /textures/",
         asset_name,
     )
     logger.info("Success")

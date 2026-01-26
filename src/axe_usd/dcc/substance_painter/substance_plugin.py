@@ -3,8 +3,10 @@
 Copyright Ahmed Hindy. Please mention the author if you found any part of this code useful.
 """
 
+import gc
 import json
 import logging
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Mapping, Optional, Protocol, Sequence, Tuple
@@ -46,6 +48,7 @@ from ...core.publish_paths import build_publish_paths
 from ...core.texture_parser import parse_textures
 from ...usd.pxr_writer import PxrUsdWriter
 
+from . import usd_scene_fixup
 import substance_painter
 import substance_painter.event
 import substance_painter.export
@@ -55,7 +58,14 @@ import substance_painter.ui
 # Configure logging
 logger = logging.getLogger(__name__)
 if not logger.handlers:
-    logger.addHandler(logging.NullHandler())
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setLevel(logging.DEBUG)
+    stream_handler.setFormatter(
+        logging.Formatter("[AxeUSD] %(levelname)s: %(message)s")
+    )
+    logger.addHandler(stream_handler)
+    logger.setLevel(logging.DEBUG)
+    logger.propagate = False
 
 PRESET_PATH = Path.home() / ".axe_usd" / "presets.json"
 CUSTOM_PRESET_LABEL = "Custom"
@@ -131,6 +141,8 @@ class MeshExporter:
             settings.publish_directory, settings.main_layer_name, asset_name
         )
         self.mesh_path = publish_paths.geometry_path
+        self.root_prim_path = f"/{asset_name}" if asset_name else settings.primitive_path
+        self.last_error: str = ""
 
     def export_mesh(self) -> Optional[Path]:
         """Call Substance Painter's USD mesh exporter.
@@ -140,6 +152,16 @@ class MeshExporter:
         """
         ensure_directory(self.mesh_path.parent)
         logger.info("Exporting mesh to %s", self.mesh_path)
+        logger.debug("Mesh export target suffix: %s", self.mesh_path.suffix)
+        export_path = self.mesh_path
+        convert_to_usdc = False
+        if self.mesh_path.suffix.lower() == ".usdc":
+            convert_to_usdc = True
+            export_path = self.mesh_path.with_suffix(".usd")
+            logger.info(
+                "Mesh export target is .usdc; exporting to %s then converting.",
+                export_path,
+            )
 
         # Choose an export option to use
         export_option = substance_painter.export.MeshExportOption.BaseMesh
@@ -152,15 +174,60 @@ class MeshExporter:
 
         try:
             export_result = substance_painter.export.export_mesh(
-                str(self.mesh_path), export_option
+                str(export_path), export_option
             )
 
             # In case of error, display a human readable message:
             if export_result.status != substance_painter.export.ExportStatus.Success:
-                print(export_result.message)
+                self.last_error = str(export_result.message)
+                logger.warning(
+                    "Mesh export failed (status=%s): %s",
+                    export_result.status,
+                    export_result.message,
+                )
                 return None
+            logger.debug(
+                "Mesh export status=%s message=%s",
+                export_result.status,
+                export_result.message,
+            )
+            if not export_path.exists():
+                self.last_error = "Mesh export reported success but file is missing."
+                logger.warning(self.last_error)
+                return None
+            if convert_to_usdc:
+                from pxr import Usd
+
+                stage = Usd.Stage.Open(str(export_path))
+                if not stage:
+                    self.last_error = "Failed to open temporary mesh for conversion."
+                    logger.warning(self.last_error)
+                    return None
+                if usd_scene_fixup.fix_sp_mesh_stage(stage, self.root_prim_path):
+                    logger.debug(
+                        "Applied SP mesh fixup to %s (root: %s)",
+                        export_path,
+                        self.root_prim_path,
+                    )
+                stage.GetRootLayer().Export(str(self.mesh_path))
+                if not self.mesh_path.exists():
+                    self.last_error = "Mesh conversion reported success but file is missing."
+                    logger.warning(self.last_error)
+                    return None
+                stage = None
+                gc.collect()
+                if export_path.exists():
+                    try:
+                        export_path.unlink()
+                    except Exception as cleanup_exc:
+                        logger.warning(
+                            "Failed to remove temporary mesh file %s: %s",
+                            export_path,
+                            cleanup_exc,
+                        )
             return self.mesh_path
         except Exception as exc:
+            self.last_error = str(exc)
             logger.error("Mesh export failed: %s", exc)
             return None
 
@@ -370,7 +437,7 @@ class USDExporterView(QDialog):
 
         self.log_level_combo = QComboBox()
         self.log_level_combo.addItems(list(LOG_LEVELS.keys()))
-        self.log_level_combo.setCurrentText("Info")
+        self.log_level_combo.setCurrentText("Debug")
         self.log_level_combo.currentTextChanged.connect(self._sync_preset_combo)
         advanced_layout.addRow("Logging Verbosity", self.log_level_combo)
 
@@ -825,13 +892,17 @@ def on_post_export(context: ExportContext) -> None:
 
     geo_file = None
     if settings.save_geometry:
-        geo_file = MeshExporter(settings).export_mesh()
+        mesh_exporter = MeshExporter(settings)
+        geo_file = mesh_exporter.export_mesh()
         if geo_file is None:
             logger.warning("Mesh export failed; exporting materials only.")
+            if mesh_exporter.last_error:
+                logger.warning("Mesh export error detail: %s", mesh_exporter.last_error)
             QMessageBox.warning(
                 usd_exported_qdialog,
                 "USD Exporter",
-                "Mesh export failed. Exporting materials only.",
+                "Mesh export failed. Exporting materials only.\n\n"
+                f"{mesh_exporter.last_error or 'Check the logs for details.'}",
             )
     try:
         export_publish(materials, settings, geo_file, PxrUsdWriter())

@@ -1,14 +1,4 @@
-"""USD asset structure utilities following ASWF guidelines.
-
-This module implements the ASWF USD Asset Structure Guidelines:
-https://github.com/usd-wg/assets/blob/main/docs/asset-structure-guidelines.md
-
-Key features:
-- Component Kind taxonomy
-- Class prim inheritance
-- assetInfo metadata
-- defaultPrim stage metadata
-"""
+"""USD asset structure utilities."""
 
 from pathlib import Path
 from typing import Optional
@@ -21,7 +11,7 @@ def initialize_component_asset(
     asset_name: str,
     asset_identifier: Optional[str] = None,
 ) -> Usd.Prim:
-    """Initialize a Component asset structure following ASWF guidelines.
+    """Initialize a Component asset structure.
 
     Creates the following structure:
     - /__class__/<asset_name>: Class prim for inheritance
@@ -42,30 +32,31 @@ def initialize_component_asset(
         >>> print(root.GetPath())
         /MyAsset
     """
-    # 1. Set defaultPrim metadata (ASWF requirement)
+    # 1. Set defaultPrim metadata
     root_path = Sdf.Path(f"/{asset_name}")
     stage.SetDefaultPrim(stage.DefinePrim(root_path))
 
-    # 2. Create class prim for inheritance (ASWF pattern)
+    # 2. Create class prim for inheritance
     class_scope = stage.CreateClassPrim("/__class__")
     class_prim = stage.CreateClassPrim(f"/__class__/{asset_name}")
 
-    # 3. Define root as Xform (ASWF requirement - must be transformable)
+    # 3. Define root as Xform (must be transformable)
     root_xform = UsdGeom.Xform.Define(stage, root_path)
     root_prim = root_xform.GetPrim()
+    UsdGeom.ModelAPI.Apply(root_prim)
 
-    # 4. Set Kind to component (ASWF requirement for leaf assets)
+    # 4. Set Kind to component (leaf assets)
     model_api = Usd.ModelAPI(root_prim)
     model_api.SetKind(Kind.Tokens.component)
 
-    # 5. Set assetInfo metadata (ASWF pattern for pipeline integration)
+    # 5. Set assetInfo metadata
     if asset_identifier is None:
         asset_identifier = f"./{asset_name}.usd"
 
     root_prim.SetAssetInfoByKey("name", asset_name)
     root_prim.SetAssetInfoByKey("identifier", Sdf.AssetPath(asset_identifier))
 
-    # 6. Add inheritance from class prim (ASWF pattern for flexibility)
+    # 6. Add inheritance from class prim
     root_prim.GetInherits().AddInherit(class_prim.GetPath())
 
     return root_prim
@@ -95,10 +86,10 @@ def add_standard_scopes(
     """
     asset_path = asset_root.GetPath()
 
-    # Create geometry scope (ASWF standard)
+    # Create geometry scope
     geo_scope = UsdGeom.Scope.Define(stage, asset_path.AppendChild("geo"))
 
-    # Create material scope (ASWF standard)
+    # Create material scope
     mtl_scope = UsdGeom.Scope.Define(stage, asset_path.AppendChild("mtl"))
 
     return {
@@ -109,7 +100,7 @@ def add_standard_scopes(
 
 def add_payload(
     asset_root: Usd.Prim,
-    payload_path: str = "./payload.usd",
+    payload_path: str = "./payload.usdc",
 ) -> None:
     """Add a payload reference to the asset root.
 
@@ -118,7 +109,7 @@ def add_payload(
         payload_path: Relative path to the payload file.
 
     Example:
-        >>> add_payload(root_prim, "./payload.usd")
+        >>> add_payload(root_prim, "./payload.usdc")
     """
     asset_root.GetPayloads().AddPayload(payload_path)
 

@@ -1,4 +1,4 @@
-"""Tests for ASWF-compliant file structure."""
+"""Tests for component-builder file structure."""
 
 import pytest
 from pathlib import Path
@@ -8,6 +8,9 @@ pxr = pytest.importorskip("pxr")
 from pxr import Usd, Kind
 
 from axe_usd.usd.asset_files import (
+    MTL_LIBRARY_ROOT,
+    MTL_VARIANT_DEFAULT,
+    MTL_VARIANT_SET,
     create_asset_file_structure,
     create_asset_usd_file,
     create_payload_usd_file,
@@ -17,7 +20,7 @@ from axe_usd.usd.asset_files import (
 
 
 class TestCreateAssetFileStructure:
-    """Tests for ASWF file structure creation."""
+    """Tests for component-builder file structure creation."""
 
     def test_creates_asset_directory(self, tmp_path):
         """Creates /AssetName/ directory."""
@@ -26,21 +29,21 @@ class TestCreateAssetFileStructure:
         assert paths.root_dir.exists()
         assert paths.root_dir.name == "TestAsset"
 
-    def test_creates_maps_directory(self, tmp_path):
-        """Creates /AssetName/maps/ directory for textures."""
+    def test_creates_textures_directory(self, tmp_path):
+        """Creates /AssetName/textures/ directory for textures."""
         paths = create_asset_file_structure(tmp_path, "TestAsset")
 
-        assert paths.maps_dir.exists()
-        assert paths.maps_dir.name == "maps"
+        assert paths.textures_dir.exists()
+        assert paths.textures_dir.name == "textures"
 
     def test_path_structure(self, tmp_path):
-        """Paths follow ASWF naming convention."""
+        """Paths follow component-builder naming convention."""
         paths = create_asset_file_structure(tmp_path, "TestAsset")
 
         assert paths.asset_file.name == "TestAsset.usd"
-        assert paths.payload_file.name == "payload.usd"
-        assert paths.geo_file.name == "geo.usd"
-        assert paths.mtl_file.name == "mtl.usd"
+        assert paths.payload_file.name == "payload.usdc"
+        assert paths.geo_file.name == "geo.usdc"
+        assert paths.mtl_file.name == "mtl.usdc"
 
 
 class TestCreateAssetUsdFile:
@@ -56,15 +59,14 @@ class TestCreateAssetUsdFile:
         assert stage is not None
 
     def test_references_payload(self, tmp_path):
-        """Asset.usd references payload.usd."""
+        """Asset.usd payloads payload.usdc."""
         paths = create_asset_file_structure(tmp_path, "TestAsset")
         create_asset_usd_file(paths, "TestAsset")
 
         stage = Usd.Stage.Open(str(paths.asset_file))
         root = stage.GetPrimAtPath("/TestAsset")
 
-        # Check for payload/reference composition arcs
-        assert root.HasAuthoredReferences() or root.HasAuthoredPayloads()
+        assert root.HasAuthoredPayloads()
 
     def test_has_component_kind(self, tmp_path):
         """Root prim has Kind=component."""
@@ -77,25 +79,11 @@ class TestCreateAssetUsdFile:
         model_api = pxr.Usd.ModelAPI(root)
         assert model_api.GetKind() == Kind.Tokens.component
 
-    def test_has_geo_and_mtl_scopes(self, tmp_path):
-        """Asset has /geo and /mtl scopes."""
-        paths = create_asset_file_structure(tmp_path, "TestAsset")
-        create_asset_usd_file(paths, "TestAsset")
-
-        stage = Usd.Stage.Open(str(paths.asset_file))
-
-        geo = stage.GetPrimAtPath("/TestAsset/geo")
-        mtl = stage.GetPrimAtPath("/TestAsset/mtl")
-
-        assert geo.IsValid()
-        assert mtl.IsValid()
-
-
 class TestCreatePayloadUsdFile:
-    """Tests for payload.usd creation."""
+    """Tests for payload.usdc creation."""
 
     def test_creates_payload_file(self, tmp_path):
-        """Creates payload.usd file."""
+        """Creates payload.usdc file."""
         paths = create_asset_file_structure(tmp_path, "TestAsset")
 
         stage = create_payload_usd_file(paths, "TestAsset")
@@ -103,46 +91,54 @@ class TestCreatePayloadUsdFile:
         assert paths.payload_file.exists()
         assert stage is not None
 
-    def test_references_geo_file(self, tmp_path):
-        """payload.usd references geo.usd."""
+    def test_references_geo_and_mtl(self, tmp_path):
+        """payload.usdc references geo.usdc and mtl.usdc."""
         paths = create_asset_file_structure(tmp_path, "TestAsset")
         create_payload_usd_file(paths, "TestAsset")
 
         stage = Usd.Stage.Open(str(paths.payload_file))
-        geo_scope = stage.GetPrimAtPath("/TestAsset/geo")
+        root = stage.GetPrimAtPath("/TestAsset")
 
-        assert geo_scope.IsValid()
-        assert geo_scope.HasAuthoredReferences()
+        assert root.IsValid()
+        refs = root.GetMetadata("references")
+        assert refs is not None
+        ref_paths = [str(ref.assetPath) for ref in refs.GetAddedOrExplicitItems()]
+        assert "./mtl.usdc" in ref_paths
+        assert "./geo.usdc" in ref_paths
 
 
 class TestCreateGeoUsdFile:
     """Tests for geo.usd creation."""
 
     def test_creates_geo_file(self, tmp_path):
-        """Creates geo.usd file."""
+        """Creates geo.usdc file."""
         paths = create_asset_file_structure(tmp_path, "TestAsset")
 
-        stage = create_geo_usd_file(paths, "TestAsset", None)
+        stage = create_geo_usd_file(paths, "TestAsset")
 
         assert paths.geo_file.exists()
         assert stage is not None
 
-    def test_has_geo_scope(self, tmp_path):
-        """geo.usd has /AssetName/geo scope."""
+    def test_has_geo_scaffold(self, tmp_path):
+        """geo.usdc has /AssetName/geo scaffold."""
         paths = create_asset_file_structure(tmp_path, "TestAsset")
-        create_geo_usd_file(paths, "TestAsset", None)
+        create_geo_usd_file(paths, "TestAsset")
 
         stage = Usd.Stage.Open(str(paths.geo_file))
         geo_scope = stage.GetPrimAtPath("/TestAsset/geo")
+        proxy_scope = stage.GetPrimAtPath("/TestAsset/geo/proxy")
+        render_scope = stage.GetPrimAtPath("/TestAsset/geo/render")
 
         assert geo_scope.IsValid()
+        assert proxy_scope.IsValid()
+        assert render_scope.IsValid()
 
 
 class TestCreateMtlUsdFile:
     """Tests for mtl.usd creation."""
 
     def test_creates_mtl_file(self, tmp_path):
-        """Creates mtl.usd file."""
+        """Creates mtl.usdc file."""
         paths = create_asset_file_structure(tmp_path, "TestAsset")
 
         stage = create_mtl_usd_file(paths, "TestAsset")
@@ -150,26 +146,33 @@ class TestCreateMtlUsdFile:
         assert paths.mtl_file.exists()
         assert stage is not None
 
-    def test_has_mtl_scope(self, tmp_path):
-        """mtl.usd has /AssetName/mtl scope."""
+    def test_has_mtl_scaffold(self, tmp_path):
+        """mtl.usdc has library and variant scaffolding."""
         paths = create_asset_file_structure(tmp_path, "TestAsset")
         create_mtl_usd_file(paths, "TestAsset")
 
         stage = Usd.Stage.Open(str(paths.mtl_file))
-        mtl_scope = stage.GetPrimAtPath("/TestAsset/mtl")
+        root = stage.GetPrimAtPath("/TestAsset")
+        library = stage.GetPrimAtPath(f"/{MTL_LIBRARY_ROOT}")
+        mtl_scope = stage.GetPrimAtPath(f"/{MTL_LIBRARY_ROOT}/mtl")
 
+        assert root.IsValid()
+        assert library.IsValid()
         assert mtl_scope.IsValid()
+        variant_set = root.GetVariantSets().GetVariantSet(MTL_VARIANT_SET)
+        assert variant_set.IsValid()
+        assert MTL_VARIANT_DEFAULT in variant_set.GetVariantNames()
 
 
-class TestASWFFileStructureIntegration:
-    """Integration tests for complete ASWF file structure."""
+class TestComponentFileStructureIntegration:
+    """Integration tests for complete component-builder file structure."""
 
     def test_complete_structure_can_be_opened(self, tmp_path):
-        """Complete ASWF structure loads correctly."""
+        """Complete structure loads correctly."""
         paths = create_asset_file_structure(tmp_path, "TestAsset")
 
         # Create all files
-        create_geo_usd_file(paths, "TestAsset", None)
+        create_geo_usd_file(paths, "TestAsset")
         create_payload_usd_file(paths, "TestAsset")
         create_mtl_usd_file(paths, "TestAsset")
         create_asset_usd_file(paths, "TestAsset")
@@ -181,11 +184,11 @@ class TestASWFFileStructureIntegration:
         assert stage.GetDefaultPrim().GetPath() == pxr.Sdf.Path("/TestAsset")
 
     def test_composition_resolves_correctly(self, tmp_path):
-        """Composed stage has all prims from referenced files."""
+        """Composed stage has prims from referenced files."""
         paths = create_asset_file_structure(tmp_path, "TestAsset")
 
         # Create all files
-        create_geo_usd_file(paths, "TestAsset", None)
+        create_geo_usd_file(paths, "TestAsset")
         create_payload_usd_file(paths, "TestAsset")
         create_mtl_usd_file(paths, "TestAsset")
         create_asset_usd_file(paths, "TestAsset")

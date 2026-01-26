@@ -15,7 +15,7 @@ def _asset_path_value(input_attr):
 
 
 def test_create_shaded_asset_publish_creates_layers(tmp_path):
-    """Ensure USD publish creates the expected ASWF layer files."""
+    """Ensure USD publish creates the expected component layer files."""
     material_dict_list = [
         {
             "basecolor": {
@@ -40,14 +40,13 @@ def test_create_shaded_asset_publish_creates_layers(tmp_path):
     # Convert tmp_path to consistent string for tests
     asset_dir = tmp_path / "Asset"
     assert (asset_dir / "Asset.usd").exists()
-    assert (asset_dir / "mtl.usd").exists()
-    assert (asset_dir / "payload.usd").exists()
-    assert (asset_dir / "geo.usd").exists()
-    # Note: geometry.usd only created if geo_file input provided, which is None here.
+    assert (asset_dir / "mtl.usdc").exists()
+    assert (asset_dir / "payload.usdc").exists()
+    assert (asset_dir / "geo.usdc").exists()
 
 
 def test_usd_preview_texture_override_applies(tmp_path):
-    """Ensure usd preview textures honor per-renderer format overrides (ASWF)."""
+    """Ensure usd preview textures honor per-renderer format overrides."""
     material_dict_list = [
         {
             "basecolor": {
@@ -70,8 +69,8 @@ def test_usd_preview_texture_override_applies(tmp_path):
         texture_format_overrides={"usd_preview": "jpg"},
     )
 
-    # Open mtl.usd to check material definitions
-    stage = pxr.Usd.Stage.Open(str(tmp_path / "Asset/mtl.usd"))
+    # Open mtl.usdc to check material definitions
+    stage = pxr.Usd.Stage.Open(str(tmp_path / "Asset/mtl.usdc"))
     texture_prim = stage.GetPrimAtPath(
         "/Asset/mtl/MatA/UsdPreviewMaterial/UsdPreviewNodeGraph/basecolorTexture"
     )
@@ -83,7 +82,7 @@ def test_usd_preview_texture_override_applies(tmp_path):
 
 
 def test_renderer_specific_format_overrides(tmp_path):
-    """Ensure per-renderer overrides apply to each network (ASWF)."""
+    """Ensure per-renderer overrides apply to each network."""
     material_dict_list = [
         {
             "basecolor": {
@@ -110,8 +109,8 @@ def test_renderer_specific_format_overrides(tmp_path):
         },
     )
 
-    # Open mtl.usd to check materials
-    stage = pxr.Usd.Stage.Open(str(tmp_path / "Asset/mtl.usd"))
+    # Open mtl.usdc to check materials
+    stage = pxr.Usd.Stage.Open(str(tmp_path / "Asset/mtl.usdc"))
 
     usd_preview_prim = stage.GetPrimAtPath(
         "/Asset/mtl/MatA/UsdPreviewMaterial/UsdPreviewNodeGraph/basecolorTexture"
@@ -137,7 +136,7 @@ def test_renderer_specific_format_overrides(tmp_path):
 
 
 def test_mtlx_metalness_is_float(tmp_path):
-    """Ensure MaterialX metalness remains float through the network (ASWF)."""
+    """Ensure MaterialX metalness remains float through the network."""
     material_dict_list = [
         {
             "metalness": {
@@ -159,7 +158,7 @@ def test_mtlx_metalness_is_float(tmp_path):
         create_mtlx=True,
     )
 
-    stage = pxr.Usd.Stage.Open(str(tmp_path / "Asset/mtl.usd"))
+    stage = pxr.Usd.Stage.Open(str(tmp_path / "Asset/mtl.usdc"))
     image_prim = stage.GetPrimAtPath("/Asset/mtl/MatA/mtlx_metalnessTexture")
     image_shader = pxr.UsdShade.Shader(image_prim)
     assert image_shader.GetIdAttr().Get() == "ND_image_float"
@@ -177,7 +176,7 @@ def test_mtlx_metalness_is_float(tmp_path):
 
 
 def test_openpbr_surface_id(tmp_path):
-    """Ensure OpenPBR surface shader is authored with the correct ID (ASWF)."""
+    """Ensure OpenPBR surface shader is authored with the correct ID."""
     material_dict_list = [
         {
             "basecolor": {
@@ -200,14 +199,14 @@ def test_openpbr_surface_id(tmp_path):
         create_openpbr=True,
     )
 
-    stage = pxr.Usd.Stage.Open(str(tmp_path / "Asset/mtl.usd"))
+    stage = pxr.Usd.Stage.Open(str(tmp_path / "Asset/mtl.usdc"))
     shader_prim = stage.GetPrimAtPath("/Asset/mtl/MatA/openpbr_surface1")
     shader = pxr.UsdShade.Shader(shader_prim)
     assert shader.GetIdAttr().Get() == "ND_open_pbr_surface_surfaceshader"
 
 
 def test_openpbr_input_names(tmp_path):
-    """Ensure OpenPBR uses base_metalness and geometry_normal inputs (ASWF)."""
+    """Ensure OpenPBR uses base_metalness and geometry_normal inputs."""
     material_dict_list = [
         {
             "metalness": {
@@ -234,7 +233,7 @@ def test_openpbr_input_names(tmp_path):
         create_openpbr=True,
     )
 
-    stage = pxr.Usd.Stage.Open(str(tmp_path / "Asset/mtl.usd"))
+    stage = pxr.Usd.Stage.Open(str(tmp_path / "Asset/mtl.usdc"))
     shader_prim = stage.GetPrimAtPath("/Asset/mtl/MatA/openpbr_surface1")
     shader = pxr.UsdShade.Shader(shader_prim)
     assert shader.GetInput("base_metalness") is not None

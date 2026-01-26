@@ -129,7 +129,7 @@ class TestAddPayload:
         stage = pxr.Usd.Stage.CreateInMemory()
         root = initialize_component_asset(stage, "TestAsset")
 
-        add_payload(root, "./payload.usd")
+        add_payload(root, "./payload.usdc")
 
         payloads = root.GetPayloads()
         # Check that payload exists (GetAllDirectPayloads returns paths)
@@ -140,7 +140,7 @@ class TestAddPayload:
         reason="USD Payloads API doesn't expose verification methods in Python"
     )
     def test_default_payload_path(self):
-        """Default payload path is ./payload.usd."""
+        """Default payload path is ./payload.usdc."""
         stage = pxr.Usd.Stage.CreateInMemory()
         root = initialize_component_asset(stage, "TestAsset")
 
