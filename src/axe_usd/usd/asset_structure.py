@@ -1,6 +1,5 @@
 """USD asset structure utilities."""
 
-from pathlib import Path
 from typing import Optional
 
 from pxr import Kind, Sdf, Usd, UsdGeom
@@ -37,7 +36,7 @@ def initialize_component_asset(
     stage.SetDefaultPrim(stage.DefinePrim(root_path))
 
     # 2. Create class prim for inheritance
-    class_scope = stage.CreateClassPrim("/__class__")
+    stage.CreateClassPrim("/__class__")
     class_prim = stage.CreateClassPrim(f"/__class__/{asset_name}")
 
     # 3. Define root as Xform (must be transformable)

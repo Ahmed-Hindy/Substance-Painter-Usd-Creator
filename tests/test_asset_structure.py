@@ -4,9 +4,12 @@ import pytest
 
 pxr = pytest.importorskip("pxr")
 
-from pxr import Kind, Sdf, Usd, UsdGeom
+Kind = pxr.Kind
+Sdf = pxr.Sdf
+Usd = pxr.Usd
+UsdGeom = pxr.UsdGeom
 
-from axe_usd.usd.asset_structure import (
+from axe_usd.usd.asset_structure import (  # noqa: E402
     add_payload,
     add_standard_scopes,
     create_subcomponent,
@@ -46,7 +49,7 @@ class TestInitializeComponentAsset:
     def test_creates_class_prim(self):
         """Creates /__class__/<asset_name> for inheritance."""
         stage = pxr.Usd.Stage.CreateInMemory()
-        root = initialize_component_asset(stage, "TestAsset")
+        initialize_component_asset(stage, "TestAsset")
 
         class_prim = stage.GetPrimAtPath("/__class__/TestAsset")
         assert class_prim.IsValid()

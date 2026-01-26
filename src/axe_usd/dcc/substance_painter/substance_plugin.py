@@ -4,7 +4,6 @@ Copyright Ahmed Hindy. Please mention the author if you found any part of this c
 """
 
 import gc
-import json
 import logging
 import sys
 from dataclasses import dataclass
@@ -16,7 +15,6 @@ from .qt_compat import (
     QCheckBox,
     QComboBox,
     QDialog,
-    QFileDialog,
     QFormLayout,
     QFrame,
     QGroupBox,
@@ -27,18 +25,12 @@ from .qt_compat import (
     QMessageBox,
     QMenuBar,
     QPushButton,
-    QToolButton,
     QScrollArea,
     QSizePolicy,
-    QStyle,
     QVBoxLayout,
     QWidget,
-    QDesktopServices,
     QIcon,
-    QPalette,
     Qt,
-    QUrl,
-    QApplication,
 )
 
 from ...core.exporter import export_publish
@@ -48,6 +40,7 @@ from ...core.publish_paths import build_publish_paths
 from ...core.texture_parser import parse_textures
 from ...usd.pxr_writer import PxrUsdWriter
 
+from . import presets
 from . import usd_scene_fixup
 import substance_painter
 import substance_painter.event
@@ -72,14 +65,14 @@ CUSTOM_PRESET_LABEL = "Custom"
 
 DEFAULT_DIALOGUE_DICT = {
     "title": "USD Exporter",
-    "publish_location": "<export_folder>",
-    "primitive_path": "/Asset",
     "enable_usdpreview": True,
     "enable_arnold": False,
     "enable_materialx": True,
     "enable_openpbr": False,
     "enable_save_geometry": True,
 }
+
+DEFAULT_PRIMITIVE_PATH = "/Asset"
 
 LOG_LEVELS = {
     "Error": logging.ERROR,
@@ -92,7 +85,6 @@ LOG_LEVELS = {
 plugin_widgets = []
 usd_exported_qdialog = None
 callbacks_registered = False
-last_export_dir: Optional[Path] = None
 
 
 @dataclass
@@ -105,8 +97,6 @@ class USDSettings:
         arnold (bool): Include Arnold standard_surface shader.
         materialx (bool): Include MaterialX standard_surface shader.
         openpbr (bool): Include MaterialX OpenPBR shader.
-        primitive_path (str): USD prim path for material_dict_list.
-        publish_directory (str): Directory for output USD layers.
         save_geometry (bool): Whether to export mesh geometry.
         texture_format_overrides (Dict[str, str]): Optional per-renderer overrides.
         log_level (str): Logging verbosity.
@@ -115,8 +105,6 @@ class USDSettings:
     usdpreview: bool
     arnold: bool
     materialx: bool
-    primitive_path: str
-    publish_directory: str
     save_geometry: bool
     openpbr: bool
     texture_format_overrides: Dict[str, str]
@@ -141,7 +129,7 @@ class MeshExporter:
             settings.publish_directory, settings.main_layer_name, asset_name
         )
         self.mesh_path = publish_paths.geometry_path
-        self.root_prim_path = f"/{asset_name}" if asset_name else settings.primitive_path
+        self.root_prim_path = DEFAULT_PRIMITIVE_PATH
         self.last_error: str = ""
 
     def export_mesh(self) -> Optional[Path]:
@@ -326,66 +314,6 @@ class USDExporterView(QDialog):
         engine_box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
         content_layout.addWidget(engine_box)
 
-        paths_box = QGroupBox("Paths")
-        paths_box.setFlat(True)
-        paths_layout = QFormLayout()
-        paths_layout.setContentsMargins(8, 6, 8, 8)
-        paths_layout.setSpacing(4)
-        paths_layout.setLabelAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        paths_layout.setFormAlignment(Qt.AlignTop)
-        paths_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
-
-        self.pub = QLineEdit()
-        self.pub.setMinimumWidth(320)
-        self.pub.setPlaceholderText(DEFAULT_DIALOGUE_DICT["publish_location"])
-        self.pub.setToolTip("Use <export_folder> token to insert texture folder path")
-        self.pub.setClearButtonEnabled(True)
-        self.pub.textChanged.connect(self._update_path_validation)
-        self.pub.textChanged.connect(self._sync_preset_combo)
-        pub_row = QHBoxLayout()
-        pub_row.setContentsMargins(0, 0, 0, 0)
-        pub_row.setSpacing(6)
-        pub_row.addWidget(self.pub, 1)
-        self.pub_browse = QPushButton("Browse...")
-        self.pub_browse.setToolTip("Select a publish directory on disk")
-        self.pub_browse.clicked.connect(self._browse_publish_directory)
-        self.pub_browse.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
-        pub_row.addWidget(self.pub_browse, 0)
-        self.pub_open = QToolButton()
-        self.pub_open.setToolTip("Open the publish folder in your file browser")
-        self.pub_open.clicked.connect(self._open_publish_directory)
-        self.pub_open.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
-        self._apply_icon_only_button(self.pub_open, QStyle.SP_DirOpenIcon)
-        self.pub_open.setFixedSize(28, 24)
-        pub_row.addWidget(self.pub_open, 0)
-        pub_row_widget = QWidget()
-        pub_row_widget.setLayout(pub_row)
-        paths_layout.addRow("Publish Directory", pub_row_widget)
-
-        pub_hint = self._make_hint_label(
-            "Tip: <export_folder> uses the texture export folder."
-        )
-        paths_layout.addRow("", pub_hint)
-
-        self.prim = QLineEdit()
-        self.prim.setMinimumWidth(320)
-        self.prim.setPlaceholderText(DEFAULT_DIALOGUE_DICT["primitive_path"])
-        self.prim.setToolTip(
-            "Root prim path for the asset; materials go under <root>/material"
-        )
-        self.prim.setClearButtonEnabled(True)
-        self.prim.editingFinished.connect(self._validate_prim_path)
-        self.prim.textChanged.connect(self._update_path_validation)
-        self.prim.textChanged.connect(self._sync_preset_combo)
-        paths_layout.addRow("Primitive Path", self.prim)
-
-        prim_hint = self._make_hint_label("Example: '/Asset' or '/Scene/Asset'")
-        paths_layout.addRow("", prim_hint)
-
-        paths_box.setLayout(paths_layout)
-        paths_box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-        content_layout.addWidget(paths_box)
-
         options_box = QGroupBox("Export Options")
         options_box.setFlat(True)
         options_layout = QVBoxLayout()
@@ -449,125 +377,13 @@ class USDExporterView(QDialog):
         advanced_box.toggled.connect(advanced_container.setVisible)
         content_layout.addWidget(advanced_box)
 
-        self._presets = self._load_presets()
+        self._presets = presets.load_presets(PRESET_PATH, logger)
         self._refresh_preset_combo()
         self._sync_preset_combo()
-        self._update_path_validation()
-
-    def _validate_prim_path(self):
-        """Validate the primitive path input field."""
-        self._update_path_validation()
-
-    def _set_field_status(self, field: QLineEdit, status: str) -> None:
-        colors = {
-            "ok": "#2e7d32",
-            "warn": "#f9a825",
-            "error": "#c62828",
-        }
-        color = colors.get(status)
-        if not color:
-            field.setStyleSheet("")
-            return
-        field.setStyleSheet(f"border:1px solid {color}")
-
-    def _update_path_validation(self) -> None:
-        prim_path = self.prim.text().strip()
-        if not prim_path:
-            self._set_field_status(self.prim, "error")
-        elif not prim_path.startswith("/"):
-            self._set_field_status(self.prim, "error")
-        elif "//" in prim_path:
-            self._set_field_status(self.prim, "warn")
-        else:
-            self._set_field_status(self.prim, "ok")
-
-        publish_dir = self.pub.text().strip()
-        if not publish_dir:
-            self._set_field_status(self.pub, "error")
-        elif "<export_folder>" in publish_dir:
-            self._set_field_status(self.pub, "warn")
-        else:
-            path = Path(publish_dir)
-            if path.exists():
-                self._set_field_status(self.pub, "ok")
-            else:
-                self._set_field_status(self.pub, "warn")
-
-    def _make_hint_label(self, text: str) -> QLabel:
-        """Create a hint label styled for the dialog.
-
-        Args:
-            text: Hint text to display.
-
-        Returns:
-            QLabel: Configured hint label widget.
-        """
-        hint = QLabel(text)
-        hint.setWordWrap(True)
-        hint_font = hint.font()
-        hint_font.setPointSize(max(8, hint_font.pointSize() - 1))
-        hint.setFont(hint_font)
-        pal = hint.palette()
-        placeholder_role = getattr(QPalette, "PlaceholderText", None)
-        if placeholder_role is not None:
-            hint_color = pal.color(placeholder_role)
-        else:
-            hint_color = pal.color(QPalette.Disabled, QPalette.WindowText)
-        if hint_color.isValid():
-            pal.setColor(QPalette.WindowText, hint_color)
-        hint.setPalette(pal)
-        hint.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
-        return hint
-
-    def _apply_icon_only_button(
-        self, button: QToolButton, icon_type: QStyle.StandardPixmap
-    ) -> None:
-        """Apply a standard icon to a tool button."""
-        app = QApplication.instance()
-        style = app.style()
-        button.setIcon(style.standardIcon(icon_type))
-        button.setToolButtonStyle(Qt.ToolButtonIconOnly)
-
-    def _builtin_presets(self) -> Dict[str, Dict[str, object]]:
-        return {
-            "USD Preview Only": {
-                "usdpreview": True,
-                "arnold": False,
-                "materialx": False,
-                "openpbr": False,
-            },
-            "OpenPBR Only": {
-                "usdpreview": False,
-                "arnold": False,
-                "materialx": False,
-                "openpbr": True,
-            },
-            "Full": {
-                "usdpreview": True,
-                "arnold": True,
-                "materialx": True,
-                "openpbr": True,
-            },
-        }
-
-    def _load_presets(self) -> Dict[str, Dict[str, object]]:
-        if not PRESET_PATH.exists():
-            return {}
-        try:
-            with PRESET_PATH.open("r", encoding="utf-8") as handle:
-                data = json.load(handle)
-        except Exception as exc:
-            logger.warning("Failed to load presets: %s", exc)
-            return {}
-        if not isinstance(data, dict):
-            return {}
-        return data
 
     def _save_presets(self) -> None:
         try:
-            PRESET_PATH.parent.mkdir(parents=True, exist_ok=True)
-            with PRESET_PATH.open("w", encoding="utf-8") as handle:
-                json.dump(self._presets, handle, indent=2)
+            presets.save_presets(PRESET_PATH, self._presets)
         except Exception as exc:
             logger.error("Failed to save presets: %s", exc)
             QMessageBox.warning(
@@ -576,28 +392,11 @@ class USDExporterView(QDialog):
                 f"Could not save presets to:\n{PRESET_PATH}\n\n{exc}",
             )
 
-    def _matches_builtin_preset(
-        self, data: Dict[str, object], preset: Dict[str, object]
-    ) -> bool:
-        for key in ("usdpreview", "arnold", "materialx", "openpbr"):
-            if bool(data.get(key)) != bool(preset.get(key)):
-                return False
-        return True
-
-    def _find_matching_preset(self, data: Dict[str, object]) -> Optional[str]:
-        for name, preset in self._presets.items():
-            if preset == data:
-                return name
-        for name, preset in self._builtin_presets().items():
-            if self._matches_builtin_preset(data, preset):
-                return name
-        return None
-
     def _refresh_preset_combo(self) -> None:
         self.preset_combo.blockSignals(True)
         self.preset_combo.clear()
         self.preset_combo.addItem(CUSTOM_PRESET_LABEL)
-        for name in self._builtin_presets().keys():
+        for name in presets.BUILTIN_PRESETS.keys():
             self.preset_combo.addItem(name)
         if self._presets:
             self.preset_combo.insertSeparator(self.preset_combo.count())
@@ -609,7 +408,7 @@ class USDExporterView(QDialog):
         if self._preset_sync_blocked:
             return
         data = self._collect_preset_data()
-        name = self._find_matching_preset(data) or CUSTOM_PRESET_LABEL
+        name = presets.match_preset_name(data, self._presets) or CUSTOM_PRESET_LABEL
         self.preset_combo.blockSignals(True)
         index = self.preset_combo.findText(name)
         if index >= 0:
@@ -617,7 +416,7 @@ class USDExporterView(QDialog):
         self.preset_combo.blockSignals(False)
 
     def _on_preset_changed(self, name: str) -> None:
-        preset = self._builtin_presets().get(name)
+        preset = presets.BUILTIN_PRESETS.get(name)
         if preset is None:
             preset = self._presets.get(name)
         if not preset:
@@ -630,8 +429,6 @@ class USDExporterView(QDialog):
             "arnold": self.arnold.isChecked(),
             "materialx": self.materialx.isChecked(),
             "openpbr": self.openpbr.isChecked(),
-            "primitive_path": self.prim.text().strip(),
-            "publish_directory": self.pub.text().strip(),
             "save_geometry": self.geom.isChecked(),
             "texture_format_overrides": self._collect_overrides(),
             "log_level": self.log_level_combo.currentText(),
@@ -646,16 +443,6 @@ class USDExporterView(QDialog):
             self.openpbr.setChecked(bool(data.get("openpbr", False)))
             self.geom.setChecked(bool(data.get("save_geometry", True)))
 
-            primitive_path = str(
-                data.get("primitive_path") or DEFAULT_DIALOGUE_DICT["primitive_path"]
-            )
-            publish_dir = str(
-                data.get("publish_directory")
-                or DEFAULT_DIALOGUE_DICT["publish_location"]
-            )
-            self.prim.setText(primitive_path)
-            self.pub.setText(publish_dir)
-
             overrides = data.get("texture_format_overrides") or {}
             if isinstance(overrides, dict):
                 self.override_usdpreview.setText(str(overrides.get("usd_preview", "")))
@@ -669,7 +456,6 @@ class USDExporterView(QDialog):
         finally:
             self._preset_sync_blocked = False
 
-        self._update_path_validation()
         self._sync_preset_combo()
 
     def _save_preset_prompt(self) -> None:
@@ -685,8 +471,7 @@ class USDExporterView(QDialog):
     def _show_help(self) -> None:
         """Show a short help dialog."""
         message = (
-            "Export textures first, then the plugin writes USD next to the export folder.\n\n"
-            "Use <export_folder> to auto-insert the current texture export path."
+            "Export textures first, then the plugin writes USD next to the export folder."
         )
         QMessageBox.information(self, "Axe USD Exporter Help", message)
 
@@ -699,48 +484,6 @@ class USDExporterView(QDialog):
         )
         QMessageBox.information(self, "About Axe USD Exporter", message)
 
-    def _browse_publish_directory(self) -> None:
-        """Open a directory picker for the publish path."""
-        current = self.pub.text().strip()
-        if not current or current == DEFAULT_DIALOGUE_DICT["publish_location"]:
-            current = str(Path.home())
-        selected = QFileDialog.getExistingDirectory(
-            self,
-            "Select Publish Directory",
-            current,
-        )
-        if selected:
-            self.pub.setText(selected)
-
-    def _resolve_publish_directory(self) -> Optional[Path]:
-        publish_dir = (
-            self.pub.text().strip() or DEFAULT_DIALOGUE_DICT["publish_location"]
-        )
-        if "<export_folder>" in publish_dir:
-            if last_export_dir is None:
-                QMessageBox.warning(
-                    self,
-                    "Publish Folder",
-                    "Export once to resolve <export_folder> before opening the folder.",
-                )
-                return None
-            publish_dir = publish_dir.replace("<export_folder>", str(last_export_dir))
-        return Path(publish_dir)
-
-    def _open_publish_directory(self) -> None:
-        """Open the resolved publish directory in the file browser."""
-        publish_dir = self._resolve_publish_directory()
-        if not publish_dir:
-            return
-        if not publish_dir.exists():
-            QMessageBox.information(
-                self,
-                "Publish Folder",
-                f"Folder does not exist yet:\n{publish_dir}",
-            )
-            return
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(publish_dir)))
-
     def get_settings(self) -> USDSettings:
         """
         Read UI state into USDSettings.
@@ -748,20 +491,10 @@ class USDExporterView(QDialog):
         Returns:
             USDSettings: Settings collected from the dialog.
         """
-        # Use default publish location if user leaves the field blank
-        publish_dir = (
-            self.pub.text().strip() or DEFAULT_DIALOGUE_DICT["publish_location"]
-        )
-        primitive_path = (
-            self.prim.text().strip() or DEFAULT_DIALOGUE_DICT["primitive_path"]
-        )
-
         return USDSettings(
             self.usdpreview.isChecked(),
             self.arnold.isChecked(),
             self.materialx.isChecked(),
-            primitive_path,
-            publish_dir,
             self.geom.isChecked(),
             self.openpbr.isChecked(),
             self._collect_overrides(),
@@ -794,7 +527,7 @@ class ExportContext(Protocol):
 
 def start_plugin() -> None:
     """Create the export UI and register callbacks."""
-    print("Plugin Starting...")
+    logger.info("Plugin starting.")
     global usd_exported_qdialog
     usd_exported_qdialog = USDExporterView()
     substance_painter.ui.add_dock_widget(usd_exported_qdialog)
@@ -804,7 +537,7 @@ def start_plugin() -> None:
 
 def register_callbacks() -> None:
     """Register the post-export callback."""
-    print("Registered callbacks")
+    logger.info("Registered callbacks.")
     global callbacks_registered
     if callbacks_registered:
         return
@@ -820,7 +553,7 @@ def on_post_export(context: ExportContext) -> None:
     Args:
         context: Substance Painter export context.
     """
-    print("ExportTexturesEnded emitted!!!")
+    logger.info("ExportTexturesEnded emitted.")
     if usd_exported_qdialog is None:
         logger.warning("USD Export UI is not available; skipping export.")
         return
@@ -853,23 +586,13 @@ def on_post_export(context: ExportContext) -> None:
         )
         return
     export_dir = Path(first_path).parent
-    global last_export_dir
-    last_export_dir = export_dir
 
     raw = usd_exported_qdialog.get_settings()
     log_level = LOG_LEVELS.get(raw.log_level)
     if log_level is not None:
         logger.setLevel(log_level)
-    primitive_path = raw.primitive_path
-    if not primitive_path.startswith("/"):
-        logger.warning("Primitive path must start with '/': %s", primitive_path)
-        QMessageBox.warning(
-            usd_exported_qdialog,
-            "Invalid Primitive Path",
-            "Primitive path must start with '/'.",
-        )
-        return
-    publish_dir = raw.publish_directory.replace("<export_folder>", str(export_dir))
+    primitive_path = DEFAULT_PRIMITIVE_PATH
+    publish_dir = str(export_dir)
     settings = ExportSettings(
         usdpreview=raw.usdpreview,
         arnold=raw.arnold,
@@ -923,7 +646,7 @@ def on_post_export(context: ExportContext) -> None:
 
 def close_plugin() -> None:
     """Remove all widgets that have been added to the UI."""
-    print("Closing plugin")
+    logger.info("Closing plugin.")
     global callbacks_registered, usd_exported_qdialog
     if callbacks_registered:
         try:
@@ -931,8 +654,9 @@ def close_plugin() -> None:
                 substance_painter.event.ExportTexturesEnded, on_post_export
             )
         except Exception as e:
-            print(f"WARNING: close_plugin() Failed to disconnect event handler: {e}")
-            pass
+            logger.warning(
+                "close_plugin() failed to disconnect event handler: %s", e
+            )
         callbacks_registered = False
     for widget in plugin_widgets:
         substance_painter.ui.delete_ui_element(widget)

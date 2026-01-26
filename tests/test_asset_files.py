@@ -1,13 +1,13 @@
 """Tests for component-builder file structure."""
 
 import pytest
-from pathlib import Path
 
 pxr = pytest.importorskip("pxr")
 
-from pxr import Usd, Kind
+Usd = pxr.Usd
+Kind = pxr.Kind
 
-from axe_usd.usd.asset_files import (
+from axe_usd.usd.asset_files import (  # noqa: E402
     MTL_LIBRARY_ROOT,
     MTL_VARIANT_DEFAULT,
     MTL_VARIANT_SET,

@@ -5,9 +5,9 @@ Supports PySide2 (SP < 10.1.0) and PySide6 (SP >= 10.1.0).
 """
 from __future__ import annotations
 
-import substance_painter as sp
+from substance_painter.application import version_info
 
-use_pyside2 = sp.application.version_info() < (10, 1, 0)
+use_pyside2: bool = version_info() < (10, 1, 0)
 
 if use_pyside2:
     from PySide2 import QtCore, QtGui, QtWidgets  # type: ignore
