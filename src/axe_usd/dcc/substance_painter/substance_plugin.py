@@ -34,6 +34,14 @@ from .qt_compat import (
 )
 
 from ...core.exporter import export_publish
+from ...core.exceptions import (
+    AxeUSDError,
+    ConfigurationError,
+    GeometryExportError,
+    MaterialExportError,
+    USDStageError,
+    ValidationError,
+)
 from ...core.fs_utils import ensure_directory
 from ...core.models import ExportSettings
 from ...core.publish_paths import build_publish_paths
@@ -73,6 +81,10 @@ DEFAULT_DIALOGUE_DICT = {
 }
 
 DEFAULT_PRIMITIVE_PATH = "/Asset"
+USD_PREVIEW_JPEG_SIZE_LOG2 = 8  # 256px
+USD_PREVIEW_JPEG_SUFFIX = ".jpg"
+PREVIEW_TEXTURE_DIRNAME = "previewTextures"
+PREVIEW_EXPORT_PRESET = "AxeUSDPreview"
 
 LOG_LEVELS = {
     "Error": logging.ERROR,
@@ -167,41 +179,39 @@ class MeshExporter:
 
             # In case of error, display a human readable message:
             if export_result.status != substance_painter.export.ExportStatus.Success:
-                self.last_error = str(export_result.message)
-                logger.warning(
-                    "Mesh export failed (status=%s): %s",
-                    export_result.status,
-                    export_result.message,
+                raise GeometryExportError(
+                    "Mesh export failed.",
+                    details={
+                        "status": str(export_result.status),
+                        "message": str(export_result.message),
+                    },
                 )
-                return None
             logger.debug(
                 "Mesh export status=%s message=%s",
                 export_result.status,
                 export_result.message,
             )
             if not export_path.exists():
-                self.last_error = "Mesh export reported success but file is missing."
-                logger.warning(self.last_error)
-                return None
+                raise GeometryExportError(
+                    "Mesh export reported success but file is missing.",
+                    details={"path": str(export_path)},
+                )
             if convert_to_usdc:
                 from pxr import Usd
 
                 stage = Usd.Stage.Open(str(export_path))
                 if not stage:
-                    self.last_error = "Failed to open temporary mesh for conversion."
-                    logger.warning(self.last_error)
-                    return None
-                if usd_scene_fixup.fix_sp_mesh_stage(stage, self.root_prim_path):
-                    logger.debug(
-                        "Applied SP mesh fixup to %s (root: %s)",
-                        export_path,
-                        self.root_prim_path,
+                    raise USDStageError(
+                        "Failed to open temporary mesh for conversion.",
+                        details={"path": str(export_path)},
                     )
+                usd_scene_fixup.fix_sp_mesh_stage(stage, self.root_prim_path)
                 stage.GetRootLayer().Export(str(self.mesh_path))
                 if not self.mesh_path.exists():
-                    self.last_error = "Mesh conversion reported success but file is missing."
-                    logger.warning(self.last_error)
-                    return None
+                    raise GeometryExportError(
+                        "Mesh conversion reported success but file is missing.",
+                        details={"path": str(self.mesh_path)},
+                    )
                 stage = None
                 gc.collect()
                 if export_path.exists():
@@ -214,10 +224,138 @@ class MeshExporter:
                             cleanup_exc,
                         )
             return self.mesh_path
+        except AxeUSDError as exc:
+            self.last_error = exc.message
+            if exc.details:
+                logger.warning("Mesh export failed: %s (%s)", exc.message, exc.details)
+            else:
+                logger.warning("Mesh export failed: %s", exc.message)
+            return None
         except Exception as exc:
             self.last_error = str(exc)
             logger.error("Mesh export failed: %s", exc)
             return None
+
+
+def _collect_texture_set_names(
+    textures: Mapping[Tuple[str, str], Sequence[str]],
+) -> Sequence[str]:
+    names: list[str] = []
+    for key in textures.keys():
+        if isinstance(key, (tuple, list)) and key:
+            name = str(key[0])
+        else:
+            name = str(key)
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
+def _build_preview_export_config(
+    preview_dir: Path, texture_sets: Sequence[str]
+) -> Dict[str, object]:
+    export_list = [
+        {"rootPath": name, "exportPreset": PREVIEW_EXPORT_PRESET}
+        for name in texture_sets
+    ]
+    export_preset = {
+        "name": PREVIEW_EXPORT_PRESET,
+        "maps": [
+            {
+                "fileName": "$textureSet_BaseColor",
+                "channels": [
+                    {
+                        "destChannel": "R",
+                        "srcChannel": "R",
+                        "srcMapType": "documentMap",
+                        "srcMapName": "baseColor",
+                    },
+                    {
+                        "destChannel": "G",
+                        "srcChannel": "G",
+                        "srcMapType": "documentMap",
+                        "srcMapName": "baseColor",
+                    },
+                    {
+                        "destChannel": "B",
+                        "srcChannel": "B",
+                        "srcMapType": "documentMap",
+                        "srcMapName": "baseColor",
+                    }
+                ],
+                "parameters": {
+                    "fileFormat": USD_PREVIEW_JPEG_SUFFIX.lstrip("."),
+                    "bitDepth": "8",
+                    "dithering": False,
+                    "sizeLog2": USD_PREVIEW_JPEG_SIZE_LOG2,
+                    "paddingAlgorithm": "diffusion",
+                    "dilationDistance": 16,
+                },
+            }
+        ],
+    }
+    return {
+        "exportPath": str(preview_dir),
+        "defaultExportPreset": PREVIEW_EXPORT_PRESET,
+        "exportPresets": [export_preset],
+        "exportList": export_list,
+        "exportShaderParams": False,
+    }
+
+
+def _export_usdpreview_textures(
+    textures_dir: Path, texture_sets: Sequence[str]
+) -> None:
+    if not texture_sets:
+        raise ValidationError("UsdPreview export failed: no texture sets found.")
+
+    ensure_directory(textures_dir)
+    preview_dir = textures_dir / PREVIEW_TEXTURE_DIRNAME
+    ensure_directory(preview_dir)
+    export_config = _build_preview_export_config(preview_dir, texture_sets)
+    logger.debug("UsdPreview texture sets: %s", texture_sets)
+    export_fn = getattr(substance_painter.export, "export_project_textures", None)
+    if export_fn is None:
+        raise ConfigurationError(
+            "UsdPreview export failed: export_project_textures not available."
+        )
+
+    logger.debug("UsdPreview export config: %s", export_config)
+    try:
+        result = export_fn(export_config)
+    except Exception as exc:
+        raise MaterialExportError(
+            "UsdPreview export failed.",
+            details={"error": str(exc)},
+        ) from exc
+
+    status = getattr(result, "status", None)
+    message = getattr(result, "message", "")
+    export_status = getattr(substance_painter.export, "ExportStatus", None)
+    if export_status and hasattr(export_status, "Success") and status is not None:
+        if status != export_status.Success:
+            raise MaterialExportError(
+                "UsdPreview export failed.",
+                details={"status": str(status), "message": str(message)},
+            )
+    elif result is False:
+        raise MaterialExportError(
+            "UsdPreview export failed.",
+            details={"result": str(result)},
+        )
+
+
+def _is_preview_export_context(context: "ExportContext") -> bool:
+    first_path = next((paths[0] for paths in context.textures.values() if paths), None)
+    if not first_path:
+        return False
+    try:
+        parts = Path(first_path).parts
+    except Exception:
+        return False
+    return any(
+        part.lower() == PREVIEW_TEXTURE_DIRNAME.lower() for part in parts
+    )
 
 
 class USDExporterView(QDialog):
@@ -248,6 +386,19 @@ class USDExporterView(QDialog):
         help_menu = menu_bar.addMenu("Help")
         help_menu.addAction("Help", self._show_help)
         help_menu.addAction("About", self._show_about)
+        advanced_menu = menu_bar.addMenu("Advanced")
+        log_menu = advanced_menu.addMenu("Logging Verbosity")
+        self._log_level_name = "Debug"
+        self._log_level_actions = {}
+        for level_name in LOG_LEVELS.keys():
+            action = log_menu.addAction(level_name)
+            action.setCheckable(True)
+            action.triggered.connect(
+                lambda _checked, name=level_name: self._set_log_level(name)
+            )
+            self._log_level_actions[level_name] = action
+        for name, action in self._log_level_actions.items():
+            action.setChecked(name == self._log_level_name)
         root_layout.setMenuBar(menu_bar)
 
         title = QLabel("Axe USD Exporter")
@@ -363,12 +514,6 @@ class USDExporterView(QDialog):
         self.override_openpbr.textChanged.connect(self._sync_preset_combo)
         advanced_layout.addRow("OpenPBR Format", self.override_openpbr)
 
-        self.log_level_combo = QComboBox()
-        self.log_level_combo.addItems(list(LOG_LEVELS.keys()))
-        self.log_level_combo.setCurrentText("Debug")
-        self.log_level_combo.currentTextChanged.connect(self._sync_preset_combo)
-        advanced_layout.addRow("Logging Verbosity", self.log_level_combo)
-
         advanced_box_layout = QVBoxLayout()
         advanced_box_layout.setContentsMargins(0, 0, 0, 0)
         advanced_box_layout.addWidget(advanced_container)
@@ -431,7 +576,7 @@ class USDExporterView(QDialog):
             "openpbr": self.openpbr.isChecked(),
             "save_geometry": self.geom.isChecked(),
             "texture_format_overrides": self._collect_overrides(),
-            "log_level": self.log_level_combo.currentText(),
+            "log_level": self._log_level_name,
         }
 
     def _apply_preset_data(self, data: Dict[str, object]) -> None:
@@ -452,7 +597,7 @@ class USDExporterView(QDialog):
 
             log_level = data.get("log_level")
             if log_level in LOG_LEVELS:
-                self.log_level_combo.setCurrentText(str(log_level))
+                self._set_log_level(str(log_level))
         finally:
             self._preset_sync_blocked = False
 
@@ -467,6 +612,14 @@ class USDExporterView(QDialog):
         self._save_presets()
         self._refresh_preset_combo()
         self.preset_combo.setCurrentText(name)
+
+    def _set_log_level(self, name: str) -> None:
+        if name not in LOG_LEVELS:
+            return
+        self._log_level_name = name
+        for level_name, action in self._log_level_actions.items():
+            action.setChecked(level_name == name)
+        self._sync_preset_combo()
 
     def _show_help(self) -> None:
         """Show a short help dialog."""
@@ -498,7 +651,7 @@ class USDExporterView(QDialog):
             self.geom.isChecked(),
             self.openpbr.isChecked(),
             self._collect_overrides(),
-            self.log_level_combo.currentText(),
+            self._log_level_name,
         )
 
     def _collect_overrides(self) -> Dict[str, str]:
@@ -554,89 +707,81 @@ def on_post_export(context: ExportContext) -> None:
         context: Substance Painter export context.
     """
     logger.info("ExportTexturesEnded emitted.")
-    if usd_exported_qdialog is None:
-        logger.warning("USD Export UI is not available; skipping export.")
+    if _is_preview_export_context(context):
+        logger.info("Preview texture export detected; skipping USD publish.")
         return
-    if not context.textures:
-        logger.warning("No textures exported; skipping USD publish.")
-        QMessageBox.information(
-            usd_exported_qdialog,
-            "USD Exporter",
-            "No textures were exported. USD publish skipped.",
-        )
-        return
+    try:
+        if usd_exported_qdialog is None:
+            raise ConfigurationError("USD Export UI is not available.")
+        if not context.textures:
+            raise ValidationError("No textures were exported.")
 
-    empty_sets = [key for key, paths in context.textures.items() if not paths]
-    if empty_sets:
-        for key in empty_sets:
-            logger.warning("Texture set '%s' exported no files; skipping.", key)
-        QMessageBox.warning(
-            usd_exported_qdialog,
-            "USD Exporter",
-            "Some texture sets exported no files and were skipped.",
+        first_path = next((paths[0] for paths in context.textures.values() if paths), None)
+        if not first_path:
+            raise ValidationError("No exported texture files found.")
+        export_dir = Path(first_path).parent
+
+        raw = usd_exported_qdialog.get_settings()
+        log_level = LOG_LEVELS.get(raw.log_level)
+        if log_level is not None:
+            logger.setLevel(log_level)
+        primitive_path = DEFAULT_PRIMITIVE_PATH
+        publish_dir = str(export_dir)
+        materials = parse_textures(context.textures)
+        if not materials:
+            raise ValidationError("No recognized textures were found.")
+
+        texture_overrides = dict(raw.texture_format_overrides or {})
+        if raw.usdpreview:
+            asset_name = primitive_path.strip("/").split("/")[-1]
+            textures_dir = export_dir / asset_name / "textures"
+            texture_sets = _collect_texture_set_names(context.textures)
+            _export_usdpreview_textures(textures_dir, texture_sets)
+
+        settings = ExportSettings(
+            usdpreview=raw.usdpreview,
+            arnold=raw.arnold,
+            materialx=raw.materialx,
+            openpbr=raw.openpbr,
+            primitive_path=primitive_path,
+            publish_directory=Path(publish_dir),
+            save_geometry=raw.save_geometry,
+            texture_format_overrides=texture_overrides or None,
         )
 
-    first_path = next((paths[0] for paths in context.textures.values() if paths), None)
-    if not first_path:
-        logger.warning("No exported texture files found; skipping USD publish.")
-        QMessageBox.information(
-            usd_exported_qdialog,
-            "USD Exporter",
-            "No texture files were exported. USD publish skipped.",
-        )
-        return
-    export_dir = Path(first_path).parent
+        geo_file = None
+        if settings.save_geometry:
+            mesh_exporter = MeshExporter(settings)
+            geo_file = mesh_exporter.export_mesh()
+            if geo_file is None:
+                raise GeometryExportError(
+                    "Mesh export failed.",
+                    details={"message": mesh_exporter.last_error},
+                )
 
-    raw = usd_exported_qdialog.get_settings()
-    log_level = LOG_LEVELS.get(raw.log_level)
-    if log_level is not None:
-        logger.setLevel(log_level)
-    primitive_path = DEFAULT_PRIMITIVE_PATH
-    publish_dir = str(export_dir)
-    settings = ExportSettings(
-        usdpreview=raw.usdpreview,
-        arnold=raw.arnold,
-        materialx=raw.materialx,
-        openpbr=raw.openpbr,
-        primitive_path=primitive_path,
-        publish_directory=Path(publish_dir),
-        save_geometry=raw.save_geometry,
-        texture_format_overrides=raw.texture_format_overrides or None,
-    )
-    materials = parse_textures(context.textures)
-    if not materials:
-        logger.warning("No recognized textures found; skipping USD publish.")
-        QMessageBox.information(
-            usd_exported_qdialog,
-            "USD Exporter",
-            "No recognized textures were found. USD publish skipped.",
-        )
-        return
-
-    geo_file = None
-    if settings.save_geometry:
-        mesh_exporter = MeshExporter(settings)
-        geo_file = mesh_exporter.export_mesh()
-        if geo_file is None:
-            logger.warning("Mesh export failed; exporting materials only.")
-            if mesh_exporter.last_error:
-                logger.warning("Mesh export error detail: %s", mesh_exporter.last_error)
-            QMessageBox.warning(
+        export_publish(materials, settings, geo_file, PxrUsdWriter())
+    except AxeUSDError as exc:
+        logger.error("USD export failed: %s", exc.message)
+        if exc.details:
+            logger.error("USD export details: %s", exc.details)
+        if usd_exported_qdialog is not None:
+            detail = f"\n\nDetails: {exc.details}" if exc.details else ""
+            QMessageBox.critical(
                 usd_exported_qdialog,
                 "USD Exporter",
-                "Mesh export failed. Exporting materials only.\n\n"
-                f"{mesh_exporter.last_error or 'Check the logs for details.'}",
+                f"USD export failed:\n{exc.message}{detail}",
             )
-    try:
-        export_publish(materials, settings, geo_file, PxrUsdWriter())
+        return
     except Exception as exc:
         logger.exception("USD export failed: %s", exc)
-        QMessageBox.critical(
-            usd_exported_qdialog,
-            "USD Exporter",
-            f"USD export failed:\n{exc}\n\nCheck the logs for more details.",
-        )
+        if usd_exported_qdialog is not None:
+            QMessageBox.critical(
+                usd_exported_qdialog,
+                "USD Exporter",
+                f"USD export failed:\n{exc}\n\nCheck the logs for more details.",
+            )
         return
+
     QMessageBox.information(
         usd_exported_qdialog,
         "USD Exporter",

@@ -7,6 +7,8 @@ from pathlib import Path
 
 from pxr import Sdf, Usd, UsdGeom
 
+from ...core.exceptions import USDStageError, ValidationError
+
 logger = logging.getLogger(__name__)
 
 SP_ROOT_PATH = Sdf.Path("/root")
@@ -33,13 +35,14 @@ def fix_sp_mesh_stage(stage: Usd.Stage, target_root: str) -> bool:
         bool: True if changes were applied.
     """
     if not stage:
-        logger.warning("No stage provided for SP mesh fixup.")
-        return False
+        raise USDStageError("No stage provided for SP mesh fixup.")
 
     target_path = Sdf.Path(target_root)
     if not (target_path.IsAbsolutePath() and target_path.IsPrimPath()):
-        logger.warning("Invalid target root path: %s", target_root)
-        return False
+        raise ValidationError(
+            "Invalid target root path.",
+            details={"target_root": target_root},
+        )
 
     layer = stage.GetRootLayer()
     changed = False
@@ -64,6 +67,11 @@ def fix_sp_mesh_stage(stage: Usd.Stage, target_root: str) -> bool:
     render_prim.CreateRelationship("proxyPrim").SetTargets([proxy_path])
 
     root_prim = stage.GetPrimAtPath(SP_ROOT_PATH)
+    if not root_prim or not root_prim.IsValid():
+        raise USDStageError(
+            "Expected /root prim is missing from the stage.",
+            details={"root_path": SP_ROOT_PATH.pathString},
+        )
     children = list(root_prim.GetChildren())
     skip_names = {"material", "render", "proxy"}
     for child in children:
@@ -100,8 +108,10 @@ def fix_sp_mesh_layer(layer_path: Path, target_root: str) -> bool:
     """
     stage = Usd.Stage.Open(str(layer_path))
     if not stage:
-        logger.warning("Failed to open USD layer: %s", layer_path)
-        return False
+        raise USDStageError(
+            "Failed to open USD layer.",
+            details={"layer_path": str(layer_path)},
+        )
 
     changed = fix_sp_mesh_stage(stage, target_root)
     if changed:

@@ -538,6 +538,7 @@ def create_shaded_asset_publish(
     # 4. Create mtl.usdc and author materials
     mtl_stage = create_mtl_usd_file(paths, asset_name)
     material_primitive_path = f"/{MTL_LIBRARY_ROOT}/mtl"
+    material_dict_list = _relocate_textures(material_dict_list, paths.textures_dir)
 
     for material_dict in material_dict_list:
         material_name = next(

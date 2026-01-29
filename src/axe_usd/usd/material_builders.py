@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 import logging
+from pathlib import Path
 from typing import Dict, Iterable, Optional, Tuple
 
 from pxr import Gf, Sdf, Usd, UsdShade
@@ -14,6 +15,8 @@ RENDERER_USD_PREVIEW = "usd_preview"
 RENDERER_ARNOLD = "arnold"
 RENDERER_MTLX = "mtlx"
 RENDERER_OPENPBR = "openpbr"
+PREVIEW_TEXTURE_DIRNAME = "previewTextures"
+PREVIEW_TEXTURE_SUFFIX = ".jpg"
 
 USD_PREVIEW_INPUTS = {
     "basecolor": "diffuseColor",
@@ -80,13 +83,23 @@ def _iter_textures(
         yield slot, input_name, path
 
 
+def _preview_texture_path(path: str, mat_name: str) -> str:
+    source_path = Path(path)
+    preview_name = f"{mat_name}_BaseColor{PREVIEW_TEXTURE_SUFFIX}"
+    preview_dir = source_path.parent / PREVIEW_TEXTURE_DIRNAME
+    preview_path = preview_dir / preview_name
+    if source_path.is_absolute():
+        return preview_path.as_posix()
+    prefix = "./" if path.startswith("./") else ""
+    return f"{prefix}{preview_path.as_posix()}"
+
+
 class UsdPreviewBuilder:
     def __init__(self, context: MaterialBuildContext) -> None:
         self._context = context
 
     def build(self, collect_path: str) -> UsdShade.Shader:
         stage = self._context.stage
-        override = self._context.texture_format_overrides.for_renderer(RENDERER_USD_PREVIEW)
 
         material_path = f"{collect_path}/UsdPreviewMaterial"
         material = UsdShade.Material.Define(stage, material_path)
@@ -105,29 +118,28 @@ class UsdPreviewBuilder:
         st_reader.CreateIdAttr("UsdPrimvarReader_float2")
         st_reader.CreateInput("varname", Sdf.ValueTypeNames.Token).Set("st")
 
-        for slot, input_name, path in _iter_textures(self._context, USD_PREVIEW_INPUTS, "usdpreview"):
-            tex_filepath = apply_texture_format_override(path, override)
-            texture_prim_path = f"{nodegraph_path}/{slot}Texture"
-            texture_prim = UsdShade.Shader.Define(stage, texture_prim_path)
-            texture_prim.CreateIdAttr("UsdUVTexture")
-            texture_prim.CreateInput("file", Sdf.ValueTypeNames.Asset).Set(tex_filepath)
-            texture_prim.CreateInput("wrapS", Sdf.ValueTypeNames.Token).Set("repeat")
-            texture_prim.CreateInput("wrapT", Sdf.ValueTypeNames.Token).Set("repeat")
-            texture_prim.CreateInput("st", Sdf.ValueTypeNames.Float2).ConnectToSource(
-                st_reader.ConnectableAPI(), "result"
-            )
+        base_info = self._context.material_dict.get("basecolor")
+        if not base_info:
+            return shader
+        path = base_info.get("path")
+        if not path:
+            return shader
 
-            if slot in USD_PREVIEW_SCALAR_SLOTS:
-                value_type = Sdf.ValueTypeNames.Float
-                channel = "r"
-            else:
-                value_type = Sdf.ValueTypeNames.Float3
-                channel = "rgb"
-
-            shader.CreateInput(input_name, value_type).ConnectToSource(
-                texture_prim.ConnectableAPI(),
-                channel,
-            )
+        mat_name = base_info.get("mat_name", "")
+        tex_filepath = _preview_texture_path(path, mat_name)
+        texture_prim_path = f"{nodegraph_path}/basecolorTexture"
+        texture_prim = UsdShade.Shader.Define(stage, texture_prim_path)
+        texture_prim.CreateIdAttr("UsdUVTexture")
+        texture_prim.CreateInput("file", Sdf.ValueTypeNames.Asset).Set(tex_filepath)
+        texture_prim.CreateInput("wrapS", Sdf.ValueTypeNames.Token).Set("repeat")
+        texture_prim.CreateInput("wrapT", Sdf.ValueTypeNames.Token).Set("repeat")
+        texture_prim.CreateInput("st", Sdf.ValueTypeNames.Float2).ConnectToSource(
+            st_reader.ConnectableAPI(), "result"
+        )
+        shader.CreateInput("diffuseColor", Sdf.ValueTypeNames.Float3).ConnectToSource(
+            texture_prim.ConnectableAPI(),
+            "rgb",
+        )
 
         return shader
 
