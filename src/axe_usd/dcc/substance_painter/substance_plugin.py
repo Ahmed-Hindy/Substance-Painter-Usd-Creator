@@ -5,6 +5,7 @@ Copyright Ahmed Hindy. Please mention the author if you found any part of this c
 
 import gc
 import logging
+import shutil
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -85,7 +86,6 @@ USD_PREVIEW_JPEG_SIZE_LOG2 = 8  # 256px
 USD_PREVIEW_JPEG_SUFFIX = ".jpg"
 PREVIEW_TEXTURE_DIRNAME = "previewTextures"
 PREVIEW_EXPORT_PRESET = "AxeUSDPreview"
-
 LOG_LEVELS = {
     "Error": logging.ERROR,
     "Warning": logging.WARNING,
@@ -343,6 +343,39 @@ def _export_usdpreview_textures(
             "UsdPreview export failed.",
             details={"result": str(result)},
         )
+
+
+def _move_exported_textures(
+    textures: Mapping[Tuple[str, str], Sequence[str]], textures_dir: Path
+) -> Mapping[Tuple[str, str], Sequence[str]]:
+    ensure_directory(textures_dir)
+    updated: dict[Tuple[str, str], list[str]] = {}
+    for key, paths in textures.items():
+        new_paths: list[str] = []
+        for path in paths:
+            if not path:
+                continue
+            src = Path(path)
+            if not src.exists():
+                raise ValidationError(
+                    "Exported texture file missing.",
+                    details={"path": str(src)},
+                )
+            if src.parent == textures_dir:
+                new_paths.append(str(src))
+                continue
+            dest = textures_dir / src.name
+            if dest.exists():
+                if dest.stat().st_mtime < src.stat().st_mtime:
+                    dest.unlink()
+                    shutil.move(str(src), str(dest))
+                else:
+                    src.unlink()
+            else:
+                shutil.move(str(src), str(dest))
+            new_paths.append(str(dest))
+        updated[key] = new_paths
+    return updated
 
 
 def _is_preview_export_context(context: "ExportContext") -> bool:
@@ -716,6 +749,14 @@ def on_post_export(context: ExportContext) -> None:
         if not context.textures:
             raise ValidationError("No textures were exported.")
 
+        empty_sets = [key for key, paths in context.textures.items() if not paths]
+        if empty_sets:
+            empty_names = _collect_texture_set_names({key: [] for key in empty_sets})
+            raise ValidationError(
+                "Texture set exported no files.",
+                details={"texture_sets": empty_names},
+            )
+
         first_path = next((paths[0] for paths in context.textures.values() if paths), None)
         if not first_path:
             raise ValidationError("No exported texture files found.")
@@ -727,15 +768,17 @@ def on_post_export(context: ExportContext) -> None:
             logger.setLevel(log_level)
         primitive_path = DEFAULT_PRIMITIVE_PATH
         publish_dir = str(export_dir)
-        materials = parse_textures(context.textures)
+        asset_name = primitive_path.strip("/").split("/")[-1]
+        textures_dir = export_dir / asset_name / "textures"
+        textures = _move_exported_textures(context.textures, textures_dir)
+
+        materials = parse_textures(textures)
         if not materials:
             raise ValidationError("No recognized textures were found.")
 
         texture_overrides = dict(raw.texture_format_overrides or {})
         if raw.usdpreview:
-            asset_name = primitive_path.strip("/").split("/")[-1]
-            textures_dir = export_dir / asset_name / "textures"
-            texture_sets = _collect_texture_set_names(context.textures)
+            texture_sets = _collect_texture_set_names(textures)
             _export_usdpreview_textures(textures_dir, texture_sets)
 
         settings = ExportSettings(
