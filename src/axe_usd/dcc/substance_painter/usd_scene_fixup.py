@@ -21,6 +21,19 @@ def _remove_prim(stage: Usd.Stage, path: Sdf.Path) -> bool:
     return bool(removed)
 
 
+def _strip_material_bindings(stage: Usd.Stage) -> int:
+    stripped = 0
+    for prim in stage.Traverse():
+        if not prim or not prim.IsValid():
+            continue
+        for rel in prim.GetRelationships():
+            name = rel.GetName()
+            if name.startswith("material:binding"):
+                if prim.RemoveProperty(name):
+                    stripped += 1
+    return stripped
+
+
 def fix_sp_mesh_stage(stage: Usd.Stage, target_root: str) -> bool:
     """Normalize a Substance Painter mesh stage for component layout.
 
@@ -46,6 +59,11 @@ def fix_sp_mesh_stage(stage: Usd.Stage, target_root: str) -> bool:
 
     layer = stage.GetRootLayer()
     changed = False
+
+    stripped = _strip_material_bindings(stage)
+    if stripped:
+        logger.debug("Stripped %d material bindings from mesh layer.", stripped)
+        changed = True
 
     if _remove_prim(stage, SP_MATERIAL_PATH):
         changed = True
