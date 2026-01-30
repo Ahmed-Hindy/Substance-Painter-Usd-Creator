@@ -101,17 +101,17 @@ class UsdPreviewBuilder:
     def build(self, collect_path: str) -> UsdShade.Shader:
         stage = self._context.stage
 
-        material_path = f"{collect_path}/UsdPreviewMaterial"
-        material = UsdShade.Material.Define(stage, material_path)
-
-        nodegraph_path = f"{material_path}/UsdPreviewNodeGraph"
-        stage.DefinePrim(nodegraph_path, "NodeGraph")
+        nodegraph_path = f"{collect_path}/UsdPreviewNodeGraph"
+        UsdShade.NodeGraph.Define(stage, nodegraph_path)
 
         shader_path = f"{nodegraph_path}/UsdPreviewSurface"
         shader = UsdShade.Shader.Define(stage, shader_path)
         shader.CreateIdAttr("UsdPreviewSurface")
 
-        material.CreateSurfaceOutput().ConnectToSource(shader.ConnectableAPI(), "surface")
+        material = UsdShade.Material.Get(stage, collect_path)
+        material.CreateSurfaceOutput().ConnectToSource(
+            shader.ConnectableAPI(), "surface"
+        )
 
         st_reader_path = f"{nodegraph_path}/TexCoordReader"
         st_reader = UsdShade.Shader.Define(stage, st_reader_path)

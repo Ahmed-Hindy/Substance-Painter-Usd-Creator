@@ -377,6 +377,12 @@ def _collect_mesh_paths(stage: Usd.Stage, root_path: str) -> list[str]:
     return mesh_paths
 
 
+def _binding_target_for_mesh_path(mesh_path: str) -> tuple[str, str]:
+    if "/geo/proxy/" in mesh_path:
+        return mesh_path.rsplit("/", 1)[0], UsdShade.Tokens.preview
+    return mesh_path, UsdShade.Tokens.allPurpose
+
+
 def _collect_material_prims(stage: Usd.Stage, parent_path: str) -> list[Usd.Prim]:
     parent = stage.GetPrimAtPath(parent_path)
     if not parent or not parent.IsValid():
@@ -424,6 +430,20 @@ def _bind_materials_in_variant(
 
     render_root = f"/{asset_name}/geo/render"
     mesh_paths = _collect_mesh_paths(asset_stage, render_root)
+    proxy_root = f"/{asset_name}/geo/proxy"
+    proxy_paths: list[str] = []
+    if asset_stage.GetPrimAtPath(proxy_root).IsValid():
+        for path in mesh_paths:
+            proxy_path = path.replace("/geo/render/", "/geo/proxy/", 1)
+            if asset_stage.GetPrimAtPath(proxy_path).IsValid():
+                proxy_paths.append(proxy_path)
+    mesh_paths.extend(proxy_paths)
+    logger.debug("Material binding render root: %s", render_root)
+    logger.debug("Material binding proxy root: %s", proxy_root)
+    logger.debug("Render mesh paths: %d", len(mesh_paths) - len(proxy_paths))
+    logger.debug("Proxy mesh paths: %d", len(proxy_paths))
+    if mesh_paths:
+        logger.debug("Sample mesh paths: %s", mesh_paths[:3])
 
     with variant_set.GetVariantEditContext():
         from .naming import NamingConvention
@@ -440,6 +460,7 @@ def _bind_materials_in_variant(
             matches = [
                 path for path in mesh_paths if cleaned in path.rsplit("/", 1)[-1]
             ]
+            logger.debug("Material %s matches: %d", cleaned, len(matches))
             if not matches:
                 logger.warning("No meshes found with name like: %s", cleaned)
                 continue
@@ -454,8 +475,18 @@ def _bind_materials_in_variant(
                 continue
 
             for mesh_path in matches:
-                mesh_prim = mtl_stage.OverridePrim(mesh_path)
-                UsdShade.MaterialBindingAPI(mesh_prim).Bind(material)
+                bind_path, purpose = _binding_target_for_mesh_path(mesh_path)
+                mesh_prim = mtl_stage.OverridePrim(bind_path)
+                UsdShade.MaterialBindingAPI.Apply(mesh_prim)
+                UsdShade.MaterialBindingAPI(mesh_prim).Bind(
+                    material, materialPurpose=purpose
+                )
+                logger.debug(
+                    "Bound %s -> %s (%s)",
+                    bind_path,
+                    material.GetPrim().GetPath(),
+                    purpose,
+                )
 
     mtl_stage.Save()
 

@@ -34,6 +34,69 @@ def _strip_material_bindings(stage: Usd.Stage) -> int:
     return stripped
 
 
+def _strip_material_binding_schema(stage: Usd.Stage) -> int:
+    """Remove MaterialBindingAPI opinions without authoring delete list ops."""
+    layer = stage.GetRootLayer()
+    stripped = 0
+    for prim in stage.Traverse():
+        if not prim or not prim.IsValid():
+            continue
+        prim_spec = layer.GetPrimAtPath(prim.GetPath())
+        if not prim_spec or not prim_spec.HasInfo("apiSchemas"):
+            continue
+        list_op = prim_spec.GetInfo("apiSchemas")
+        if not list_op:
+            continue
+        def _filter(items: list[str]) -> list[str]:
+            return [item for item in items if item != "MaterialBindingAPI"]
+        explicit = _filter(list(list_op.explicitItems))
+        prepended = _filter(list(list_op.prependedItems))
+        appended = _filter(list(list_op.appendedItems))
+        ordered = _filter(list(list_op.orderedItems))
+        added = _filter(list(list_op.addedItems))
+        deleted = _filter(list(list_op.deletedItems))
+        if not (explicit or prepended or appended or ordered or added or deleted):
+            prim_spec.ClearInfo("apiSchemas")
+        else:
+            new_list_op = Sdf.TokenListOp()
+            new_list_op.explicitItems = explicit
+            new_list_op.prependedItems = prepended
+            new_list_op.appendedItems = appended
+            new_list_op.orderedItems = ordered
+            new_list_op.addedItems = added
+            new_list_op.deletedItems = deleted
+            prim_spec.SetInfo("apiSchemas", new_list_op)
+        stripped += 1
+    return stripped
+
+
+def _instance_proxy_prim(
+    stage: Usd.Stage,
+    proxy_parent: Sdf.Path,
+    render_child_path: Sdf.Path,
+    child_name: str,
+) -> bool:
+    """Create an instanceable proxy prim from its render counterpart.
+
+    Args:
+        stage: The USD stage being edited.
+        proxy_parent: Parent path for proxy prims (e.g. /Asset/geo/proxy).
+        render_child_path: Render prim path to reference.
+        child_name: Name of the child prim to create under proxy_parent.
+
+    Returns:
+        bool: True if the proxy instance was authored.
+    """
+    proxy_child_path = proxy_parent.AppendChild(child_name)
+    _remove_prim(stage, proxy_child_path)
+    proxy_prim = stage.OverridePrim(proxy_child_path.pathString)
+    proxy_prim.SetInstanceable(True)
+    refs = proxy_prim.GetReferences()
+    refs.ClearReferences()
+    refs.AddInternalReference(render_child_path)
+    return True
+
+
 def fix_sp_mesh_stage(stage: Usd.Stage, target_root: str) -> bool:
     """Normalize a Substance Painter mesh stage for component layout.
 
@@ -64,6 +127,13 @@ def fix_sp_mesh_stage(stage: Usd.Stage, target_root: str) -> bool:
     if stripped:
         logger.debug("Stripped %d material bindings from mesh layer.", stripped)
         changed = True
+    schema_stripped = _strip_material_binding_schema(stage)
+    if schema_stripped:
+        logger.debug(
+            "Removed MaterialBindingAPI from %d prims in mesh layer.",
+            schema_stripped,
+        )
+        changed = True
 
     if _remove_prim(stage, SP_MATERIAL_PATH):
         changed = True
@@ -93,17 +163,21 @@ def fix_sp_mesh_stage(stage: Usd.Stage, target_root: str) -> bool:
     children = list(root_prim.GetChildren())
     skip_names = {"material", "render", "proxy"}
     for child in children:
-        if child.GetName() in skip_names:
+        child_name = child.GetName()
+        if child_name in skip_names:
             continue
-        dst_path = render_path.AppendChild(child.GetName())
+        child_path = child.GetPath()
+        dst_path = render_path.AppendChild(child_name)
         if _remove_prim(stage, dst_path):
             changed = True
-        copied = Sdf.CopySpec(layer, child.GetPath(), layer, dst_path)
+        copied = Sdf.CopySpec(layer, child_path, layer, dst_path)
         if not copied:
-            logger.warning("CopySpec failed for %s", child.GetPath())
+            logger.warning("CopySpec failed for %s", child_path)
             continue
         changed = True
-        if _remove_prim(stage, child.GetPath()):
+        if _remove_prim(stage, child_path):
+            changed = True
+        if _instance_proxy_prim(stage, proxy_path, dst_path, child_name):
             changed = True
 
     root_prim = stage.GetPrimAtPath(SP_ROOT_PATH)
