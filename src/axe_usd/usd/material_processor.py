@@ -12,7 +12,7 @@ from typing import Iterable, Mapping, Optional
 
 from pxr import Sdf, Tf, Usd, UsdGeom, UsdShade
 
-from ..core.exceptions import MaterialAssignmentError
+from ..core.exceptions import GeometryExportError, MaterialAssignmentError
 
 from . import utils as usd_utils
 from .material_builders import (
@@ -153,11 +153,17 @@ class USDShaderCreate:
             collect_usd_material.CreateOutput(
                 "mtlx:surface", Sdf.ValueTypeNames.Token
             ).ConnectToSource(mtlx_nodegraph.ConnectableAPI(), "surface")
+            collect_usd_material.CreateOutput(
+                "kma:surface", Sdf.ValueTypeNames.Token
+            ).ConnectToSource(mtlx_nodegraph.ConnectableAPI(), "surface")
 
         if self.create_openpbr:
             openpbr_nodegraph = OpenPbrBuilder(context).build(collect_path)
             collect_usd_material.CreateOutput(
                 "mtlx:surface", Sdf.ValueTypeNames.Token
+            ).ConnectToSource(openpbr_nodegraph.ConnectableAPI(), "surface")
+            collect_usd_material.CreateOutput(
+                "kma:surface", Sdf.ValueTypeNames.Token
             ).ConnectToSource(openpbr_nodegraph.ConnectableAPI(), "surface")
 
 
@@ -223,13 +229,10 @@ class USDShaderAssign:
             mats_parent_prim, prim_type=UsdShade.Material, recursive=False
         )
         if not check:
-            # If no materials are found (e.g. they are in sub-scopes), try a recursive search
-            # Or just warn if truly nothing found.
-            # Standard structure: /mtl/Scope/Material? Usually just /mtl/Material.
-            logger.warning(
-                "No UsdShade.Material found under prim: '%s'.", mats_parent_path
+            raise MaterialAssignmentError(
+                "No UsdShade.Material found under prim.",
+                details={"mats_parent_path": mats_parent_path},
             )
-            return
 
         for mat_prim in found_mats:
             # 2. cleaning material name:
@@ -544,26 +547,25 @@ def create_shaded_asset_publish(
     has_geometry = False
     if geo_file:
         geo_path = Path(geo_file)
-        if geo_path.exists():
-            if geo_path.resolve() == paths.geo_file.resolve():
-                has_geometry = True
-                logger.info(f"Using geometry file: {geo_path}")
-            else:
-                logger.warning(
-                    "Geometry file is not at the expected path (%s): %s",
-                    paths.geo_file,
-                    geo_path,
-                )
-        else:
-            logger.warning(f"Geometry file not found at expected path: {geo_path}")
+        if not geo_path.exists():
+            raise GeometryExportError(
+                "Geometry file not found.",
+                details={"path": str(geo_path)},
+            )
+        expected_path = paths.geo_file.resolve()
+        actual_path = geo_path.resolve()
+        if actual_path != expected_path:
+            raise GeometryExportError(
+                "Geometry file is not at the expected path.",
+                details={"expected": str(expected_path), "actual": str(actual_path)},
+            )
+        has_geometry = True
+        logger.info("Using geometry file: %s", geo_path)
 
     # 2. Create geo.usdc scaffold (does not overwrite existing files)
     create_geo_usd_file(paths, asset_name)
 
-    # 3. Create payload.usdc (references mtl.usdc and geo.usdc)
-    create_payload_usd_file(paths, asset_name)
-
-    # 4. Create mtl.usdc and author materials
+    # 3. Create mtl.usdc and author materials
     mtl_stage = create_mtl_usd_file(paths, asset_name)
     material_primitive_path = f"/{MTL_LIBRARY_ROOT}/mtl"
     material_dict_list = _relocate_textures(material_dict_list, paths.textures_dir)
@@ -585,6 +587,9 @@ def create_shaded_asset_publish(
             texture_format_overrides=texture_format_overrides,
         )
     mtl_stage.Save()
+
+    # 4. Create payload.usdc (references mtl.usdc and geo.usdc)
+    create_payload_usd_file(paths, asset_name)
 
     # 5. Create Asset.usd (main entry point)
     create_asset_usd_file(paths, asset_name)

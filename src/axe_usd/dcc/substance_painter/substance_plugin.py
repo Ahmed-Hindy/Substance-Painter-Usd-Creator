@@ -385,16 +385,23 @@ def _move_exported_textures(
 
 
 def _is_preview_export_context(context: "ExportContext") -> bool:
-    first_path = next((paths[0] for paths in context.textures.values() if paths), None)
-    if not first_path:
+    texture_paths = [
+        Path(path)
+        for paths in context.textures.values()
+        for path in paths
+        if path
+    ]
+    if not texture_paths:
         return False
-    try:
-        parts = Path(first_path).parts
-    except Exception:
-        return False
-        return any(
-        part.lower() == PREVIEW_TEXTURE_DIRNAME.lower() for part in parts
-    )
+    preview_token = PREVIEW_TEXTURE_DIRNAME.lower()
+    for path in texture_paths:
+        try:
+            parts = path.parts
+        except Exception:
+            return False
+        if not any(part.lower() == preview_token for part in parts):
+            return False
+    return True
 
 
 def _env_flag(name: str) -> bool:

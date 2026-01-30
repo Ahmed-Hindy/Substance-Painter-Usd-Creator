@@ -1,6 +1,6 @@
 """Custom exceptions for USD export operations."""
 
-from typing import Any, Dict, Optional
+from typing import Any, Mapping, Optional
 
 
 class AxeUSDError(Exception):
@@ -11,7 +11,9 @@ class AxeUSDError(Exception):
         details: Optional dictionary of additional error context.
     """
 
-    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None) -> None:
+    def __init__(
+        self, message: str, details: Optional[Mapping[str, Any]] = None
+    ) -> None:
         """Initialize the exception.
 
         Args:
@@ -19,8 +21,25 @@ class AxeUSDError(Exception):
             details: Optional dictionary of additional error context.
         """
         super().__init__(message)
-        self.message = message
-        self.details = details or {}
+        self._details = dict(details) if details else {}
+
+    @property
+    def message(self) -> str:
+        """Return the human-readable error message."""
+        if self.args:
+            return str(self.args[0])
+        return ""
+
+    @property
+    def details(self) -> Mapping[str, Any]:
+        """Return an immutable view of error details."""
+        return self._details
+
+    def __str__(self) -> str:
+        message = self.message
+        if not self._details:
+            return message
+        return f"{message} (details={self._details!r})"
 
 
 class TextureParsingError(AxeUSDError):
