@@ -134,16 +134,13 @@ class USDShaderCreate:
         context = self._build_context()
 
         if self.create_usd_preview:
-            usd_preview_shader = UsdPreviewBuilder(context).build(collect_path)
-            collect_usd_material.CreateSurfaceOutput().ConnectToSource(
-                usd_preview_shader.ConnectableAPI(), "surface"
-            )
+            UsdPreviewBuilder(context).build(collect_path)
 
         if self.create_arnold:
-            arnold_shader = ArnoldBuilder(context).build(collect_path)
+            arnold_nodegraph = ArnoldBuilder(context).build(collect_path)
             collect_usd_material.CreateOutput(
                 "arnold:surface", Sdf.ValueTypeNames.Token
-            ).ConnectToSource(arnold_shader.ConnectableAPI(), "surface")
+            ).ConnectToSource(arnold_nodegraph.ConnectableAPI(), "surface")
 
         if self.create_openpbr and self.create_mtlx:
             logger.warning(
@@ -152,16 +149,16 @@ class USDShaderCreate:
             self.create_mtlx = False
 
         if self.create_mtlx:
-            mtlx_shader = MtlxBuilder(context).build(collect_path)
+            mtlx_nodegraph = MtlxBuilder(context).build(collect_path)
             collect_usd_material.CreateOutput(
                 "mtlx:surface", Sdf.ValueTypeNames.Token
-            ).ConnectToSource(mtlx_shader.ConnectableAPI(), "surface")
+            ).ConnectToSource(mtlx_nodegraph.ConnectableAPI(), "surface")
 
         if self.create_openpbr:
-            openpbr_shader = OpenPbrBuilder(context).build(collect_path)
+            openpbr_nodegraph = OpenPbrBuilder(context).build(collect_path)
             collect_usd_material.CreateOutput(
                 "mtlx:surface", Sdf.ValueTypeNames.Token
-            ).ConnectToSource(openpbr_shader.ConnectableAPI(), "surface")
+            ).ConnectToSource(openpbr_nodegraph.ConnectableAPI(), "surface")
 
 
 class USDShaderAssign:

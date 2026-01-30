@@ -102,15 +102,19 @@ class UsdPreviewBuilder:
         stage = self._context.stage
 
         nodegraph_path = f"{collect_path}/UsdPreviewNodeGraph"
-        UsdShade.NodeGraph.Define(stage, nodegraph_path)
+        nodegraph = UsdShade.NodeGraph.Define(stage, nodegraph_path)
 
         shader_path = f"{nodegraph_path}/UsdPreviewSurface"
         shader = UsdShade.Shader.Define(stage, shader_path)
         shader.CreateIdAttr("UsdPreviewSurface")
 
         material = UsdShade.Material.Get(stage, collect_path)
+        nodegraph_output = nodegraph.CreateOutput(
+            "surface", Sdf.ValueTypeNames.Token
+        )
+        nodegraph_output.ConnectToSource(shader.ConnectableAPI(), "surface")
         material.CreateSurfaceOutput().ConnectToSource(
-            shader.ConnectableAPI(), "surface"
+            nodegraph.ConnectableAPI(), "surface"
         )
 
         st_reader_path = f"{nodegraph_path}/TexCoordReader"
@@ -148,21 +152,27 @@ class ArnoldBuilder:
     def __init__(self, context: MaterialBuildContext) -> None:
         self._context = context
 
-    def build(self, collect_path: str) -> UsdShade.Shader:
+    def build(self, collect_path: str) -> UsdShade.NodeGraph:
         stage = self._context.stage
         override = self._context.texture_format_overrides.for_renderer(RENDERER_ARNOLD)
 
-        shader_path = f"{collect_path}/arnold_standard_surface1"
+        nodegraph_path = f"{collect_path}/ArnoldNodeGraph"
+        nodegraph = UsdShade.NodeGraph.Define(stage, nodegraph_path)
+
+        shader_path = f"{nodegraph_path}/arnold_standard_surface1"
         shader = UsdShade.Shader.Define(stage, shader_path)
         shader.CreateIdAttr("arnold:standard_surface")
 
+        nodegraph_output = nodegraph.CreateOutput("surface", Sdf.ValueTypeNames.Token)
+        nodegraph_output.ConnectToSource(shader.ConnectableAPI(), "surface")
+
         self._initialize_standard_surface(shader)
-        self._wire_textures(collect_path, shader, override)
+        self._wire_textures(nodegraph_path, shader, override)
 
         if self._context.is_transmissive:
             self._enable_transmission(shader)
 
-        return shader
+        return nodegraph
 
     def _initialize_standard_surface(self, shader: UsdShade.Shader) -> None:
         shader.CreateInput("aov_id1", Sdf.ValueTypeNames.Float3).Set((0, 0, 0))
@@ -391,21 +401,27 @@ class MtlxBuilder:
     def __init__(self, context: MaterialBuildContext) -> None:
         self._context = context
 
-    def build(self, collect_path: str) -> UsdShade.Shader:
+    def build(self, collect_path: str) -> UsdShade.NodeGraph:
         stage = self._context.stage
         override = self._context.texture_format_overrides.for_renderer(RENDERER_MTLX)
 
-        shader_path = f"{collect_path}/mtlx_mtlxstandard_surface1"
+        nodegraph_path = f"{collect_path}/MtlxNodeGraph"
+        nodegraph = UsdShade.NodeGraph.Define(stage, nodegraph_path)
+
+        shader_path = f"{nodegraph_path}/mtlx_mtlxstandard_surface1"
         shader = UsdShade.Shader.Define(stage, shader_path)
         shader.CreateIdAttr("ND_standard_surface_surfaceshader")
 
+        nodegraph_output = nodegraph.CreateOutput("surface", Sdf.ValueTypeNames.Token)
+        nodegraph_output.ConnectToSource(shader.ConnectableAPI(), "surface")
+
         self._initialize_standard_surface(shader)
-        self._wire_textures(collect_path, shader, override)
+        self._wire_textures(nodegraph_path, shader, override)
 
         if self._context.is_transmissive:
             self._enable_transmission(shader)
 
-        return shader
+        return nodegraph
 
     def _initialize_standard_surface(self, shader: UsdShade.Shader) -> None:
         shader.CreateInput("base", Sdf.ValueTypeNames.Float).Set(1)
@@ -535,21 +551,27 @@ class OpenPbrBuilder:
     def __init__(self, context: MaterialBuildContext) -> None:
         self._context = context
 
-    def build(self, collect_path: str) -> UsdShade.Shader:
+    def build(self, collect_path: str) -> UsdShade.NodeGraph:
         stage = self._context.stage
         override = self._context.texture_format_overrides.for_renderer(RENDERER_OPENPBR)
 
-        shader_path = f"{collect_path}/openpbr_surface1"
+        nodegraph_path = f"{collect_path}/OpenPbrNodeGraph"
+        nodegraph = UsdShade.NodeGraph.Define(stage, nodegraph_path)
+
+        shader_path = f"{nodegraph_path}/openpbr_surface1"
         shader = UsdShade.Shader.Define(stage, shader_path)
         shader.CreateIdAttr("ND_open_pbr_surface_surfaceshader")
 
+        nodegraph_output = nodegraph.CreateOutput("surface", Sdf.ValueTypeNames.Token)
+        nodegraph_output.ConnectToSource(shader.ConnectableAPI(), "surface")
+
         self._initialize_surface(shader)
-        self._wire_textures(collect_path, shader, override)
+        self._wire_textures(nodegraph_path, shader, override)
 
         if self._context.is_transmissive:
             self._enable_transmission(shader)
 
-        return shader
+        return nodegraph
 
     def _initialize_surface(self, shader: UsdShade.Shader) -> None:
         shader.CreateInput("base", Sdf.ValueTypeNames.Float).Set(1)

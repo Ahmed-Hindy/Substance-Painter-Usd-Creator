@@ -5,6 +5,7 @@ Copyright Ahmed Hindy. Please mention the author if you found any part of this c
 
 import gc
 import logging
+import os
 import shutil
 import sys
 from dataclasses import dataclass
@@ -128,11 +129,12 @@ class MeshExporter:
     Exports mesh geometry to USD if requested.
     """
 
-    def __init__(self, settings: ExportSettings):
+    def __init__(self, settings: ExportSettings, skip_postprocess: bool = False):
         """Initialize the mesh exporter.
 
         Args:
             settings: Export settings for determining output paths.
+            skip_postprocess: Skip fixup/conversion and leave raw export untouched.
         """
         # Extract asset name from settings (e.g. primitive_path="/Asset" -> "Asset")
         asset_name = settings.primitive_path.strip("/").split("/")[-1]
@@ -142,6 +144,7 @@ class MeshExporter:
         )
         self.mesh_path = publish_paths.geometry_path
         self.root_prim_path = DEFAULT_PRIMITIVE_PATH
+        self.skip_postprocess = skip_postprocess
         self.last_error: str = ""
 
     def export_mesh(self) -> Optional[Path]:
@@ -196,6 +199,9 @@ class MeshExporter:
                     "Mesh export reported success but file is missing.",
                     details={"path": str(export_path)},
                 )
+            if self.skip_postprocess:
+                logger.info("Skipping mesh fixup/conversion for testing.")
+                return export_path
             if convert_to_usdc:
                 from pxr import Usd
 
@@ -386,9 +392,14 @@ def _is_preview_export_context(context: "ExportContext") -> bool:
         parts = Path(first_path).parts
     except Exception:
         return False
-    return any(
+        return any(
         part.lower() == PREVIEW_TEXTURE_DIRNAME.lower() for part in parts
     )
+
+
+def _env_flag(name: str) -> bool:
+    value = os.getenv(name, "")
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 class USDExporterView(QDialog):
@@ -768,6 +779,36 @@ def on_post_export(context: ExportContext) -> None:
             logger.setLevel(log_level)
         primitive_path = DEFAULT_PRIMITIVE_PATH
         publish_dir = str(export_dir)
+
+        if _env_flag("AXEUSD_STOP_AFTER_MESH_EXPORT"):
+            if not raw.save_geometry:
+                raise ValidationError(
+                    "Save Geometry must be enabled to stop after mesh export."
+                )
+            settings = ExportSettings(
+                usdpreview=raw.usdpreview,
+                arnold=raw.arnold,
+                materialx=raw.materialx,
+                openpbr=raw.openpbr,
+                primitive_path=primitive_path,
+                publish_directory=Path(publish_dir),
+                save_geometry=True,
+                texture_format_overrides=raw.texture_format_overrides or None,
+            )
+            mesh_exporter = MeshExporter(settings, skip_postprocess=True)
+            geo_file = mesh_exporter.export_mesh()
+            if geo_file is None:
+                raise GeometryExportError(
+                    "Mesh export failed.",
+                    details={"message": mesh_exporter.last_error},
+                )
+            if usd_exported_qdialog is not None:
+                QMessageBox.information(
+                    usd_exported_qdialog,
+                    "USD Exporter",
+                    f"Mesh export complete.\n\nMesh file:\n{geo_file}",
+                )
+            return
         asset_name = primitive_path.strip("/").split("/")[-1]
         textures_dir = export_dir / asset_name / "textures"
         textures = _move_exported_textures(context.textures, textures_dir)
