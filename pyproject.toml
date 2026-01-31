@@ -6,9 +6,13 @@ dependencies = [
   "usd-core==24.5",
 ]
 
+[project.scripts]
+sp-usd-preview-ui = "tools.preview_ui:main"
+
 [dependency-groups]
 dev = [
   "OpenImageIO",
+  "PySide6-Essentials",
   "pytest-cov",
   "pytest",
   "ruff",
