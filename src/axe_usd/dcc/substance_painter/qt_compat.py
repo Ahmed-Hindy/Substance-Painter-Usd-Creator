@@ -3,6 +3,7 @@ Qt compatibility layer for Substance Painter.
 
 Supports PySide2 (SP < 10.1.0) and PySide6 (SP >= 10.1.0).
 """
+
 from __future__ import annotations
 
 from substance_painter.application import version_info

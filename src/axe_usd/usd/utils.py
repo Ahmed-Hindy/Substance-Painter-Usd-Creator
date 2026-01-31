@@ -8,7 +8,6 @@ from typing import List, Optional, Tuple
 from pxr import Usd
 
 
-
 def collect_prims_of_type(
     parent_prim: Usd.Prim,
     prim_type: type,
@@ -48,5 +47,3 @@ def collect_prims_of_type(
 
     all_prims_found = _recursive_search(parent_prim)
     return True, all_prims_found
-
-

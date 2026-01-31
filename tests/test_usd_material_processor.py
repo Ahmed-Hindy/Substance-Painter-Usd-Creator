@@ -20,7 +20,9 @@ def sp_sample_sources() -> dict[str, Path]:
     def _pick(pattern: str) -> Path:
         matches = sorted(textures_dir.glob(pattern))
         if not matches:
-            raise AssertionError(f"Missing texture match for {pattern} in {textures_dir}")
+            raise AssertionError(
+                f"Missing texture match for {pattern} in {textures_dir}"
+            )
         return matches[0]
 
     return {
@@ -59,7 +61,9 @@ def sp_texture_factory(sp_sample_sources, tmp_path):
     return _make
 
 
-def _material_dict_from_paths(paths: dict[str, Path]) -> list[dict[str, dict[str, str]]]:
+def _material_dict_from_paths(
+    paths: dict[str, Path],
+) -> list[dict[str, dict[str, str]]]:
     material_dict: dict[str, dict[str, str]] = {}
     for slot, path in paths.items():
         material_dict[slot] = {"mat_name": "MatA", "path": str(path)}
@@ -180,8 +184,7 @@ def test_renderer_specific_format_overrides(tmp_path, sp_texture_factory):
     )
     mtlx_shader = UsdShade.Shader(mtlx_prim)
     assert (
-        _asset_path_value(mtlx_shader.GetInput("file"))
-        == "textures/MatA_BaseColor.png"
+        _asset_path_value(mtlx_shader.GetInput("file")) == "textures/MatA_BaseColor.png"
     )
 
 
@@ -220,9 +223,7 @@ def test_mtlx_metalness_is_float(tmp_path, sp_texture_factory):
         "/Asset/mtl/MatA/MtlxNodeGraph/mtlx_mtlxstandard_surface1"
     )
     std_shader = UsdShade.Shader(std_prim)
-    assert (
-        std_shader.GetInput("metalness").GetTypeName() == Sdf.ValueTypeNames.Float
-    )
+    assert std_shader.GetInput("metalness").GetTypeName() == Sdf.ValueTypeNames.Float
 
 
 def test_openpbr_surface_id(tmp_path, sp_texture_factory):

@@ -46,12 +46,16 @@ plugin_dist = DIST_DIR / "axe_usd_plugin"
 shutil.copytree(
     PLUGIN_SRC,
     plugin_dist,
-    ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".ruff_cache", ".pytest_cache"),
+    ignore=shutil.ignore_patterns(
+        "__pycache__", "*.pyc", ".ruff_cache", ".pytest_cache"
+    ),
 )
 shutil.copytree(
     PACKAGE_SRC,
     plugin_dist / "axe_usd",
-    ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".ruff_cache", ".pytest_cache"),
+    ignore=shutil.ignore_patterns(
+        "__pycache__", "*.pyc", ".ruff_cache", ".pytest_cache"
+    ),
 )
 
 version = _read_project_version()

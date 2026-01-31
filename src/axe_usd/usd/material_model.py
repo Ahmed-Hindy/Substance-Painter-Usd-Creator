@@ -15,7 +15,9 @@ SLOT_ALIASES = {
 _LOGGER = logging.getLogger(__name__)
 
 
-def normalize_slot_name(slot: str, slot_aliases: Mapping[str, str] = SLOT_ALIASES) -> str:
+def normalize_slot_name(
+    slot: str, slot_aliases: Mapping[str, str] = SLOT_ALIASES
+) -> str:
     normalized = slot.strip().lower()
     return slot_aliases.get(normalized, normalized)
 
@@ -30,7 +32,9 @@ def normalize_material_dict(
     for slot, info in material_dict.items():
         normalized_slot = normalize_slot_name(slot, slot_aliases=slot_aliases)
         if normalized_slot in normalized and normalized_slot != slot:
-            active_logger.debug("Overriding texture slot '%s' with '%s'.", normalized_slot, slot)
+            active_logger.debug(
+                "Overriding texture slot '%s' with '%s'.", normalized_slot, slot
+            )
         normalized[normalized_slot] = info
     return normalized
 
@@ -61,7 +65,9 @@ class TextureFormatOverrides:
     overrides: Dict[str, str]
 
     @classmethod
-    def from_mapping(cls, texture_format_overrides: Optional[Mapping[str, str]]) -> "TextureFormatOverrides":
+    def from_mapping(
+        cls, texture_format_overrides: Optional[Mapping[str, str]]
+    ) -> "TextureFormatOverrides":
         if not texture_format_overrides:
             return cls({})
         normalized: Dict[str, str] = {}

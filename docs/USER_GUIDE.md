@@ -14,13 +14,6 @@ This plugin exports materials and optional geometry from Adobe Substance Painter
 
 If you previously installed `AxeFX_usd_plugin.py`, `sp_usd_creator/`, `axe_usd/`, or an older `axe_usd_plugin.py`, delete them before copying the new build to avoid duplicate plugins.
 
-## Installation (Developers)
-
-1. Build the plugin bundle:
-   - `python tools/build_plugin.py`
-2. Copy `dist/axe_usd_plugin/` to your Substance Painter plugins folder.
-3. Optional dev install on Windows:
-   - `powershell -File tools/install_plugin.ps1`
 
 ## Usage
 

@@ -29,7 +29,7 @@ from ...usd.pxr_writer import PxrUsdWriter
 from . import usd_scene_fixup
 from .qt_compat import QMessageBox
 from .ui import LOG_LEVELS, USDExporterView
-import substance_painter
+import substance_painter.application
 import substance_painter.event
 import substance_painter.export
 import substance_painter.ui
@@ -63,6 +63,7 @@ PREVIEW_EXPORT_PRESET = "AxeUSDPreview"
 plugin_widgets = []
 usd_exported_qdialog = None
 callbacks_registered = False
+
 
 class MeshExporter:
     """
@@ -204,9 +205,7 @@ def _build_preview_export_config(
         {"rootPath": name, "exportPreset": PREVIEW_EXPORT_PRESET}
         for name in texture_sets
     ]
-    size_log2 = USD_PREVIEW_RESOLUTION_LOG2.get(
-        resolution, USD_PREVIEW_JPEG_SIZE_LOG2
-    )
+    size_log2 = USD_PREVIEW_RESOLUTION_LOG2.get(resolution, USD_PREVIEW_JPEG_SIZE_LOG2)
     export_preset = {
         "name": PREVIEW_EXPORT_PRESET,
         "maps": [
@@ -230,7 +229,7 @@ def _build_preview_export_config(
                         "srcChannel": "B",
                         "srcMapType": "documentMap",
                         "srcMapName": "baseColor",
-                    }
+                    },
                 ],
                 "parameters": {
                     "fileFormat": USD_PREVIEW_JPEG_SUFFIX.lstrip("."),
@@ -261,9 +260,7 @@ def _export_usdpreview_textures(
     ensure_directory(textures_dir)
     preview_dir = textures_dir / PREVIEW_TEXTURE_DIRNAME
     ensure_directory(preview_dir)
-    export_config = _build_preview_export_config(
-        preview_dir, texture_sets, resolution
-    )
+    export_config = _build_preview_export_config(preview_dir, texture_sets, resolution)
     logger.debug("UsdPreview texture sets: %s", texture_sets)
     export_fn = getattr(substance_painter.export, "export_project_textures", None)
     if export_fn is None:
@@ -331,10 +328,7 @@ def _move_exported_textures(
 
 def _is_preview_export_context(context: "ExportContext") -> bool:
     texture_paths = [
-        Path(path)
-        for paths in context.textures.values()
-        for path in paths
-        if path
+        Path(path) for paths in context.textures.values() for path in paths if path
     ]
     if not texture_paths:
         return False
@@ -353,6 +347,7 @@ def _env_flag(name: str) -> bool:
     value = os.getenv(name, "")
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
+
 # Entry-point functions required by Substance Painter
 class ExportContext(Protocol):
     """Substance Painter export context interface."""
@@ -363,6 +358,13 @@ class ExportContext(Protocol):
 def start_plugin() -> None:
     """Create the export UI and register callbacks."""
     logger.info("Plugin starting.")
+
+    if substance_painter.application.version_info() < (8, 3, 0):
+        logger.error(
+            "Axe USD Exporter requires Substance Painter 8.3.0 or later. Plugin disabled."
+        )
+        return
+
     global usd_exported_qdialog
     usd_exported_qdialog = USDExporterView(logger=logger)
     substance_painter.ui.add_dock_widget(usd_exported_qdialog)
@@ -406,7 +408,9 @@ def on_post_export(context: ExportContext) -> None:
                 details={"texture_sets": empty_names},
             )
 
-        first_path = next((paths[0] for paths in context.textures.values() if paths), None)
+        first_path = next(
+            (paths[0] for paths in context.textures.values() if paths), None
+        )
         if not first_path:
             raise ValidationError("No exported texture files found.")
         export_dir = Path(first_path).parent
@@ -523,9 +527,7 @@ def close_plugin() -> None:
                 substance_painter.event.ExportTexturesEnded, on_post_export
             )
         except Exception as e:
-            logger.warning(
-                "close_plugin() failed to disconnect event handler: %s", e
-            )
+            logger.warning("close_plugin() failed to disconnect event handler: %s", e)
         callbacks_registered = False
     for widget in plugin_widgets:
         substance_painter.ui.delete_ui_element(widget)
