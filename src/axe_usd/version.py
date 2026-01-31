@@ -1,4 +1,5 @@
 """Version helpers for the Axe USD plugin."""
+
 from __future__ import annotations
 
 from importlib import metadata

@@ -421,9 +421,7 @@ def _bind_materials_in_variant(
         variant_set.AddVariant(MTL_VARIANT_DEFAULT)
     variant_set.SetVariantSelection(MTL_VARIANT_DEFAULT)
 
-    material_prims = _collect_material_prims(
-        mtl_stage, f"/{MTL_LIBRARY_ROOT}/mtl"
-    )
+    material_prims = _collect_material_prims(mtl_stage, f"/{MTL_LIBRARY_ROOT}/mtl")
     if not material_prims:
         logger.warning("No materials found to bind in %s", mtl_file)
         return
@@ -449,7 +447,9 @@ def _bind_materials_in_variant(
         from .naming import NamingConvention
 
         if not mesh_paths:
-            logger.warning("No meshes found for material binding under %s.", render_root)
+            logger.warning(
+                "No meshes found for material binding under %s.", render_root
+            )
             return
 
         naming = NamingConvention()

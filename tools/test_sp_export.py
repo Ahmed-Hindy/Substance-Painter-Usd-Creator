@@ -108,7 +108,9 @@ def _group_textures_by_material(
         if matches:
             material_name = max(matches, key=len)
         else:
-            material_name = _fallback_material_name(path.name, slot_from_path(path.name))
+            material_name = _fallback_material_name(
+                path.name, slot_from_path(path.name)
+            )
         grouped.setdefault(material_name, []).append(str(path))
     return grouped
 
@@ -233,7 +235,9 @@ def main() -> int:
     if not geo_path.exists():
         raise SystemExit(f"Geo file not found: {geo_path}")
 
-    out_root = Path(args.out) if args.out else Path(tempfile.mkdtemp(prefix="axe_usd_test_"))
+    out_root = (
+        Path(args.out) if args.out else Path(tempfile.mkdtemp(prefix="axe_usd_test_"))
+    )
     asset_name = args.asset_name
     target_root = args.root_prim or f"/{asset_name}"
     material_name = args.material_name

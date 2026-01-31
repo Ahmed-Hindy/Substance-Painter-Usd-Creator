@@ -1,7 +1,15 @@
-![Screenshot_1.png](Examples/images/Screenshot_1.png)
-
 # Substance Painter USD Export Plugin
+
+[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
+[![VFX Platform CY2024](https://img.shields.io/badge/VFX_Platform-CY2024-2b7a78.svg)](https://vfxplatform.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Code style: Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Documentation](https://img.shields.io/badge/docs-markdown-blue)](docs/USER_GUIDE.md)
+
 This plugin allows you to export materials and geometry from Adobe Substance Painter to USD (`.usda`) files, supporting multiple render engines (USD Preview, Arnold, MaterialX).
+Targets Substance Painter 8.3.0+ and the VFX Platform CY2024 spec.
+
+**[Full Documentation](docs/USER_GUIDE.md)**
 
 
 ## Features
@@ -42,8 +50,8 @@ This plugin allows you to export materials and geometry from Adobe Substance Pai
 
 ## Documentation
 
-- User guide: `docs/USER_GUIDE.md`
-- Developer guide: `docs/DEVELOPER_GUIDE.md`
+- [User Guide](docs/USER_GUIDE.md)
+- [Developer Guide](docs/DEVELOPER_GUIDE.md)
 
 
 ## Usage

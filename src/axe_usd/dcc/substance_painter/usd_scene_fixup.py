@@ -47,8 +47,10 @@ def _strip_material_binding_schema(stage: Usd.Stage) -> int:
         list_op = prim_spec.GetInfo("apiSchemas")
         if not list_op:
             continue
+
         def _filter(items: list[str]) -> list[str]:
             return [item for item in items if item != "MaterialBindingAPI"]
+
         explicit = _filter(list(list_op.explicitItems))
         prepended = _filter(list(list_op.prependedItems))
         appended = _filter(list(list_op.appendedItems))

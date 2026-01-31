@@ -74,6 +74,7 @@ class TestCreateAssetUsdFile:
         model_api = Usd.ModelAPI(root)
         assert model_api.GetKind() == Kind.Tokens.component
 
+
 class TestCreatePayloadUsdFile:
     """Tests for payload.usdc creation."""
 

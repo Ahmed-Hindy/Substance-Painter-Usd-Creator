@@ -1,6 +1,7 @@
 """
 Substance Painter entry point for the Axe USD plugin.
 """
+
 from pathlib import Path
 
 PLUGIN_DIR = Path(__file__).resolve().parent

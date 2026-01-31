@@ -40,7 +40,9 @@ def test_is_transmissive_material_matches_tokens():
 
 
 def test_texture_format_overrides_normalizes_keys():
-    overrides = TextureFormatOverrides.from_mapping({"Usd_Preview": "jpg", "ARNOLD": ".tif"})
+    overrides = TextureFormatOverrides.from_mapping(
+        {"Usd_Preview": "jpg", "ARNOLD": ".tif"}
+    )
 
     assert overrides.for_renderer("usd_preview") == "jpg"
     assert overrides.for_renderer("arnold") == ".tif"
