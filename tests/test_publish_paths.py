@@ -7,8 +7,8 @@ def test_build_publish_paths_from_directory():
     """Verify path building when given a directory."""
     paths = build_publish_paths(Path("publish"), "main.usda")
     assert paths.root_dir == Path("publish")
-    assert paths.layers_dir == Path("publish") / "layers"
-    assert paths.main_layer_path == Path("publish") / "main.usda"
+    assert paths.root_dir == Path("publish")
+    assert paths.geometry_path == Path("publish/geo.usdc")
 
 
 def test_build_publish_paths_from_file():

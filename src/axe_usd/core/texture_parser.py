@@ -1,6 +1,7 @@
 import logging
 from typing import Dict, List, Mapping, Sequence, Tuple, Union
 
+from .exceptions import TextureParsingError
 from .models import MaterialBundle
 from .texture_keys import slot_from_path
 
@@ -34,7 +35,19 @@ def parse_textures(textures_dict: TexturePathMap) -> List[MaterialBundle]:
 
     Returns:
         List[MaterialBundle]: Bundles with normalized texture slots.
+
+    Raises:
+        TextureParsingError: If textures_dict is None or not a mapping.
     """
+    if textures_dict is None:
+        raise TextureParsingError("Texture dictionary cannot be None")
+
+    if not isinstance(textures_dict, Mapping):
+        raise TextureParsingError(
+            "Invalid texture dictionary type",
+            details={"type": type(textures_dict).__name__},
+        )
+
     material_bundles: List[MaterialBundle] = []
 
     for key, paths in textures_dict.items():
@@ -49,8 +62,12 @@ def parse_textures(textures_dict: TexturePathMap) -> List[MaterialBundle]:
             textures[slot] = str(path)
 
         if textures:
-            material_bundles.append(MaterialBundle(name=material_name, textures=textures))
+            material_bundles.append(
+                MaterialBundle(name=material_name, textures=textures)
+            )
         else:
-            logger.info("Skipping material '%s' with no recognized textures.", material_name)
+            logger.info(
+                "Skipping material '%s' with no recognized textures.", material_name
+            )
 
     return material_bundles

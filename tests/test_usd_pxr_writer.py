@@ -1,7 +1,5 @@
 import pytest
 
-pxr = pytest.importorskip("pxr")
-
 from pathlib import Path
 
 from axe_usd.core.models import ExportSettings, MaterialBundle
@@ -11,7 +9,9 @@ from axe_usd.usd.pxr_writer import PxrUsdWriter
 
 def test_pxr_writer_exports_layers(tmp_path):
     """Ensure PxrUsdWriter writes the expected layer files."""
-    materials = [MaterialBundle(name="MatA", textures={"basecolor": "C:/tex/MatA_BaseColor.png"})]
+    materials = [
+        MaterialBundle(name="MatA", textures={"basecolor": "C:/tex/MatA_BaseColor.png"})
+    ]
     settings = ExportSettings(
         usdpreview=True,
         arnold=False,
@@ -25,6 +25,8 @@ def test_pxr_writer_exports_layers(tmp_path):
 
     PxrUsdWriter().export(materials, settings, None, paths)
 
-    assert paths.main_layer_path.exists()
-    assert paths.layer_mats_path.exists()
-    assert paths.layer_assign_path.exists()
+    # Convert paths to component structure checks
+    asset_dir = tmp_path / "Asset"
+    assert (asset_dir / "Asset.usd").exists()
+    assert (asset_dir / "mtl.usdc").exists()
+    assert (asset_dir / "payload.usdc").exists()

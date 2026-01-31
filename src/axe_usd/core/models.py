@@ -49,14 +49,8 @@ class PublishPaths:
 
     Attributes:
         root_dir: Root publish directory.
-        layers_dir: Directory for layer files.
-        main_layer_path: Full path to the main layer.
-        layer_mats_path: Path to the material layer.
-        layer_assign_path: Path to the assignment layer.
+        geometry_path: Path to the geometry layer file (geo.usdc).
     """
 
     root_dir: Path
-    layers_dir: Path
-    main_layer_path: Path
-    layer_mats_path: Path
-    layer_assign_path: Path
+    geometry_path: Path

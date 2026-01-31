@@ -2,43 +2,33 @@
 
 Copyright Ahmed Hindy. Please mention the author if you found any part of this code useful.
 """
-import logging
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Mapping, Optional, Protocol, Sequence, Tuple
 
-from ...version import get_version
-from .qt_compat import (
-    QCheckBox,
-    QDialog,
-    QFileDialog,
-    QFormLayout,
-    QFrame,
-    QGroupBox,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QMessageBox,
-    QMenuBar,
-    QPushButton,
-    QScrollArea,
-    QSizePolicy,
-    QVBoxLayout,
-    QWidget,
-    QDesktopServices,
-    QIcon,
-    QPalette,
-    Qt,
-    QUrl,
-)
+import gc
+import logging
+import os
+import shutil
+import sys
+from pathlib import Path
+from typing import Dict, Mapping, Optional, Protocol, Sequence, Tuple
 
 from ...core.exporter import export_publish
+from ...core.exceptions import (
+    AxeUSDError,
+    ConfigurationError,
+    GeometryExportError,
+    MaterialExportError,
+    USDStageError,
+    ValidationError,
+)
 from ...core.fs_utils import ensure_directory
 from ...core.models import ExportSettings
 from ...core.publish_paths import build_publish_paths
 from ...core.texture_parser import parse_textures
 from ...usd.pxr_writer import PxrUsdWriter
 
+from . import usd_scene_fixup
+from .qt_compat import QMessageBox
+from .ui import LOG_LEVELS, USDExporterView
 import substance_painter
 import substance_painter.event
 import substance_painter.export
@@ -48,63 +38,48 @@ import substance_painter.ui
 # Configure logging
 logger = logging.getLogger(__name__)
 if not logger.handlers:
-    logger.addHandler(logging.NullHandler())
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setLevel(logging.DEBUG)
+    stream_handler.setFormatter(
+        logging.Formatter("[AxeUSD] %(levelname)s: %(message)s")
+    )
+    logger.addHandler(stream_handler)
+    logger.setLevel(logging.DEBUG)
+    logger.propagate = False
 
-DEFAULT_DIALOGUE_DICT = {
-    "title": "USD Exporter",
-    "publish_location": "<export_folder>",
-    "primitive_path": "/Asset",
-    "enable_usdpreview": True,
-    "enable_arnold": False,
-    "enable_materialx": True,
-    "enable_openpbr": False,
-    "enable_save_geometry": True,
-}
+DEFAULT_PRIMITIVE_PATH = "/Asset"
+USD_PREVIEW_JPEG_SIZE_LOG2 = 7  # 128px
+USD_PREVIEW_JPEG_SUFFIX = ".jpg"
+PREVIEW_TEXTURE_DIRNAME = "previewTextures"
+PREVIEW_EXPORT_PRESET = "AxeUSDPreview"
 
 # Hold references to UI widgets
 plugin_widgets = []
 usd_exported_qdialog = None
 callbacks_registered = False
-last_export_dir: Optional[Path] = None
-
-
-@dataclass
-class USDSettings:
-    """
-    USD export options container.
-
-    Attributes:
-        usdpreview (bool): Include UsdPreviewSurface shader.
-        arnold (bool): Include Arnold standard_surface shader.
-        materialx (bool): Include MaterialX standard_surface shader.
-        openpbr (bool): Include MaterialX OpenPBR shader.
-        primitive_path (str): USD prim path for material_dict_list.
-        publish_directory (str): Directory for output USD layers.
-        save_geometry (bool): Whether to export mesh geometry.
-    """
-
-    usdpreview: bool
-    arnold: bool
-    materialx: bool
-    primitive_path: str
-    publish_directory: str
-    save_geometry: bool
-    openpbr: bool
-
 
 class MeshExporter:
     """
     Exports mesh geometry to USD if requested.
     """
 
-    def __init__(self, settings: ExportSettings):
+    def __init__(self, settings: ExportSettings, skip_postprocess: bool = False):
         """Initialize the mesh exporter.
 
         Args:
             settings: Export settings for determining output paths.
+            skip_postprocess: Skip fixup/conversion and leave raw export untouched.
         """
-        publish_paths = build_publish_paths(settings.publish_directory, settings.main_layer_name)
-        self.mesh_path = publish_paths.layers_dir / "mesh.usd"
+        # Extract asset name from settings (e.g. primitive_path="/Asset" -> "Asset")
+        asset_name = settings.primitive_path.strip("/").split("/")[-1]
+
+        publish_paths = build_publish_paths(
+            settings.publish_directory, settings.main_layer_name, asset_name
+        )
+        self.mesh_path = publish_paths.geometry_path
+        self.root_prim_path = DEFAULT_PRIMITIVE_PATH
+        self.skip_postprocess = skip_postprocess
+        self.last_error: str = ""
 
     def export_mesh(self) -> Optional[Path]:
         """Call Substance Painter's USD mesh exporter.
@@ -114,276 +89,258 @@ class MeshExporter:
         """
         ensure_directory(self.mesh_path.parent)
         logger.info("Exporting mesh to %s", self.mesh_path)
+        logger.debug("Mesh export target suffix: %s", self.mesh_path.suffix)
+        export_path = self.mesh_path
+        convert_to_usdc = False
+        if self.mesh_path.suffix.lower() == ".usdc":
+            convert_to_usdc = True
+            export_path = self.mesh_path.with_suffix(".usd")
+            logger.info(
+                "Mesh export target is .usdc; exporting to %s then converting.",
+                export_path,
+            )
 
         # Choose an export option to use
         export_option = substance_painter.export.MeshExportOption.BaseMesh
         if not substance_painter.export.scene_is_triangulated():
             export_option = substance_painter.export.MeshExportOption.TriangulatedMesh
         if substance_painter.export.scene_has_tessellation():
-            export_option = substance_painter.export.MeshExportOption.TessellationNormalsBaseMesh
+            export_option = (
+                substance_painter.export.MeshExportOption.TessellationNormalsBaseMesh
+            )
 
         try:
-            export_result = substance_painter.export.export_mesh(str(self.mesh_path), export_option)
+            export_result = substance_painter.export.export_mesh(
+                str(export_path), export_option
+            )
 
             # In case of error, display a human readable message:
             if export_result.status != substance_painter.export.ExportStatus.Success:
-                print(export_result.message)
-                return None
+                raise GeometryExportError(
+                    "Mesh export failed.",
+                    details={
+                        "status": str(export_result.status),
+                        "message": str(export_result.message),
+                    },
+                )
+            logger.debug(
+                "Mesh export status=%s message=%s",
+                export_result.status,
+                export_result.message,
+            )
+            if not export_path.exists():
+                raise GeometryExportError(
+                    "Mesh export reported success but file is missing.",
+                    details={"path": str(export_path)},
+                )
+            if self.skip_postprocess:
+                logger.info("Skipping mesh fixup/conversion for testing.")
+                return export_path
+            if convert_to_usdc:
+                from pxr import Usd
+
+                stage = Usd.Stage.Open(str(export_path))
+                if not stage:
+                    raise USDStageError(
+                        "Failed to open temporary mesh for conversion.",
+                        details={"path": str(export_path)},
+                    )
+                usd_scene_fixup.fix_sp_mesh_stage(stage, self.root_prim_path)
+                stage.GetRootLayer().Export(str(self.mesh_path))
+                if not self.mesh_path.exists():
+                    raise GeometryExportError(
+                        "Mesh conversion reported success but file is missing.",
+                        details={"path": str(self.mesh_path)},
+                    )
+                stage = None
+                gc.collect()
+                if export_path.exists():
+                    try:
+                        export_path.unlink()
+                    except Exception as cleanup_exc:
+                        logger.warning(
+                            "Failed to remove temporary mesh file %s: %s",
+                            export_path,
+                            cleanup_exc,
+                        )
             return self.mesh_path
+        except AxeUSDError as exc:
+            self.last_error = exc.message
+            if exc.details:
+                logger.warning("Mesh export failed: %s (%s)", exc.message, exc.details)
+            else:
+                logger.warning("Mesh export failed: %s", exc.message)
+            return None
         except Exception as exc:
+            self.last_error = str(exc)
             logger.error("Mesh export failed: %s", exc)
             return None
 
 
-class USDExporterView(QDialog):
-    """
-    UI widget for USD export settings.
-    """
-
-    def __init__(self, parent=None):
-        """Build the export settings UI.
-
-        Args:
-            parent: Optional parent widget.
-        """
-        super().__init__(parent)
-        self.setWindowTitle("USD Exporter")
-        self.setWindowIcon(QIcon())
-        self.setMinimumSize(520, 240)
-        self._plugin_version = get_version()
-
-        root_layout = QVBoxLayout()
-        root_layout.setContentsMargins(10, 10, 10, 10)
-        root_layout.setSpacing(6)
-        self.setLayout(root_layout)
-
-        menu_bar = QMenuBar()
-        menu_bar.setNativeMenuBar(False)
-        help_menu = menu_bar.addMenu("Help")
-        help_menu.addAction("Help", self._show_help)
-        help_menu.addAction("About", self._show_about)
-        root_layout.setMenuBar(menu_bar)
-
-        title = QLabel("Axe USD Exporter")
-        title_font = title.font()
-        title_font.setBold(True)
-        title_font.setPointSize(title_font.pointSize() + 1)
-        title.setFont(title_font)
-        title.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        root_layout.addWidget(title)
-
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setFrameShape(QFrame.NoFrame)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        root_layout.addWidget(scroll_area, 1)
-
-        content = QWidget()
-        content_layout = QVBoxLayout()
-        content_layout.setContentsMargins(0, 0, 0, 0)
-        content_layout.setSpacing(8)
-        content_layout.setAlignment(Qt.AlignTop)
-        content.setLayout(content_layout)
-        scroll_area.setWidget(content)
-
-        engine_box = QGroupBox("Render Engines")
-        engine_box.setFlat(True)
-        engine_layout = QVBoxLayout()
-        engine_layout.setContentsMargins(8, 6, 8, 8)
-        engine_layout.setSpacing(4)
-        self.usdpreview = QCheckBox("USD Preview")
-        self.usdpreview.setChecked(DEFAULT_DIALOGUE_DICT["enable_usdpreview"])
-        self.arnold = QCheckBox("Arnold")
-        self.arnold.setChecked(DEFAULT_DIALOGUE_DICT["enable_arnold"])
-        self.materialx = QCheckBox("MaterialX (Standard Surface)")
-        self.materialx.setChecked(DEFAULT_DIALOGUE_DICT["enable_materialx"])
-        self.openpbr = QCheckBox("OpenPBR (MaterialX)")
-        self.openpbr.setChecked(DEFAULT_DIALOGUE_DICT["enable_openpbr"])
-        engine_layout.addWidget(self.usdpreview)
-        engine_layout.addWidget(self.arnold)
-        engine_layout.addWidget(self.materialx)
-        engine_layout.addWidget(self.openpbr)
-        engine_box.setLayout(engine_layout)
-        engine_box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
-        content_layout.addWidget(engine_box)
-
-        paths_box = QGroupBox("Paths")
-        paths_box.setFlat(True)
-        paths_layout = QFormLayout()
-        paths_layout.setContentsMargins(8, 6, 8, 8)
-        paths_layout.setSpacing(4)
-        paths_layout.setLabelAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        paths_layout.setFormAlignment(Qt.AlignTop)
-        paths_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
-
-        self.pub = QLineEdit()
-        self.pub.setMinimumWidth(320)
-        self.pub.setPlaceholderText(DEFAULT_DIALOGUE_DICT["publish_location"])
-        self.pub.setToolTip("Use <export_folder> token to insert texture folder path")
-        self.pub.setClearButtonEnabled(True)
-        pub_row = QHBoxLayout()
-        pub_row.setContentsMargins(0, 0, 0, 0)
-        pub_row.setSpacing(6)
-        pub_row.addWidget(self.pub, 1)
-        self.pub_browse = QPushButton("Browse...")
-        self.pub_browse.setToolTip("Select a publish directory on disk")
-        self.pub_browse.clicked.connect(self._browse_publish_directory)
-        self.pub_browse.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
-        pub_row.addWidget(self.pub_browse, 0)
-        self.pub_open = QPushButton("Open Folder")
-        self.pub_open.setToolTip("Open the publish folder in your file browser")
-        self.pub_open.clicked.connect(self._open_publish_directory)
-        self.pub_open.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
-        pub_row.addWidget(self.pub_open, 0)
-        pub_row_widget = QWidget()
-        pub_row_widget.setLayout(pub_row)
-        paths_layout.addRow("Publish Directory", pub_row_widget)
-
-        pub_hint = self._make_hint_label("Tip: <export_folder> uses the texture export folder.")
-        paths_layout.addRow("", pub_hint)
-
-        self.prim = QLineEdit()
-        self.prim.setMinimumWidth(320)
-        self.prim.setPlaceholderText(DEFAULT_DIALOGUE_DICT["primitive_path"])
-        self.prim.setToolTip("Root prim path for the asset; materials go under <root>/material")
-        self.prim.setClearButtonEnabled(True)
-        self.prim.editingFinished.connect(self._validate_prim_path)
-        paths_layout.addRow("Primitive Path", self.prim)
-
-        prim_hint = self._make_hint_label("Example: /Asset or /Scene/Asset")
-        paths_layout.addRow("", prim_hint)
-
-        paths_box.setLayout(paths_layout)
-        paths_box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-        content_layout.addWidget(paths_box)
-
-        options_box = QGroupBox("Export Options")
-        options_box.setFlat(True)
-        options_layout = QVBoxLayout()
-        options_layout.setContentsMargins(8, 6, 8, 8)
-        options_layout.setSpacing(4)
-        self.geom = QCheckBox("Include Geometry in USD")
-        self.geom.setToolTip("Exports mesh geometry to USD if supported")
-        self.geom.setChecked(DEFAULT_DIALOGUE_DICT["enable_save_geometry"])
-        options_layout.addWidget(self.geom)
-        options_box.setLayout(options_layout)
-        options_box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
-        content_layout.addWidget(options_box)
-
-    def _validate_prim_path(self):
-        """Validate the primitive path input field."""
-        text = self.prim.text()
-        if not text.startswith("/"):
-            QMessageBox.warning(self, "Invalid Path", "Primitive path must start with '/'")
-            self.prim.setStyleSheet("border:1px solid red")
+def _collect_texture_set_names(
+    textures: Mapping[Tuple[str, str], Sequence[str]],
+) -> Sequence[str]:
+    names: list[str] = []
+    for key in textures.keys():
+        if isinstance(key, (tuple, list)) and key:
+            name = str(key[0])
         else:
-            self.prim.setStyleSheet("")
+            name = str(key)
+        if name and name not in names:
+            names.append(name)
+    return names
 
-    def _make_hint_label(self, text: str) -> QLabel:
-        """Create a hint label styled for the dialog.
 
-        Args:
-            text: Hint text to display.
+def _build_preview_export_config(
+    preview_dir: Path, texture_sets: Sequence[str]
+) -> Dict[str, object]:
+    export_list = [
+        {"rootPath": name, "exportPreset": PREVIEW_EXPORT_PRESET}
+        for name in texture_sets
+    ]
+    export_preset = {
+        "name": PREVIEW_EXPORT_PRESET,
+        "maps": [
+            {
+                "fileName": "$textureSet_BaseColor",
+                "channels": [
+                    {
+                        "destChannel": "R",
+                        "srcChannel": "R",
+                        "srcMapType": "documentMap",
+                        "srcMapName": "baseColor",
+                    },
+                    {
+                        "destChannel": "G",
+                        "srcChannel": "G",
+                        "srcMapType": "documentMap",
+                        "srcMapName": "baseColor",
+                    },
+                    {
+                        "destChannel": "B",
+                        "srcChannel": "B",
+                        "srcMapType": "documentMap",
+                        "srcMapName": "baseColor",
+                    }
+                ],
+                "parameters": {
+                    "fileFormat": USD_PREVIEW_JPEG_SUFFIX.lstrip("."),
+                    "bitDepth": "8",
+                    "dithering": False,
+                    "sizeLog2": USD_PREVIEW_JPEG_SIZE_LOG2,
+                    "paddingAlgorithm": "diffusion",
+                    "dilationDistance": 16,
+                },
+            }
+        ],
+    }
+    return {
+        "exportPath": str(preview_dir),
+        "defaultExportPreset": PREVIEW_EXPORT_PRESET,
+        "exportPresets": [export_preset],
+        "exportList": export_list,
+        "exportShaderParams": False,
+    }
 
-        Returns:
-            QLabel: Configured hint label widget.
-        """
-        hint = QLabel(text)
-        hint.setWordWrap(True)
-        hint_font = hint.font()
-        hint_font.setPointSize(max(8, hint_font.pointSize() - 1))
-        hint.setFont(hint_font)
-        pal = hint.palette()
-        placeholder_role = getattr(QPalette, "PlaceholderText", None)
-        if placeholder_role is not None:
-            hint_color = pal.color(placeholder_role)
-        else:
-            hint_color = pal.color(QPalette.Disabled, QPalette.WindowText)
-        if hint_color.isValid():
-            pal.setColor(QPalette.WindowText, hint_color)
-        hint.setPalette(pal)
-        hint.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
-        return hint
 
-    def _show_help(self) -> None:
-        """Show a short help dialog."""
-        message = (
-            "Export textures first, then the plugin writes USD next to the export folder.\n\n"
-            "Use <export_folder> to auto-insert the current texture export path."
+def _export_usdpreview_textures(
+    textures_dir: Path, texture_sets: Sequence[str]
+) -> None:
+    if not texture_sets:
+        raise ValidationError("UsdPreview export failed: no texture sets found.")
+
+    ensure_directory(textures_dir)
+    preview_dir = textures_dir / PREVIEW_TEXTURE_DIRNAME
+    ensure_directory(preview_dir)
+    export_config = _build_preview_export_config(preview_dir, texture_sets)
+    logger.debug("UsdPreview texture sets: %s", texture_sets)
+    export_fn = getattr(substance_painter.export, "export_project_textures", None)
+    if export_fn is None:
+        raise ConfigurationError(
+            "UsdPreview export failed: export_project_textures not available."
         )
-        QMessageBox.information(self, "Axe USD Exporter Help", message)
 
-    def _show_about(self) -> None:
-        """Show an about dialog with version details."""
-        message = (
-            f"Axe USD Exporter\n"
-            f"Version {self._plugin_version}\n\n"
-            "Exports Substance Painter textures to USD with supported render engines."
-        )
-        QMessageBox.information(self, "About Axe USD Exporter", message)
+    logger.debug("UsdPreview export config: %s", export_config)
+    try:
+        result = export_fn(export_config)
+    except Exception as exc:
+        raise MaterialExportError(
+            "UsdPreview export failed.",
+            details={"error": str(exc)},
+        ) from exc
 
-    def _browse_publish_directory(self) -> None:
-        """Open a directory picker for the publish path."""
-        current = self.pub.text().strip()
-        if not current or current == DEFAULT_DIALOGUE_DICT["publish_location"]:
-            current = str(Path.home())
-        selected = QFileDialog.getExistingDirectory(
-            self,
-            "Select Publish Directory",
-            current,
-        )
-        if selected:
-            self.pub.setText(selected)
-
-    def _resolve_publish_directory(self) -> Optional[Path]:
-        publish_dir = self.pub.text().strip() or DEFAULT_DIALOGUE_DICT["publish_location"]
-        if "<export_folder>" in publish_dir:
-            if last_export_dir is None:
-                QMessageBox.warning(
-                    self,
-                    "Publish Folder",
-                    "Export once to resolve <export_folder> before opening the folder.",
-                )
-                return None
-            publish_dir = publish_dir.replace("<export_folder>", str(last_export_dir))
-        return Path(publish_dir)
-
-    def _open_publish_directory(self) -> None:
-        """Open the resolved publish directory in the file browser."""
-        publish_dir = self._resolve_publish_directory()
-        if not publish_dir:
-            return
-        if not publish_dir.exists():
-            QMessageBox.information(
-                self,
-                "Publish Folder",
-                f"Folder does not exist yet:\n{publish_dir}",
+    status = getattr(result, "status", None)
+    message = getattr(result, "message", "")
+    export_status = getattr(substance_painter.export, "ExportStatus", None)
+    if export_status and hasattr(export_status, "Success") and status is not None:
+        if status != export_status.Success:
+            raise MaterialExportError(
+                "UsdPreview export failed.",
+                details={"status": str(status), "message": str(message)},
             )
-            return
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(publish_dir)))
-
-    def get_settings(self) -> USDSettings:
-        """
-        Read UI state into USDSettings.
-
-        Returns:
-            USDSettings: Settings collected from the dialog.
-        """
-        # Use default publish location if user leaves the field blank
-        publish_dir = self.pub.text().strip() or DEFAULT_DIALOGUE_DICT["publish_location"]
-        primitive_path = self.prim.text().strip() or DEFAULT_DIALOGUE_DICT["primitive_path"]
-
-        return USDSettings(
-            self.usdpreview.isChecked(),
-            self.arnold.isChecked(),
-            self.materialx.isChecked(),
-            primitive_path,
-            publish_dir,
-            self.geom.isChecked(),
-            self.openpbr.isChecked(),
+    elif result is False:
+        raise MaterialExportError(
+            "UsdPreview export failed.",
+            details={"result": str(result)},
         )
 
+
+def _move_exported_textures(
+    textures: Mapping[Tuple[str, str], Sequence[str]], textures_dir: Path
+) -> Mapping[Tuple[str, str], Sequence[str]]:
+    ensure_directory(textures_dir)
+    updated: dict[Tuple[str, str], list[str]] = {}
+    for key, paths in textures.items():
+        new_paths: list[str] = []
+        for path in paths:
+            if not path:
+                continue
+            src = Path(path)
+            if not src.exists():
+                raise ValidationError(
+                    "Exported texture file missing.",
+                    details={"path": str(src)},
+                )
+            if src.parent == textures_dir:
+                new_paths.append(str(src))
+                continue
+            dest = textures_dir / src.name
+            if dest.exists():
+                if dest.stat().st_mtime < src.stat().st_mtime:
+                    dest.unlink()
+                    shutil.move(str(src), str(dest))
+                else:
+                    src.unlink()
+            else:
+                shutil.move(str(src), str(dest))
+            new_paths.append(str(dest))
+        updated[key] = new_paths
+    return updated
+
+
+def _is_preview_export_context(context: "ExportContext") -> bool:
+    texture_paths = [
+        Path(path)
+        for paths in context.textures.values()
+        for path in paths
+        if path
+    ]
+    if not texture_paths:
+        return False
+    preview_token = PREVIEW_TEXTURE_DIRNAME.lower()
+    for path in texture_paths:
+        try:
+            parts = path.parts
+        except Exception:
+            return False
+        if not any(part.lower() == preview_token for part in parts):
+            return False
+    return True
+
+
+def _env_flag(name: str) -> bool:
+    value = os.getenv(name, "")
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 # Entry-point functions required by Substance Painter
 class ExportContext(Protocol):
@@ -394,9 +351,9 @@ class ExportContext(Protocol):
 
 def start_plugin() -> None:
     """Create the export UI and register callbacks."""
-    print("Plugin Starting...")
+    logger.info("Plugin starting.")
     global usd_exported_qdialog
-    usd_exported_qdialog = USDExporterView()
+    usd_exported_qdialog = USDExporterView(logger=logger)
     substance_painter.ui.add_dock_widget(usd_exported_qdialog)
     plugin_widgets.append(usd_exported_qdialog)
     register_callbacks()
@@ -404,7 +361,7 @@ def start_plugin() -> None:
 
 def register_callbacks() -> None:
     """Register the post-export callback."""
-    print("Registered callbacks")
+    logger.info("Registered callbacks.")
     global callbacks_registered
     if callbacks_registered:
         return
@@ -420,96 +377,132 @@ def on_post_export(context: ExportContext) -> None:
     Args:
         context: Substance Painter export context.
     """
-    print("ExportTexturesEnded emitted!!!")
-    if usd_exported_qdialog is None:
-        logger.warning("USD Export UI is not available; skipping export.")
+    logger.info("ExportTexturesEnded emitted.")
+    if _is_preview_export_context(context):
+        logger.info("Preview texture export detected; skipping USD publish.")
         return
-    if not context.textures:
-        logger.warning("No textures exported; skipping USD publish.")
-        QMessageBox.information(
-            usd_exported_qdialog,
-            "USD Exporter",
-            "No textures were exported. USD publish skipped.",
-        )
-        return
+    try:
+        if usd_exported_qdialog is None:
+            raise ConfigurationError("USD Export UI is not available.")
+        if not context.textures:
+            raise ValidationError("No textures were exported.")
 
-    empty_sets = [key for key, paths in context.textures.items() if not paths]
-    if empty_sets:
-        for key in empty_sets:
-            logger.warning("Texture set '%s' exported no files; skipping.", key)
-        QMessageBox.warning(
-            usd_exported_qdialog,
-            "USD Exporter",
-            "Some texture sets exported no files and were skipped.",
+        empty_sets = [key for key, paths in context.textures.items() if not paths]
+        if empty_sets:
+            empty_names = _collect_texture_set_names({key: [] for key in empty_sets})
+            raise ValidationError(
+                "Texture set exported no files.",
+                details={"texture_sets": empty_names},
+            )
+
+        first_path = next((paths[0] for paths in context.textures.values() if paths), None)
+        if not first_path:
+            raise ValidationError("No exported texture files found.")
+        export_dir = Path(first_path).parent
+
+        raw = usd_exported_qdialog.get_settings()
+        log_level = LOG_LEVELS.get(raw.log_level)
+        if log_level is not None:
+            logger.setLevel(log_level)
+        primitive_path = DEFAULT_PRIMITIVE_PATH
+        publish_dir = str(export_dir)
+
+        if _env_flag("AXEUSD_STOP_AFTER_MESH_EXPORT"):
+            if not raw.save_geometry:
+                raise ValidationError(
+                    "Save Geometry must be enabled to stop after mesh export."
+                )
+            settings = ExportSettings(
+                usdpreview=raw.usdpreview,
+                arnold=raw.arnold,
+                materialx=raw.materialx,
+                openpbr=raw.openpbr,
+                primitive_path=primitive_path,
+                publish_directory=Path(publish_dir),
+                save_geometry=True,
+                texture_format_overrides=raw.texture_format_overrides or None,
+            )
+            mesh_exporter = MeshExporter(settings, skip_postprocess=True)
+            geo_file = mesh_exporter.export_mesh()
+            if geo_file is None:
+                raise GeometryExportError(
+                    "Mesh export failed.",
+                    details={"message": mesh_exporter.last_error},
+                )
+            if usd_exported_qdialog is not None:
+                QMessageBox.information(
+                    usd_exported_qdialog,
+                    "USD Exporter",
+                    f"Mesh export complete.\n\nMesh file:\n{geo_file}",
+                )
+            return
+        asset_name = primitive_path.strip("/").split("/")[-1]
+        textures_dir = export_dir / asset_name / "textures"
+        textures = _move_exported_textures(context.textures, textures_dir)
+
+        materials = parse_textures(textures)
+        if not materials:
+            raise ValidationError("No recognized textures were found.")
+
+        texture_overrides = dict(raw.texture_format_overrides or {})
+        if raw.usdpreview:
+            texture_sets = _collect_texture_set_names(textures)
+            _export_usdpreview_textures(textures_dir, texture_sets)
+
+        settings = ExportSettings(
+            usdpreview=raw.usdpreview,
+            arnold=raw.arnold,
+            materialx=raw.materialx,
+            openpbr=raw.openpbr,
+            primitive_path=primitive_path,
+            publish_directory=Path(publish_dir),
+            save_geometry=raw.save_geometry,
+            texture_format_overrides=texture_overrides or None,
         )
 
-    first_path = next((paths[0] for paths in context.textures.values() if paths), None)
-    if not first_path:
-        logger.warning("No exported texture files found; skipping USD publish.")
-        QMessageBox.information(
-            usd_exported_qdialog,
-            "USD Exporter",
-            "No texture files were exported. USD publish skipped.",
-        )
-        return
-    export_dir = Path(first_path).parent
-    global last_export_dir
-    last_export_dir = export_dir
+        geo_file = None
+        if settings.save_geometry:
+            mesh_exporter = MeshExporter(settings)
+            geo_file = mesh_exporter.export_mesh()
+            if geo_file is None:
+                raise GeometryExportError(
+                    "Mesh export failed.",
+                    details={"message": mesh_exporter.last_error},
+                )
 
-    raw = usd_exported_qdialog.get_settings()
-    primitive_path = raw.primitive_path
-    if not primitive_path.startswith("/"):
-        logger.warning("Primitive path must start with '/': %s", primitive_path)
-        QMessageBox.warning(
-            usd_exported_qdialog,
-            "Invalid Primitive Path",
-            "Primitive path must start with '/'.",
-        )
-        return
-    publish_dir = raw.publish_directory.replace("<export_folder>", str(export_dir))
-    settings = ExportSettings(
-        usdpreview=raw.usdpreview,
-        arnold=raw.arnold,
-        materialx=raw.materialx,
-        openpbr=raw.openpbr,
-        primitive_path=primitive_path,
-        publish_directory=Path(publish_dir),
-        save_geometry=raw.save_geometry,
-    )
-    materials = parse_textures(context.textures)
-    if not materials:
-        logger.warning("No recognized textures found; skipping USD publish.")
-        QMessageBox.information(
-            usd_exported_qdialog,
-            "USD Exporter",
-            "No recognized textures were found. USD publish skipped.",
-        )
-        return
-
-    geo_file = None
-    if settings.save_geometry:
-        geo_file = MeshExporter(settings).export_mesh()
-        if geo_file is None:
-            logger.warning("Mesh export failed; exporting materials only.")
-            QMessageBox.warning(
+        export_publish(materials, settings, geo_file, PxrUsdWriter())
+    except AxeUSDError as exc:
+        logger.error("USD export failed: %s", exc.message)
+        if exc.details:
+            logger.error("USD export details: %s", exc.details)
+        if usd_exported_qdialog is not None:
+            detail = f"\n\nDetails: {exc.details}" if exc.details else ""
+            QMessageBox.critical(
                 usd_exported_qdialog,
                 "USD Exporter",
-                "Mesh export failed. Exporting materials only.",
+                f"USD export failed:\n{exc.message}{detail}",
             )
-    try:
-        export_publish(materials, settings, geo_file, PxrUsdWriter())
+        return
     except Exception as exc:
         logger.exception("USD export failed: %s", exc)
-        QMessageBox.critical(
-            usd_exported_qdialog,
-            "USD Exporter",
-            f"USD export failed:\n{exc}",
-        )
+        if usd_exported_qdialog is not None:
+            QMessageBox.critical(
+                usd_exported_qdialog,
+                "USD Exporter",
+                f"USD export failed:\n{exc}\n\nCheck the logs for more details.",
+            )
+        return
+
+    QMessageBox.information(
+        usd_exported_qdialog,
+        "USD Exporter",
+        f"USD export complete.\n\nPublish folder:\n{settings.publish_directory}",
+    )
 
 
 def close_plugin() -> None:
     """Remove all widgets that have been added to the UI."""
-    print("Closing plugin")
+    logger.info("Closing plugin.")
     global callbacks_registered, usd_exported_qdialog
     if callbacks_registered:
         try:
@@ -517,8 +510,9 @@ def close_plugin() -> None:
                 substance_painter.event.ExportTexturesEnded, on_post_export
             )
         except Exception as e:
-            print(f"WARNING: close_plugin() Failed to disconnect event handler: {e}")
-            pass
+            logger.warning(
+                "close_plugin() failed to disconnect event handler: %s", e
+            )
         callbacks_registered = False
     for widget in plugin_widgets:
         substance_painter.ui.delete_ui_element(widget)
