@@ -52,6 +52,14 @@ The Substance Painter plugins folder should contain:
 - Lint:
   - `uv run ruff check .`
 
+## UI Preview (No Substance Painter Required)
+
+- Install dev deps:
+  - `uv sync`
+- Run the standalone UI preview:
+  - `uv run sp-usd-preview-ui`
+  - Or: `python tools/preview_ui.py`
+
 ## Export Flow (High Level)
 
 1. Substance Painter triggers `on_post_export`.

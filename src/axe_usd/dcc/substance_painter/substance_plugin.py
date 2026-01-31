@@ -50,6 +50,12 @@ if not logger.handlers:
 DEFAULT_PRIMITIVE_PATH = "/Asset"
 USD_PREVIEW_JPEG_SIZE_LOG2 = 7  # 128px
 USD_PREVIEW_JPEG_SUFFIX = ".jpg"
+USD_PREVIEW_RESOLUTION_LOG2 = {
+    128: 7,
+    256: 8,
+    512: 9,
+    1024: 10,
+}
 PREVIEW_TEXTURE_DIRNAME = "previewTextures"
 PREVIEW_EXPORT_PRESET = "AxeUSDPreview"
 
@@ -192,12 +198,15 @@ def _collect_texture_set_names(
 
 
 def _build_preview_export_config(
-    preview_dir: Path, texture_sets: Sequence[str]
+    preview_dir: Path, texture_sets: Sequence[str], resolution: int
 ) -> Dict[str, object]:
     export_list = [
         {"rootPath": name, "exportPreset": PREVIEW_EXPORT_PRESET}
         for name in texture_sets
     ]
+    size_log2 = USD_PREVIEW_RESOLUTION_LOG2.get(
+        resolution, USD_PREVIEW_JPEG_SIZE_LOG2
+    )
     export_preset = {
         "name": PREVIEW_EXPORT_PRESET,
         "maps": [
@@ -227,7 +236,7 @@ def _build_preview_export_config(
                     "fileFormat": USD_PREVIEW_JPEG_SUFFIX.lstrip("."),
                     "bitDepth": "8",
                     "dithering": False,
-                    "sizeLog2": USD_PREVIEW_JPEG_SIZE_LOG2,
+                    "sizeLog2": size_log2,
                     "paddingAlgorithm": "diffusion",
                     "dilationDistance": 16,
                 },
@@ -244,7 +253,7 @@ def _build_preview_export_config(
 
 
 def _export_usdpreview_textures(
-    textures_dir: Path, texture_sets: Sequence[str]
+    textures_dir: Path, texture_sets: Sequence[str], resolution: int
 ) -> None:
     if not texture_sets:
         raise ValidationError("UsdPreview export failed: no texture sets found.")
@@ -252,7 +261,9 @@ def _export_usdpreview_textures(
     ensure_directory(textures_dir)
     preview_dir = textures_dir / PREVIEW_TEXTURE_DIRNAME
     ensure_directory(preview_dir)
-    export_config = _build_preview_export_config(preview_dir, texture_sets)
+    export_config = _build_preview_export_config(
+        preview_dir, texture_sets, resolution
+    )
     logger.debug("UsdPreview texture sets: %s", texture_sets)
     export_fn = getattr(substance_painter.export, "export_project_textures", None)
     if export_fn is None:
@@ -447,7 +458,9 @@ def on_post_export(context: ExportContext) -> None:
         texture_overrides = dict(raw.texture_format_overrides or {})
         if raw.usdpreview:
             texture_sets = _collect_texture_set_names(textures)
-            _export_usdpreview_textures(textures_dir, texture_sets)
+            _export_usdpreview_textures(
+                textures_dir, texture_sets, raw.usdpreview_resolution
+            )
 
         settings = ExportSettings(
             usdpreview=raw.usdpreview,
