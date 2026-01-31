@@ -1,5 +1,3 @@
-import pytest
-
 from pathlib import Path
 
 from axe_usd.core.models import ExportSettings, MaterialBundle

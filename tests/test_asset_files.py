@@ -1,6 +1,5 @@
 """Tests for component-builder file structure."""
 
-import pytest
 from pxr import Kind, Sdf, Usd
 
 from axe_usd.usd.asset_files import (  # noqa: E402
