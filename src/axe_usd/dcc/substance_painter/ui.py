@@ -19,7 +19,6 @@ from .qt_compat import (
     QMenuBar,
     QPushButton,
     QScrollArea,
-    QSizePolicy,
     QVBoxLayout,
     QWidget,
     QDesktopServices,
@@ -76,9 +75,7 @@ class USDExporterView(QDialog):
     UI widget for USD export settings.
     """
 
-    def __init__(
-        self, parent=None, logger: Optional[logging.Logger] = None
-    ) -> None:
+    def __init__(self, parent=None, logger: Optional[logging.Logger] = None) -> None:
         """Build the export settings UI.
 
         Args:
@@ -87,26 +84,57 @@ class USDExporterView(QDialog):
         """
         super().__init__(parent)
         self._logger = logger or logging.getLogger(__name__)
+        self._plugin_version = get_version()
+        self._log_level_actions = {}
+        self._log_level_name = "Debug"
+
+        self._setup_window()
+        self._build_ui()
+
+    def _setup_window(self):
         self.setWindowTitle("USD Exporter")
         self.setWindowIcon(QIcon())
-        self.setMinimumSize(320, 240)
-        self._plugin_version = get_version()
+        self.setMinimumSize(360, 480)
 
+    def _build_ui(self):
         root_layout = QVBoxLayout()
-        root_layout.setContentsMargins(10, 10, 10, 10)
-        root_layout.setSpacing(6)
+        root_layout.setContentsMargins(15, 15, 15, 15)
+        root_layout.setSpacing(10)
         self.setLayout(root_layout)
 
+        self._build_menu(root_layout)
+        self._build_header(root_layout)
+
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        root_layout.addWidget(scroll_area, 1)
+
+        content = QWidget()
+        self.content_layout = QVBoxLayout()
+        self.content_layout.setContentsMargins(10, 5, 15, 5)
+        self.content_layout.setSpacing(15)
+        self.content_layout.setAlignment(Qt.AlignTop)
+        content.setLayout(self.content_layout)
+        scroll_area.setWidget(content)
+
+        self._build_engine_group()
+        self._build_options_group()
+        self._build_footer()
+
+    def _build_menu(self, root_layout: QVBoxLayout):
         menu_bar = QMenuBar()
         menu_bar.setNativeMenuBar(False)
+
+        # Help Menu
         help_menu = menu_bar.addMenu("Help")
         help_menu.addAction("Help", self._show_help)
         help_menu.addAction("User Guide", self._open_docs)
         help_menu.addAction("About", self._show_about)
+
+        # Advanced Menu
         advanced_menu = menu_bar.addMenu("Advanced")
         log_menu = advanced_menu.addMenu("Log Level")
-        self._log_level_name = "Debug"
-        self._log_level_actions = {}
+
         for level_name in LOG_LEVELS.keys():
             action = log_menu.addAction(level_name)
             action.setCheckable(True)
@@ -114,124 +142,139 @@ class USDExporterView(QDialog):
                 lambda _checked, name=level_name: self._set_log_level(name)
             )
             self._log_level_actions[level_name] = action
+
         for name, action in self._log_level_actions.items():
             action.setChecked(name == self._log_level_name)
+
         root_layout.setMenuBar(menu_bar)
+
+    def _build_header(self, root_layout: QVBoxLayout):
+        header = QWidget()
+        header_layout = QHBoxLayout()
+        header_layout.setContentsMargins(0, 0, 0, 10)
 
         title = QLabel("Axe USD Exporter")
         title_font = title.font()
         title_font.setBold(True)
-        title_font.setPointSize(title_font.pointSize() + 1)
+        title_font.setPointSize(14)
         title.setFont(title_font)
-        title.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        root_layout.addWidget(title)
 
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setFrameShape(QFrame.NoFrame)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        root_layout.addWidget(scroll_area, 1)
+        header_layout.addWidget(title)
+        header_layout.addStretch()
 
-        content = QWidget()
-        content_layout = QVBoxLayout()
-        content_layout.setContentsMargins(0, 0, 0, 0)
-        content_layout.setSpacing(10)
-        content_layout.setAlignment(Qt.AlignTop)
-        content.setLayout(content_layout)
-        scroll_area.setWidget(content)
+        version_label = QLabel(f"v{self._plugin_version}")
+        header_layout.addWidget(version_label)
 
+        header.setLayout(header_layout)
+        root_layout.addWidget(header)
+
+    def _build_engine_group(self):
         engine_box = QGroupBox("Render Engines")
-        engine_box.setFlat(True)
-        engine_box.setStyleSheet(
-            "QCheckBox:checked { font-weight: 600; color: #2b4a5f; }"
-        )
         engine_layout = QVBoxLayout()
-        engine_layout.setContentsMargins(8, 4, 8, 6)
-        engine_layout.setSpacing(4)
-        self.usdpreview = QCheckBox("USD Preview")
+        engine_layout.setContentsMargins(15, 20, 15, 15)
+        engine_layout.setSpacing(8)
+
+        self.usdpreview = QCheckBox("USD Preview Surface")
         self.usdpreview.setChecked(DEFAULT_DIALOGUE_DICT["enable_usdpreview"])
-        self.arnold = QCheckBox("Arnold")
-        self.arnold.setChecked(DEFAULT_DIALOGUE_DICT["enable_arnold"])
+        self.usdpreview.setToolTip("Standard USD lighting model")
+
         self.materialx = QCheckBox("MaterialX (Standard Surface)")
         self.materialx.setChecked(DEFAULT_DIALOGUE_DICT["enable_materialx"])
+
         self.openpbr = QCheckBox("OpenPBR (MaterialX)")
         self.openpbr.setChecked(DEFAULT_DIALOGUE_DICT["enable_openpbr"])
+
+        self.arnold = QCheckBox("Arnold Standard Surface")
+        self.arnold.setChecked(DEFAULT_DIALOGUE_DICT["enable_arnold"])
+
         engine_layout.addWidget(self.usdpreview)
         engine_layout.addWidget(self.materialx)
         engine_layout.addWidget(self.openpbr)
         engine_layout.addWidget(self.arnold)
-        engine_help = QLabel("You can enable multiple engines at once.")
-        engine_help.setWordWrap(True)
-        engine_help.setStyleSheet("color: #666;")
-        engine_layout.addWidget(engine_help)
-        engine_box.setLayout(engine_layout)
-        engine_box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
-        content_layout.addWidget(engine_box)
 
+        help_label = QLabel("Select target renderers for material export.")
+        help_label.setWordWrap(True)
+        engine_layout.addWidget(help_label)
+
+        engine_box.setLayout(engine_layout)
+        self.content_layout.addWidget(engine_box)
+
+    def _build_options_group(self):
         options_box = QGroupBox("Export Options")
-        options_box.setFlat(True)
         options_layout = QVBoxLayout()
-        options_layout.setContentsMargins(8, 4, 8, 6)
-        options_layout.setSpacing(4)
-        self.geom = QCheckBox("Include Mesh in USD")
-        self.geom.setToolTip("Exports mesh geometry to USD if supported")
+        options_layout.setContentsMargins(15, 20, 15, 15)
+        options_layout.setSpacing(12)
+
+        # Geometry
+        self.geom = QCheckBox("Include Mesh Geometry")
+        self.geom.setToolTip("Export the mesh along with materials")
         self.geom.setChecked(DEFAULT_DIALOGUE_DICT["enable_save_geometry"])
         options_layout.addWidget(self.geom)
 
-        usdpreview_header = QLabel("USD Preview Options")
-        usdpreview_header.setStyleSheet("color: #555; font-weight: 600;")
-        options_layout.addSpacing(4)
-        options_layout.addWidget(usdpreview_header)
+        # Separator
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)
+        line.setFrameShadow(QFrame.Sunken)
+        options_layout.addWidget(line)
 
-        usdpreview_form = QFormLayout()
-        usdpreview_form.setContentsMargins(0, 0, 0, 0)
-        usdpreview_form.setSpacing(4)
-        usdpreview_form.setLabelAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        # USD Preview Options
+        preview_grid = QFormLayout()
+        preview_grid.setContentsMargins(0, 5, 0, 5)
+        preview_grid.setSpacing(8)
+        preview_grid.setLabelAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
         self.override_usdpreview = QComboBox()
-        self.override_usdpreview.addItems(["auto", "jpeg", "png"])
+        self.override_usdpreview.addItems(["Auto (Match Source)", "JPEG", "PNG"])
+        self.override_usdpreview.setItemData(0, "auto")
+        self.override_usdpreview.setItemData(1, "jpeg")
+        self.override_usdpreview.setItemData(2, "png")
         self.override_usdpreview.setToolTip(
-            "Override USD Preview texture format (e.g., jpg)"
+            "Force a specific format for preview textures"
         )
-        usdpreview_form.addRow("USD Preview Override", self.override_usdpreview)
 
         self.usdpreview_resolution = QComboBox()
-        self.usdpreview_resolution.addItems(["128", "256", "512", "1024"])
+        valid_res = ["128", "256", "512", "1024", "2048", "4096"]
+        self.usdpreview_resolution.addItems(valid_res)
         self.usdpreview_resolution.setCurrentText("128")
         self.usdpreview_resolution.setToolTip(
-            "Resolution for USD Preview textures (max 1024)"
+            "Max resolution for baked preview textures"
         )
-        usdpreview_form.addRow(
-            "USD Preview Resolution", self.usdpreview_resolution
-        )
-        options_layout.addLayout(usdpreview_form)
 
-        self.preview_hint = QLabel(
-            "Preview textures will be exported to previewTextures/"
-        )
+        preview_grid.addRow("Texture Format:", self.override_usdpreview)
+        preview_grid.addRow("Max Resolution:", self.usdpreview_resolution)
+        options_layout.addLayout(preview_grid)
+
+        self.preview_hint = QLabel("Baked textures are saved to /previewTextures")
         self.preview_hint.setWordWrap(True)
-        self.preview_hint.setStyleSheet("color: #666;")
         options_layout.addWidget(self.preview_hint)
 
-        reset_row = QHBoxLayout()
-        reset_row.addStretch(1)
-        self.reset_export_btn = QPushButton("Reset to Defaults")
-        self.reset_export_btn.setToolTip("Reset export options to defaults")
-        self.reset_export_btn.clicked.connect(self._reset_export_options)
-        reset_row.addWidget(self.reset_export_btn, 0)
-        options_layout.addLayout(reset_row)
-
         options_box.setLayout(options_layout)
-        options_box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
-        content_layout.addWidget(options_box)
+        self.content_layout.addWidget(options_box)
 
-        self.override_usdpreview.setEnabled(self.usdpreview.isChecked())
-        self.usdpreview_resolution.setEnabled(self.usdpreview.isChecked())
-        self.preview_hint.setVisible(self.usdpreview.isChecked())
+        # Connect signals
         self.usdpreview.toggled.connect(self.override_usdpreview.setEnabled)
         self.usdpreview.toggled.connect(self.usdpreview_resolution.setEnabled)
         self.usdpreview.toggled.connect(self.preview_hint.setVisible)
+
+        # Initial state
+        state = self.usdpreview.isChecked()
+        self.override_usdpreview.setEnabled(state)
+        self.usdpreview_resolution.setEnabled(state)
+        self.preview_hint.setVisible(state)
+
+    def _build_footer(self):
+        footer_layout = QHBoxLayout()
+        footer_layout.setContentsMargins(0, 10, 0, 0)
+
+        self.reset_export_btn = QPushButton("Reset Defaults")
+        self.reset_export_btn.setToolTip("Reset all settings to default values")
+        self.reset_export_btn.clicked.connect(self._reset_export_options)
+        self.reset_export_btn.setFixedWidth(120)
+
+        footer_layout.addStretch()
+        footer_layout.addWidget(self.reset_export_btn)
+
+        self.layout().addLayout(footer_layout)
 
     def _set_log_level(self, name: str) -> None:
         if name not in LOG_LEVELS:
@@ -242,13 +285,21 @@ class USDExporterView(QDialog):
 
     def _reset_export_options(self) -> None:
         self.geom.setChecked(DEFAULT_DIALOGUE_DICT["enable_save_geometry"])
-        self.override_usdpreview.setCurrentText("auto")
+        self.usdpreview.setChecked(DEFAULT_DIALOGUE_DICT["enable_usdpreview"])
+        self.arnold.setChecked(DEFAULT_DIALOGUE_DICT["enable_arnold"])
+        self.materialx.setChecked(DEFAULT_DIALOGUE_DICT["enable_materialx"])
+        self.openpbr.setChecked(DEFAULT_DIALOGUE_DICT["enable_openpbr"])
+
+        self.override_usdpreview.setCurrentIndex(0)  # auto
         self.usdpreview_resolution.setCurrentText("128")
 
     def _show_help(self) -> None:
         """Show a short help dialog."""
         message = (
-            "Export textures first, then the plugin writes USD next to the export folder."
+            "<h3>Usage Guide</h3>"
+            "<p>1. Configure export settings in this window.</p>"
+            "<p>2. Run the Substance Painter export process.</p>"
+            "<p>3. The plugin will automatically generate USD files in the export directory.</p>"
         )
         QMessageBox.information(self, "Axe USD Exporter Help", message)
 
@@ -261,7 +312,7 @@ class USDExporterView(QDialog):
         if docs_path.exists():
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(docs_path)))
         else:
-            QMessageBox.information(
+            QMessageBox.warning(
                 self,
                 "Docs Not Found",
                 "Local documentation was not found in this install.",
@@ -270,9 +321,14 @@ class USDExporterView(QDialog):
     def _show_about(self) -> None:
         """Show an about dialog with version details."""
         message = (
-            f"Axe USD Exporter\n"
-            f"Version {self._plugin_version}\n\n"
-            "Exports Substance Painter textures to USD with supported render engines."
+            f"<h3>Axe USD Exporter</h3>"
+            f"<p>Version: <b>{self._plugin_version}</b></p>"
+            "<p>Exports Substance Painter textures to USD with support for:</p>"
+            "<ul>"
+            "<li>UsdPreviewSurface</li>"
+            "<li>Arnold Standard Surface</li>"
+            "<li>MaterialX</li>"
+            "</ul>"
         )
         QMessageBox.information(self, "About Axe USD Exporter", message)
 
@@ -283,6 +339,12 @@ class USDExporterView(QDialog):
         Returns:
             USDSettings: Settings collected from the dialog.
         """
+        # Handle the combobox data for override format
+        format_override = self.override_usdpreview.currentData()
+        overrides = {}
+        if format_override and format_override != "auto":
+            overrides["usd_preview"] = format_override
+
         return USDSettings(
             self.usdpreview.isChecked(),
             self.arnold.isChecked(),
@@ -290,13 +352,6 @@ class USDExporterView(QDialog):
             self.geom.isChecked(),
             self.openpbr.isChecked(),
             int(self.usdpreview_resolution.currentText()),
-            self._collect_overrides(),
+            overrides,
             self._log_level_name,
         )
-
-    def _collect_overrides(self) -> Dict[str, str]:
-        overrides: Dict[str, str] = {}
-        usd_preview = self.override_usdpreview.currentText().strip().lower()
-        if usd_preview and usd_preview != "auto":
-            overrides["usd_preview"] = usd_preview
-        return overrides
