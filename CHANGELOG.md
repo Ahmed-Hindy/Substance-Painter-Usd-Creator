@@ -1,11 +1,27 @@
-## [1.4.0] - Unreleased
+## [1.4.0]
 
-- Implement ASWF-compliant asset structure with self-contained geometry and payload layout.
-- Improve export validation, texture relocation, and relative path handling.
-- Refine material graphs and bindings (UsdPreview/OpenPBR updates; remove purpose-specific proxy bindings).
-- Refactor Substance Painter USD exporter UI into a dedicated module and streamline presets/version UI.
-- Stabilize USD tests using local SP sample textures and direct `pxr` imports.
-- Add Sphinx docs and a GitHub Pages workflow.
+### UI / Plugin Structure
+
+- Split the Substance Painter exporter UI into its own module.
+- Simplified UI wiring/presets while preserving behavior and logging.
+
+### USD Export / ASWF Structure
+
+- Implemented an ASWF-compliant asset structure across the export pipeline (component layout, payload/geo/mtl layers, consistent paths).
+
+### Materials & Textures
+
+- Improved material graph generation and texture relocation into the asset’s textures/ directory.
+
+### Tests
+
+- Replaced pytest.importorskip("pxr") patterns with direct pxr imports to avoid silent skips.
+- Updated USD tests to use local SP sample textures via fixtures, so material graph assertions are based on real inputs.
+- Stabilized expected prim paths to match current authored graphs.
+
+### docs
+
+- Added Sphinx documentation scaffolding and a GitHub Pages workflow.
 
 ## [1.3.0]
 
