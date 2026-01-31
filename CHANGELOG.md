@@ -1,3 +1,30 @@
+## [1.5.0]
+
+### Documentation
+
+- **Sphinx Theme**: Applied modern Furo theme with custom color scheme and dark mode support.
+- **reStructuredText**: Converted all documentation from Markdown to reStructuredText for enhanced Sphinx features.
+- **Enhanced Docs**: Added proper directives, cross-references, and semantic markup throughout documentation.
+- **Copy Buttons**: Added sphinx-copybutton extension for easy code copying.
+
+### README
+
+- **Image Layout**: Improved screenshot layout with 2x2 grid and descriptive captions.
+- **Content Updates**: Streamlined feature descriptions and usage instructions.
+- **Examples**: Updated example file references and simplified documentation structure.
+
+### Bug Fixes
+
+- **Version Check**: Plugin now disables on unsupported Substance Painter versions.
+- **User Guide**: Removed technical implementation details from user-facing documentation.
+- **Documentation Link**: Added link to full documentation in README.
+
+### UI Improvements
+
+- **Modular Layout**: Refactored UI into modular components for better maintainability.
+- **Style Cleanup**: Removed inline styles in favor of proper Qt styling.
+- **UI Options**: Updated Substance Painter UI options and preview tooling.
+
 ## [1.4.0]
 
 ### UI / Plugin Structure
