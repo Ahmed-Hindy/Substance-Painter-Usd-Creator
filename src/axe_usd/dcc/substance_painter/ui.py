@@ -306,9 +306,9 @@ class USDExporterView(QDialog):
     def _open_docs(self) -> None:
         """Open the local user guide if available."""
         repo_root = Path(__file__).resolve().parents[4]
-        docs_path = repo_root / "docs" / "USER_GUIDE.md"
+        docs_path = repo_root / "docs" / "user_guide.rst"
         if not docs_path.exists():
-            docs_path = repo_root / "docs" / "index.md"
+            docs_path = repo_root / "docs" / "index.rst"
         if docs_path.exists():
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(docs_path)))
         else:

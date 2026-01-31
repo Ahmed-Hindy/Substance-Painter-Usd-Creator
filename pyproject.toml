@@ -13,8 +13,12 @@ sp-usd-preview-ui = "tools.preview_ui:main"
 dev = [
   "OpenImageIO",
   "PySide6-Essentials",
+  "furo",
+  "myst-parser",
   "pytest-cov",
   "pytest",
+  "sphinx-copybutton",
+  "sphinx",
   "ruff",
 ]
 

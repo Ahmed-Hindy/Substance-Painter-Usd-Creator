@@ -4,12 +4,12 @@
 [![VFX Platform CY2024](https://img.shields.io/badge/VFX_Platform-CY2024-2b7a78.svg)](https://vfxplatform.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Code style: Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Documentation](https://img.shields.io/badge/docs-markdown-blue)](docs/USER_GUIDE.md)
+[![Documentation](https://img.shields.io/badge/docs-sphinx-blue)](docs/user_guide.rst)
 
 This plugin allows you to export materials and geometry from Adobe Substance Painter to USD (`.usd`) files, with support for multiple render engines.
 Targets Substance Painter 8.3.0+ and the VFX Platform CY2024 spec.
 
-**[Full Documentation](docs/USER_GUIDE.md)**
+**[Full Documentation](docs/user_guide.rst)**
 
 
 ## Features
@@ -50,7 +50,7 @@ Targets Substance Painter 8.3.0+ and the VFX Platform CY2024 spec.
 
 ## Documentation
 
-- [User Guide](docs/USER_GUIDE.md)
+- [User Guide](docs/user_guide.rst)
 - [Developer Guide](docs/DEVELOPER_GUIDE.md)
 
 
