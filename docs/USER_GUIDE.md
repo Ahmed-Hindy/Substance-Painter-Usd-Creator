@@ -1,9 +1,11 @@
 # User Guide
 
 ## Overview
+
 This plugin exports materials and optional geometry from Adobe Substance Painter to USD. It supports multiple render engines (USD Preview Surface, Arnold, MaterialX) and writes a layered USD publish under a chosen output directory.
 
 ## Installation (End Users)
+
 1. Download the latest release zip from GitHub Releases (`axe_usd_plugin.zip`).
 2. Unzip the archive to your Substance Painter plugins folder:
    - Windows: `C:\Users\<USERNAME>\Documents\Adobe\Adobe Substance 3D Painter\python\plugins`
@@ -15,6 +17,7 @@ This plugin exports materials and optional geometry from Adobe Substance Painter
 If you previously installed `AxeFX_usd_plugin.py`, `sp_usd_creator/`, `axe_usd/`, or an older `axe_usd_plugin.py`, delete them before copying the new build to avoid duplicate plugins.
 
 ## Installation (Developers)
+
 1. Build the plugin bundle:
    - `python tools/build_plugin.py`
 2. Copy `dist/axe_usd_plugin/` to your Substance Painter plugins folder.
@@ -22,23 +25,29 @@ If you previously installed `AxeFX_usd_plugin.py`, `sp_usd_creator/`, `axe_usd/`
    - `powershell -File tools/install_plugin.ps1`
 
 ## Usage
+
 1. Open Substance Painter.
 2. Menu: `Plugins` -> `USD Exporter`.
 3. Configure:
    - Render Engines: USD Preview, OpenPBR, MaterialX standard surface, Arnold optional.
-   - Publish Directory: target folder for USD outputs.
-   - Primitive Path: root prim for the asset (e.g., `/Asset`). Materials are written under `<root>/material`.
-   - Save Geometry: exports mesh as `layers/mesh.usd` if enabled.
+   - Publish Folder: the plugin writes USD next to your texture export folder (no UI field).
+   - Primitive Path: currently fixed to `/Asset` (used for the component asset name and prims).
+   - Save Geometry: exports mesh into `<AssetName>/geo.usdc` if enabled.
 4. Export textures normally in Substance Painter. After export finishes, the plugin writes USD files.
 
 ## Output Layout
-When you publish to a directory like `C:\Projects\Exports\my_asset`, the plugin writes:
-- `main.usda` (default main layer)
-- `layers/layer_mats.usda` (materials layer)
-- `layers/layer_assign.usda` (material bindings)
-- `layers/mesh.usd` (optional geometry)
+
+When you export textures to a directory like `C:\Projects\Exports\my_asset`, the plugin writes
+into `<export_dir>/<AssetName>/` (AssetName comes from the primitive path, default `Asset`):
+- `<AssetName>/<AssetName>.usd` (main entry point)
+- `<AssetName>/payload.usdc` (references geometry + materials)
+- `<AssetName>/geo.usdc` (geometry layer when enabled)
+- `<AssetName>/mtl.usdc` (materials layer)
+- `<AssetName>/textures/` (exported textures, moved from the export folder)
+- `<AssetName>/textures/previewTextures/` (USD Preview textures when enabled)
 
 ## Texture Naming Conventions
+
 The plugin looks for tokens in exported texture file names:
 - `base_color`, `basecolor`, `albedo`, `diffuse` -> base color
 - `metallic`, `metalness` -> metalness
@@ -51,12 +60,14 @@ The plugin looks for tokens in exported texture file names:
 Tokens are matched as standalone words (non-alphanumeric boundaries), so unrelated substrings like `road` do not match `ao`. Unknown texture files are ignored, and materials are still authored when only a subset of maps is available.
 
 ## Notes
+
 - USD Preview uses `metallic`, Arnold/MaterialX use `metalness`. The plugin normalizes this for you.
-- The publish directory can include `<export_folder>` to substitute the active texture export folder.
+- The publish folder is derived from the texture export directory (USD is written alongside it).
 - By default, non-USDPreview renderers use `png` texture overrides unless customized via the API.
 - Advanced: per-renderer texture format overrides (`usd_preview`, `arnold`, `mtlx`, `openpbr`) are available via the API (see `docs/DEVELOPER_GUIDE.md`).
 
 ## Troubleshooting
+
 - Plugin not showing up:
   - Ensure `axe_usd_plugin/` is directly inside the Substance Painter plugins directory.
   - Restart Substance Painter.
