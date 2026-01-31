@@ -1,11 +1,7 @@
 """Tests for component-builder file structure."""
 
 import pytest
-
-pxr = pytest.importorskip("pxr")
-
-Usd = pxr.Usd
-Kind = pxr.Kind
+from pxr import Kind, Sdf, Usd
 
 from axe_usd.usd.asset_files import (  # noqa: E402
     MTL_LIBRARY_ROOT,
@@ -76,7 +72,7 @@ class TestCreateAssetUsdFile:
         stage = Usd.Stage.Open(str(paths.asset_file))
         root = stage.GetPrimAtPath("/TestAsset")
 
-        model_api = pxr.Usd.ModelAPI(root)
+        model_api = Usd.ModelAPI(root)
         assert model_api.GetKind() == Kind.Tokens.component
 
 class TestCreatePayloadUsdFile:
@@ -181,7 +177,7 @@ class TestComponentFileStructureIntegration:
         stage = Usd.Stage.Open(str(paths.asset_file))
 
         assert stage is not None
-        assert stage.GetDefaultPrim().GetPath() == pxr.Sdf.Path("/TestAsset")
+        assert stage.GetDefaultPrim().GetPath() == Sdf.Path("/TestAsset")
 
     def test_composition_resolves_correctly(self, tmp_path):
         """Composed stage has prims from referenced files."""

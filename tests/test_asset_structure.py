@@ -1,13 +1,7 @@
 """Tests for USD asset structure utilities."""
 
 import pytest
-
-pxr = pytest.importorskip("pxr")
-
-Kind = pxr.Kind
-Sdf = pxr.Sdf
-Usd = pxr.Usd
-UsdGeom = pxr.UsdGeom
+from pxr import Kind, Sdf, Usd, UsdGeom
 
 from axe_usd.usd.asset_structure import (  # noqa: E402
     add_payload,
@@ -24,7 +18,7 @@ class TestInitializeComponentAsset:
 
     def test_creates_root_xform(self):
         """Root prim is created as UsdGeom.Xform."""
-        stage = pxr.Usd.Stage.CreateInMemory()
+        stage = Usd.Stage.CreateInMemory()
         root = initialize_component_asset(stage, "TestAsset")
 
         assert root.IsValid()
@@ -33,7 +27,7 @@ class TestInitializeComponentAsset:
 
     def test_sets_component_kind(self):
         """Root prim has Kind=component."""
-        stage = pxr.Usd.Stage.CreateInMemory()
+        stage = Usd.Stage.CreateInMemory()
         root = initialize_component_asset(stage, "TestAsset")
 
         model_api = Usd.ModelAPI(root)
@@ -41,14 +35,14 @@ class TestInitializeComponentAsset:
 
     def test_sets_default_prim(self):
         """Stage defaultPrim is set to the root."""
-        stage = pxr.Usd.Stage.CreateInMemory()
+        stage = Usd.Stage.CreateInMemory()
         root = initialize_component_asset(stage, "TestAsset")
 
         assert stage.GetDefaultPrim() == root
 
     def test_creates_class_prim(self):
         """Creates /__class__/<asset_name> for inheritance."""
-        stage = pxr.Usd.Stage.CreateInMemory()
+        stage = Usd.Stage.CreateInMemory()
         initialize_component_asset(stage, "TestAsset")
 
         class_prim = stage.GetPrimAtPath("/__class__/TestAsset")
@@ -57,7 +51,7 @@ class TestInitializeComponentAsset:
 
     def test_adds_inheritance(self):
         """Root prim inherits from class prim."""
-        stage = pxr.Usd.Stage.CreateInMemory()
+        stage = Usd.Stage.CreateInMemory()
         root = initialize_component_asset(stage, "TestAsset")
 
         inherits = root.GetInherits()
@@ -68,7 +62,7 @@ class TestInitializeComponentAsset:
 
     def test_sets_asset_info_name(self):
         """assetInfo contains the asset name."""
-        stage = pxr.Usd.Stage.CreateInMemory()
+        stage = Usd.Stage.CreateInMemory()
         root = initialize_component_asset(stage, "TestAsset")
 
         name = root.GetAssetInfoByKey("name")
@@ -76,7 +70,7 @@ class TestInitializeComponentAsset:
 
     def test_sets_asset_info_identifier_default(self):
         """assetInfo identifier defaults to ./<asset_name>.usd."""
-        stage = pxr.Usd.Stage.CreateInMemory()
+        stage = Usd.Stage.CreateInMemory()
         root = initialize_component_asset(stage, "TestAsset")
 
         identifier = root.GetAssetInfoByKey("identifier")
@@ -84,7 +78,7 @@ class TestInitializeComponentAsset:
 
     def test_sets_asset_info_identifier_custom(self):
         """assetInfo identifier can be customized."""
-        stage = pxr.Usd.Stage.CreateInMemory()
+        stage = Usd.Stage.CreateInMemory()
         root = initialize_component_asset(
             stage, "TestAsset", asset_identifier="/custom/path/asset.usd"
         )
@@ -98,7 +92,7 @@ class TestAddStandardScopes:
 
     def test_creates_geo_scope(self):
         """Creates /asset/geo scope."""
-        stage = pxr.Usd.Stage.CreateInMemory()
+        stage = Usd.Stage.CreateInMemory()
         root = initialize_component_asset(stage, "TestAsset")
 
         scopes = add_standard_scopes(stage, root)
@@ -110,7 +104,7 @@ class TestAddStandardScopes:
 
     def test_creates_mtl_scope(self):
         """Creates /asset/mtl scope."""
-        stage = pxr.Usd.Stage.CreateInMemory()
+        stage = Usd.Stage.CreateInMemory()
         root = initialize_component_asset(stage, "TestAsset")
 
         scopes = add_standard_scopes(stage, root)
@@ -129,7 +123,7 @@ class TestAddPayload:
     )
     def test_adds_payload_to_root(self):
         """Payload is added to the root prim."""
-        stage = pxr.Usd.Stage.CreateInMemory()
+        stage = Usd.Stage.CreateInMemory()
         root = initialize_component_asset(stage, "TestAsset")
 
         add_payload(root, "./payload.usdc")
@@ -144,7 +138,7 @@ class TestAddPayload:
     )
     def test_default_payload_path(self):
         """Default payload path is ./payload.usdc."""
-        stage = pxr.Usd.Stage.CreateInMemory()
+        stage = Usd.Stage.CreateInMemory()
         root = initialize_component_asset(stage, "TestAsset")
 
         add_payload(root)  # Use default
@@ -159,7 +153,7 @@ class TestSetAssetVersion:
 
     def test_sets_version_in_asset_info(self):
         """Version is added to assetInfo."""
-        stage = pxr.Usd.Stage.CreateInMemory()
+        stage = Usd.Stage.CreateInMemory()
         root = initialize_component_asset(stage, "TestAsset")
 
         set_asset_version(root, "1.0")
@@ -169,7 +163,7 @@ class TestSetAssetVersion:
 
     def test_updates_existing_version(self):
         """Version can be updated."""
-        stage = pxr.Usd.Stage.CreateInMemory()
+        stage = Usd.Stage.CreateInMemory()
         root = initialize_component_asset(stage, "TestAsset")
 
         set_asset_version(root, "1.0")
@@ -184,7 +178,7 @@ class TestGetAssetInfo:
 
     def test_retrieves_name_and_identifier(self):
         """Retrieves basic assetInfo metadata."""
-        stage = pxr.Usd.Stage.CreateInMemory()
+        stage = Usd.Stage.CreateInMemory()
         root = initialize_component_asset(stage, "TestAsset")
 
         info = get_asset_info(root)
@@ -195,7 +189,7 @@ class TestGetAssetInfo:
 
     def test_retrieves_version(self):
         """Retrieves version if set."""
-        stage = pxr.Usd.Stage.CreateInMemory()
+        stage = Usd.Stage.CreateInMemory()
         root = initialize_component_asset(stage, "TestAsset")
         set_asset_version(root, "1.5")
 
@@ -206,7 +200,7 @@ class TestGetAssetInfo:
 
     def test_empty_dict_for_prim_without_asset_info(self):
         """Returns empty dict for prim without assetInfo."""
-        stage = pxr.Usd.Stage.CreateInMemory()
+        stage = Usd.Stage.CreateInMemory()
         prim = stage.DefinePrim("/SomePrim")
 
         info = get_asset_info(prim)
@@ -220,7 +214,7 @@ class TestCreateSubcomponent:
 
     def test_creates_subcomponent_prim(self):
         """Subcomponent prim is created."""
-        stage = pxr.Usd.Stage.CreateInMemory()
+        stage = Usd.Stage.CreateInMemory()
         root = initialize_component_asset(stage, "TestAsset")
 
         subcomp = create_subcomponent(stage, root.GetPath(), "wheel")
@@ -230,7 +224,7 @@ class TestCreateSubcomponent:
 
     def test_sets_subcomponent_kind(self):
         """Subcomponent has Kind=subcomponent."""
-        stage = pxr.Usd.Stage.CreateInMemory()
+        stage = Usd.Stage.CreateInMemory()
         root = initialize_component_asset(stage, "TestAsset")
 
         subcomp = create_subcomponent(stage, root.GetPath(), "wheel")
@@ -240,7 +234,7 @@ class TestCreateSubcomponent:
 
     def test_subcomponent_is_xformable(self):
         """Subcomponent is created as Xform."""
-        stage = pxr.Usd.Stage.CreateInMemory()
+        stage = Usd.Stage.CreateInMemory()
         root = initialize_component_asset(stage, "TestAsset")
 
         subcomp = create_subcomponent(stage, root.GetPath(), "wheel")

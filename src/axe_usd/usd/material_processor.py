@@ -377,10 +377,10 @@ def _collect_mesh_paths(stage: Usd.Stage, root_path: str) -> list[str]:
     return mesh_paths
 
 
-def _binding_target_for_mesh_path(mesh_path: str) -> tuple[str, str]:
+def _binding_target_for_mesh_path(mesh_path: str) -> str:
     if "/geo/proxy/" in mesh_path:
-        return mesh_path.rsplit("/", 1)[0], UsdShade.Tokens.preview
-    return mesh_path, UsdShade.Tokens.allPurpose
+        return mesh_path.rsplit("/", 1)[0]
+    return mesh_path
 
 
 def _collect_material_prims(stage: Usd.Stage, parent_path: str) -> list[Usd.Prim]:
@@ -475,17 +475,14 @@ def _bind_materials_in_variant(
                 continue
 
             for mesh_path in matches:
-                bind_path, purpose = _binding_target_for_mesh_path(mesh_path)
+                bind_path = _binding_target_for_mesh_path(mesh_path)
                 mesh_prim = mtl_stage.OverridePrim(bind_path)
                 UsdShade.MaterialBindingAPI.Apply(mesh_prim)
-                UsdShade.MaterialBindingAPI(mesh_prim).Bind(
-                    material, materialPurpose=purpose
-                )
+                UsdShade.MaterialBindingAPI(mesh_prim).Bind(material)
                 logger.debug(
-                    "Bound %s -> %s (%s)",
+                    "Bound %s -> %s",
                     bind_path,
                     material.GetPrim().GetPath(),
-                    purpose,
                 )
 
     mtl_stage.Save()

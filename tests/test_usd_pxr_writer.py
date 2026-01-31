@@ -1,7 +1,5 @@
 import pytest
 
-pxr = pytest.importorskip("pxr")
-
 from pathlib import Path
 
 from axe_usd.core.models import ExportSettings, MaterialBundle

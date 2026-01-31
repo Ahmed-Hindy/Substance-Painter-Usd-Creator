@@ -1,7 +1,5 @@
 import pytest
 
-pxr = pytest.importorskip("pxr")
-
 from pxr import Usd, UsdShade
 
 from axe_usd.usd.utils import collect_prims_of_type
