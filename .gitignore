@@ -10,3 +10,4 @@ __pycache__/
 dist/
 .idea/
 .temp/
+docs/_build/

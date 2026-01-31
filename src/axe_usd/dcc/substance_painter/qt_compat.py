@@ -7,7 +7,10 @@ from __future__ import annotations
 
 from substance_painter.application import version_info
 
-use_pyside2: bool = version_info() < (10, 1, 0)
+try:
+    use_pyside2: bool = version_info() < (10, 1, 0)
+except Exception:
+    use_pyside2 = True
 
 if use_pyside2:
     from PySide2 import QtCore, QtGui, QtWidgets  # type: ignore
