@@ -46,6 +46,7 @@ extensions = [
     "sphinx.ext.autosummary",
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
+    "sphinx_copybutton",
 ]
 
 source_suffix = {
@@ -67,3 +68,27 @@ autodoc_mock_imports = [
     "PySide2",
     "PySide6",
 ]
+
+# HTML theme configuration
+html_theme = "furo"
+html_title = "SP USD Creator"
+
+html_theme_options = {
+    "light_css_variables": {
+        "color-brand-primary": "#2b7a78",
+        "color-brand-content": "#17252a",
+    },
+    "dark_css_variables": {
+        "color-brand-primary": "#3aafa9",
+        "color-brand-content": "#def2f1",
+    },
+    "sidebar_hide_name": False,
+    "navigation_with_keys": True,
+}
+
+html_static_path = ["_static"]
+html_css_files = []
+
+# Additional options
+html_show_sourcelink = True
+html_copy_source = True
