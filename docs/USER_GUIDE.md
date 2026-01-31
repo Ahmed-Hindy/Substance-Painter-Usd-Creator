@@ -6,12 +6,10 @@ This plugin exports materials and optional geometry from Adobe Substance Painter
 
 ## Installation (End Users)
 
-1. Download the latest release zip from GitHub Releases (`axe_usd_plugin.zip`).
-2. Unzip the archive to your Substance Painter plugins folder:
-   - Windows: `C:\Users\<USERNAME>\Documents\Adobe\Adobe Substance 3D Painter\python\plugins`
-   - macOS: `~/Library/Application Support/Adobe/Adobe Substance 3D Painter/python/plugins`
-   - Linux: `~/.local/share/Adobe/Adobe Substance 3D Painter/python/plugins`
-   This places `axe_usd_plugin/` directly in the plugins folder.
+1. Download the packaged release zip (`axe_usd_plugin.zip`) from GitHub Releases.
+2. Unzip it into your Substance Painter plugins folder:
+   - `<DOCUMENTS>/Adobe/Adobe Substance 3D Painter/python/plugins/`
+   This should create `axe_usd_plugin/` directly inside the plugins folder.
 3. Restart Substance Painter.
 
 If you previously installed `AxeFX_usd_plugin.py`, `sp_usd_creator/`, `axe_usd/`, or an older `axe_usd_plugin.py`, delete them before copying the new build to avoid duplicate plugins.
@@ -43,7 +41,7 @@ into `<export_dir>/<AssetName>/` (AssetName comes from the primitive path, defau
 - `<AssetName>/payload.usdc` (references geometry + materials)
 - `<AssetName>/geo.usdc` (geometry layer when enabled)
 - `<AssetName>/mtl.usdc` (materials layer)
-- `<AssetName>/textures/` (exported textures, moved from the export folder)
+- `<AssetName>/textures/` (all exported textures, moved from the export folder)
 - `<AssetName>/textures/previewTextures/` (USD Preview textures when enabled)
 
 ## Texture Naming Conventions
