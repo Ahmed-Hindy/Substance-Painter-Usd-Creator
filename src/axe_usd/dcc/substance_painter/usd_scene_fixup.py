@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import List, Optional
 
-from pxr import Sdf, Usd, UsdGeom
+from pxr import Gf, Sdf, Usd, UsdGeom
 
 from ...core.exceptions import USDStageError, ValidationError
 
@@ -13,6 +14,51 @@ logger = logging.getLogger(__name__)
 
 SP_ROOT_PATH = Sdf.Path("/root")
 SP_MATERIAL_PATH = SP_ROOT_PATH.AppendChild("material")
+
+
+def _compute_mesh_extent(mesh: UsdGeom.Mesh) -> Optional[List[Gf.Vec3f]]:
+    points_attr = mesh.GetPointsAttr()
+    if not points_attr:
+        return None
+    points = points_attr.Get()
+    if not points:
+        return None
+
+    min_x = min(point[0] for point in points)
+    min_y = min(point[1] for point in points)
+    min_z = min(point[2] for point in points)
+    max_x = max(point[0] for point in points)
+    max_y = max(point[1] for point in points)
+    max_z = max(point[2] for point in points)
+    return [Gf.Vec3f(min_x, min_y, min_z), Gf.Vec3f(max_x, max_y, max_z)]
+
+
+def _author_mesh_extents(stage: Usd.Stage, render_root: Sdf.Path) -> int:
+    render_prim = stage.GetPrimAtPath(render_root)
+    if not render_prim or not render_prim.IsValid():
+        logger.warning("Render root prim missing: %s", render_root.pathString)
+        return 0
+
+    authored = 0
+    for prim in Usd.PrimRange(render_prim):
+        if prim == render_prim:
+            continue
+        if not prim.IsA(UsdGeom.Mesh):
+            continue
+        mesh = UsdGeom.Mesh(prim)
+        extent = _compute_mesh_extent(mesh)
+        if not extent:
+            logger.debug("Skipping extent for mesh with no points: %s", prim.GetPath())
+            continue
+        extent_attr = mesh.GetExtentAttr()
+        if not extent_attr:
+            extent_attr = mesh.CreateExtentAttr()
+        extent_attr.Set(extent)
+        authored += 1
+
+    if authored:
+        logger.debug("Authored extents on %d mesh prims.", authored)
+    return authored
 
 
 def _remove_prim(stage: Usd.Stage, path: Sdf.Path) -> bool:
@@ -181,6 +227,8 @@ def fix_sp_mesh_stage(stage: Usd.Stage, target_root: str) -> bool:
             changed = True
         if _instance_proxy_prim(stage, proxy_path, dst_path, child_name):
             changed = True
+
+    _author_mesh_extents(stage, render_path)
 
     root_prim = stage.GetPrimAtPath(SP_ROOT_PATH)
     if root_prim and root_prim.IsValid() and not list(root_prim.GetChildren()):
