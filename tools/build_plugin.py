@@ -1,10 +1,13 @@
 from pathlib import Path
 from typing import Optional
+import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -55,6 +58,48 @@ def _format_python_version(py_ver: str) -> str:
     return f"{py_ver[0]}.{py_ver[1:]}"
 
 
+def _pip_available() -> bool:
+    try:
+        import pip  # noqa: F401
+    except Exception:
+        return False
+    return True
+
+
+def _download_usd_wheel_from_pypi(py_ver: str, usd_version: str, wheel_dir: Path) -> Path:
+    wheel_tag = f"cp{py_ver}-none-{USD_WHEEL_PLATFORM}.whl"
+    index_url = f"https://pypi.org/pypi/usd-core/{usd_version}/json"
+    try:
+        with urllib.request.urlopen(index_url, timeout=60) as response:
+            payload = json.load(response)
+    except (urllib.error.URLError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"Failed to query PyPI for usd-core {usd_version}: {exc}") from exc
+
+    releases = payload.get("releases", {})
+    files = releases.get(usd_version, [])
+    for file_info in files:
+        filename = file_info.get("filename", "")
+        if filename.endswith(wheel_tag):
+            url = file_info.get("url")
+            if not url:
+                continue
+            wheel_path = wheel_dir / filename
+            if wheel_path.exists():
+                return wheel_path
+            tmp_path = wheel_path.with_suffix(".tmp")
+            try:
+                with urllib.request.urlopen(url, timeout=120) as response, open(tmp_path, "wb") as handle:
+                    shutil.copyfileobj(response, handle)
+            except urllib.error.URLError as exc:
+                raise SystemExit(f"Failed to download {filename}: {exc}") from exc
+            tmp_path.replace(wheel_path)
+            return wheel_path
+
+    raise SystemExit(
+        f"USD wheel not found on PyPI for Python {py_ver} (USD {usd_version})."
+    )
+
+
 def _download_usd_wheel(py_ver: str, usd_version: str, wheel_dir: Path) -> Path:
     wheel_dir.mkdir(parents=True, exist_ok=True)
     wheel_name = f"usd_core-{usd_version}-cp{py_ver}-none-{USD_WHEEL_PLATFORM}.whl"
@@ -62,27 +107,31 @@ def _download_usd_wheel(py_ver: str, usd_version: str, wheel_dir: Path) -> Path:
     if wheel_path.exists():
         return wheel_path
 
-    python_version = _format_python_version(py_ver)
-    cmd = [
-        sys.executable,
-        "-m",
-        "pip",
-        "download",
-        "--only-binary=:all:",
-        "--no-deps",
-        "--platform",
-        USD_WHEEL_PLATFORM,
-        "--python-version",
-        python_version,
-        "--implementation",
-        "cp",
-        "--abi",
-        f"cp{py_ver}",
-        "--dest",
-        str(wheel_dir),
-        f"usd-core=={usd_version}",
-    ]
-    subprocess.check_call(cmd)
+    if _pip_available():
+        python_version = _format_python_version(py_ver)
+        cmd = [
+            sys.executable,
+            "-m",
+            "pip",
+            "download",
+            "--only-binary=:all:",
+            "--no-deps",
+            "--platform",
+            USD_WHEEL_PLATFORM,
+            "--python-version",
+            python_version,
+            "--implementation",
+            "cp",
+            "--abi",
+            f"cp{py_ver}",
+            "--dest",
+            str(wheel_dir),
+            f"usd-core=={usd_version}",
+        ]
+        try:
+            subprocess.check_call(cmd)
+        except subprocess.CalledProcessError as exc:
+            print(f"pip download failed; falling back to PyPI fetch: {exc}")
 
     if wheel_path.exists():
         return wheel_path
@@ -90,7 +139,8 @@ def _download_usd_wheel(py_ver: str, usd_version: str, wheel_dir: Path) -> Path:
     matches = list(wheel_dir.glob(f"usd_core-{usd_version}-cp{py_ver}-none-{USD_WHEEL_PLATFORM}.whl"))
     if matches:
         return matches[0]
-    raise SystemExit(f"USD wheel not found for Python {py_ver} (USD {usd_version}).")
+
+    return _download_usd_wheel_from_pypi(py_ver, usd_version, wheel_dir)
 
 
 def _extract_usd_pxr(wheel_path: Path, dest_dir: Path, temp_root: Path) -> None:
