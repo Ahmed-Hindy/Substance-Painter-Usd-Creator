@@ -75,8 +75,11 @@ def _download_usd_wheel_from_pypi(py_ver: str, usd_version: str, wheel_dir: Path
     except (urllib.error.URLError, json.JSONDecodeError) as exc:
         raise SystemExit(f"Failed to query PyPI for usd-core {usd_version}: {exc}") from exc
 
-    releases = payload.get("releases", {})
-    files = releases.get(usd_version, [])
+    if "urls" in payload:
+        files = payload.get("urls", [])
+    else:
+        releases = payload.get("releases", {})
+        files = releases.get(usd_version, [])
     for file_info in files:
         filename = file_info.get("filename", "")
         if filename.endswith(wheel_tag):
