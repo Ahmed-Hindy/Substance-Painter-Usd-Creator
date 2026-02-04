@@ -1,3 +1,6 @@
+import pytest
+
+pxr = pytest.importorskip("pxr")
 from pxr import Gf, Usd, UsdGeom
 
 from axe_usd.dcc.substance_painter import usd_scene_fixup

@@ -14,7 +14,11 @@ if not PACKAGE_DIR.exists():
 
 # Load USD dependencies before any imports that require pxr
 from .axe_usd.dcc.substance_painter.pxr_loader import load_dependencies
-load_dependencies(PLUGIN_DIR)
+if not load_dependencies(PLUGIN_DIR):
+    raise ImportError(
+        "USD dependencies could not be loaded. "
+        "Verify the plugin bundle includes the correct USD binaries."
+    )
 
 from .axe_usd.dcc.substance_painter.substance_plugin import start_plugin, close_plugin  # noqa: E402
 

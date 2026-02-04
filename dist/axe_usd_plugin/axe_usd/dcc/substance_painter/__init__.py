@@ -1,1 +1,0 @@
-"""Substance Painter DCC integration."""

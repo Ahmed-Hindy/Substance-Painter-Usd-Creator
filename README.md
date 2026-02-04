@@ -33,7 +33,8 @@ Targets Substance Painter 8.3.0+ and the VFX Platform CY2024 spec.
    This will place `axe_usd_plugin/` directly in the plugins folder.
 3. Restart Substance Painter.
 
-**Note**: USD dependencies are pre-bundled with the plugin. No additional setup required!
+**Note**: Release artifacts bundle the USD dependencies. For local builds, the
+`tools/build_plugin.py` script downloads the required USD wheels automatically.
 
 
 ## Developer Installation

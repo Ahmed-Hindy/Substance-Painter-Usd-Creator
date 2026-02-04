@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 
 # Flag to ensure we only load dependencies once
 _dependencies_loaded = False
+# Keep DLL directory handles alive for the process lifetime (Windows).
+_dll_dir_handles = []
 
 
 def load_dependencies(plugin_dir: Optional[Path] = None) -> bool:
@@ -52,7 +54,7 @@ def load_dependencies(plugin_dir: Optional[Path] = None) -> bool:
     # Map Python version to bundled dependency folders
     dep_map = {
         "39": "py39_usd24_5",      # For Substance Painter 10.0 (USD 24.5)
-        "310": "py310_usd22",      # For Substance Painter 9.x
+        "310": "py310_usd24_5",    # For Substance Painter 9.x (USD 24.5)
         "311": "py311_usd25_5_1",  # For Substance Painter 10.1+ (USD 25.5.1)
     }
     
@@ -88,7 +90,7 @@ def load_dependencies(plugin_dir: Optional[Path] = None) -> bool:
             if not dll_dir.exists():
                 continue
             try:
-                os.add_dll_directory(dll_dir_str)
+                _dll_dir_handles.append(os.add_dll_directory(dll_dir_str))
                 logger.debug(f"Added DLL directory: {dll_dir_str}")
             except Exception as e:
                 logger.warning(f"Failed to add DLL directory '{dll_dir_str}': {e}")

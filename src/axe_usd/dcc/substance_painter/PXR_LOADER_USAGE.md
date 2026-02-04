@@ -32,7 +32,7 @@ When the plugin is loaded by Substance Painter, the bootloader runs automaticall
    - Detects Python version (3.9, 3.10, or 3.11)
    - Maps to appropriate dependency folder:
      - Python 3.9 → `dependencies/py39_usd24_5/` (USD 24.5)
-     - Python 3.10 → `dependencies/py310_usd22/`
+     - Python 3.10 → `dependencies/py310_usd24_5/` (USD 24.5)
      - Python 3.11 → `dependencies/py311_usd25_5_1/` (USD 25.5.1)
    - Adds dependency path to `sys.path`
    - Registers DLL directory for Windows
@@ -44,7 +44,7 @@ When the plugin is loaded by Substance Painter, the bootloader runs automaticall
 
 | SP Version | Python Version | Dependency Folder |
 |------------|----------------|-------------------|
-| 9.x | 3.10 | `py310_usd22/` |
+| 9.x | 3.10 | `py310_usd24_5/` |
 | 10.0 | 3.9 | `py39_usd24_5/` |
 | 10.1+ | 3.11 | `py311_usd25_5_1/` |
 
@@ -145,7 +145,7 @@ except ImportError as e:
 ```
 Python version: 3.11.x (or 3.10.x / 3.9.x)
 ✓ pxr module loaded successfully!
-USD version: (25, 5, 1) for Python 3.11, (24, 5, 0) for Python 3.9
+USD version: (25, 5, 1) for Python 3.11, (24, 5, 0) for Python 3.9/3.10
 ```
 
 ---
@@ -173,7 +173,7 @@ USD version: (25, 5, 1) for Python 3.11, (24, 5, 0) for Python 3.9
    ├── dependencies/
    │   ├── py39_usd24_5/
    │   │   └── pxr/
-   │   ├── py310_usd22/
+   │   ├── py310_usd24_5/
    │   │   └── pxr/
    │   └── py311_usd25_5_1/
    │       └── pxr/
@@ -278,7 +278,7 @@ plugin_root/
     │       ├── UsdShade/
     │       ├── __init__.py
     │       └── *.dll
-    ├── py310_usd22/          # Python 3.10
+    ├── py310_usd24_5/          # Python 3.10
     │   └── pxr/
     │       ├── Gf/
     │       ├── Kind/
@@ -304,7 +304,7 @@ To add support for a new Python version (e.g., 3.12):
    ```python
    dep_map = {
        "39": "py39_usd24_5",
-       "310": "py310_usd22",
+       "310": "py310_usd24_5",
        "311": "py311_usd25_5_1",
        "312": "py312_usdXX",  # Add new mapping
    }
