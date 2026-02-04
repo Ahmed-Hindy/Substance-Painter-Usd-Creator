@@ -49,6 +49,12 @@ def _read_project_version() -> Optional[str]:
     return None
 
 
+def _format_python_version(py_ver: str) -> str:
+    if not py_ver.isdigit() or len(py_ver) < 2:
+        raise SystemExit(f"Invalid Python version tag: {py_ver}")
+    return f"{py_ver[0]}.{py_ver[1:]}"
+
+
 def _download_usd_wheel(py_ver: str, usd_version: str, wheel_dir: Path) -> Path:
     wheel_dir.mkdir(parents=True, exist_ok=True)
     wheel_name = f"usd_core-{usd_version}-cp{py_ver}-none-{USD_WHEEL_PLATFORM}.whl"
@@ -56,6 +62,7 @@ def _download_usd_wheel(py_ver: str, usd_version: str, wheel_dir: Path) -> Path:
     if wheel_path.exists():
         return wheel_path
 
+    python_version = _format_python_version(py_ver)
     cmd = [
         sys.executable,
         "-m",
@@ -66,7 +73,7 @@ def _download_usd_wheel(py_ver: str, usd_version: str, wheel_dir: Path) -> Path:
         "--platform",
         USD_WHEEL_PLATFORM,
         "--python-version",
-        py_ver,
+        python_version,
         "--implementation",
         "cp",
         "--abi",
@@ -128,6 +135,17 @@ def _populate_usd_dependencies(plugin_dist: Path) -> None:
         _extract_usd_pxr(wheel_path, dest_dir, extract_root)
 
 
+def _zip_plugin(plugin_dist: Path, zip_path: Path) -> None:
+    if zip_path.exists():
+        zip_path.unlink()
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for file_path in plugin_dist.rglob("*"):
+            if file_path.is_dir():
+                continue
+            arcname = file_path.relative_to(plugin_dist.parent)
+            zf.write(file_path, arcname)
+
+
 if DIST_DIR.exists():
     shutil.rmtree(DIST_DIR)
 
@@ -156,4 +174,8 @@ if version:
     version_path = plugin_dist / "axe_usd" / "_version.py"
     version_path.write_text(f'__version__ = "{version}"\n', encoding="utf-8")
 
+zip_path = DIST_DIR / "axe_usd_plugin.zip"
+_zip_plugin(plugin_dist, zip_path)
+
 print(f"Built plugin bundle at: {DIST_DIR}")
+print(f"Packaged release zip at: {zip_path}")
