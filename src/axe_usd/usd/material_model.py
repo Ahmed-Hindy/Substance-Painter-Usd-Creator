@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 import logging
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Dict, Mapping, Optional
 
 from .types import MaterialTextureDict
@@ -39,14 +39,32 @@ def normalize_material_dict(
     return normalized
 
 
-def apply_texture_format_override(path: str, override: Optional[str]) -> str:
-    if not override:
+def normalize_asset_path(path: str) -> str:
+    if not path:
         return path
+    path_str = str(path)
+    is_absolute = Path(path_str).is_absolute()
+    normalized = path_str.replace("\\", "/")
+    if normalized.startswith("./") or normalized.startswith("../"):
+        return normalized
+    if is_absolute:
+        return normalized
+    return f"./{normalized}"
+
+
+def apply_texture_format_override(path: str, override: Optional[str]) -> str:
+    normalized = normalize_asset_path(path)
+    if not override:
+        return normalized
     ext = override if override.startswith(".") else f".{override}"
-    path_obj = Path(path)
-    if path_obj.suffix:
-        return str(path_obj.with_suffix(ext))
-    return f"{path}{ext}"
+    prefix = "./" if normalized.startswith("./") else ""
+    working = normalized[2:] if prefix else normalized
+    posix_path = PurePosixPath(working)
+    if posix_path.suffix:
+        posix_path = posix_path.with_suffix(ext)
+    else:
+        posix_path = PurePosixPath(f"{posix_path}{ext}")
+    return f"{prefix}{posix_path.as_posix()}"
 
 
 def is_transmissive_material(
