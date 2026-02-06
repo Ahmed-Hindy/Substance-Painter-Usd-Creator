@@ -13,5 +13,11 @@ class MaterialTextureInfo(TypedDict):
     path: str
 
 
-MaterialTextureDict = Dict[str, MaterialTextureInfo]
+class MaterialTextureInfoWithMeshes(MaterialTextureInfo, total=False):
+    """Optional mesh name assignments for a material slot."""
+
+    mesh_names: List[str]
+
+
+MaterialTextureDict = Dict[str, MaterialTextureInfoWithMeshes]
 MaterialTextureList = List[MaterialTextureDict]

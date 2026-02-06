@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 
 @dataclass(frozen=True)
@@ -37,10 +37,12 @@ class MaterialBundle:
     Attributes:
         name: Material identifier.
         textures: Mapping of slot name to texture path.
+        mesh_names: Optional mesh names assigned to this material/texture set.
     """
 
     name: str
     textures: Dict[str, str]
+    mesh_names: Tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

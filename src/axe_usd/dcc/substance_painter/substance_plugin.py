@@ -7,7 +7,6 @@ import gc
 import logging
 import os
 import shutil
-import sys
 from pathlib import Path
 from typing import Dict, Mapping, Optional, Protocol, Sequence, Tuple
 
@@ -27,25 +26,19 @@ from ...core.texture_parser import parse_textures
 from ...usd.pxr_writer import PxrUsdWriter
 
 from . import usd_scene_fixup
+from .logging_utils import configure_logging, set_base_log_level
 from .qt_compat import QMessageBox
 from .ui import LOG_LEVELS, USDExporterView
 import substance_painter.application
 import substance_painter.event
 import substance_painter.export
+import substance_painter.textureset
 import substance_painter.ui
 
 
-# Configure logging
+configure_logging(__name__)
 logger = logging.getLogger(__name__)
-if not logger.handlers:
-    stream_handler = logging.StreamHandler(sys.stdout)
-    stream_handler.setLevel(logging.DEBUG)
-    stream_handler.setFormatter(
-        logging.Formatter("[AxeUSD] %(levelname)s: %(message)s")
-    )
-    logger.addHandler(stream_handler)
-    logger.setLevel(logging.DEBUG)
-    logger.propagate = False
+logger.propagate = True
 
 DEFAULT_PRIMITIVE_PATH = "/Asset"
 USD_PREVIEW_JPEG_SIZE_LOG2 = 7  # 128px
@@ -196,6 +189,46 @@ def _collect_texture_set_names(
         if name and name not in names:
             names.append(name)
     return names
+
+
+def _collect_mesh_name_map(
+    texture_set_names: Sequence[str],
+) -> Dict[str, list[str]]:
+    """Collect mesh name assignments for the exported texture sets."""
+    assignments: Dict[str, list[str]] = {}
+    try:
+        all_texture_sets = substance_painter.textureset.all_texture_sets()
+    except Exception as exc:
+        logger.warning("Failed to read texture sets for mesh assignments: %s", exc)
+        return assignments
+
+    target_names = {str(name) for name in texture_set_names if name}
+    for texture_set in all_texture_sets:
+        try:
+            set_name = str(texture_set.name())
+        except Exception as exc:
+            logger.warning("Failed to read texture set name: %s", exc)
+            continue
+        if target_names and set_name not in target_names:
+            continue
+        try:
+            mesh_names = texture_set.all_mesh_names()
+        except Exception as exc:
+            logger.warning(
+                "Failed to read mesh names for texture set %s: %s", set_name, exc
+            )
+            mesh_names = []
+        cleaned: list[str] = []
+        for mesh_name in mesh_names or []:
+            mesh_str = str(mesh_name)
+            if mesh_str and mesh_str not in cleaned:
+                cleaned.append(mesh_str)
+        if set_name:
+            assignments[set_name] = cleaned
+            logger.debug(
+                "Texture set '%s' assigned to meshes: %s", set_name, cleaned
+            )
+    return assignments
 
 
 def _build_preview_export_config(
@@ -418,6 +451,7 @@ def on_post_export(context: ExportContext) -> None:
         raw = usd_exported_qdialog.get_settings()
         log_level = LOG_LEVELS.get(raw.log_level)
         if log_level is not None:
+            set_base_log_level(log_level)
             logger.setLevel(log_level)
         primitive_path = DEFAULT_PRIMITIVE_PATH
         publish_dir = str(export_dir)
@@ -455,13 +489,14 @@ def on_post_export(context: ExportContext) -> None:
         textures_dir = export_dir / asset_name / "textures"
         textures = _move_exported_textures(context.textures, textures_dir)
 
-        materials = parse_textures(textures)
+        texture_sets = _collect_texture_set_names(textures)
+        mesh_name_map = _collect_mesh_name_map(texture_sets)
+        materials = parse_textures(textures, mesh_name_map=mesh_name_map)
         if not materials:
             raise ValidationError("No recognized textures were found.")
 
         texture_overrides = dict(raw.texture_format_overrides or {})
         if raw.usdpreview:
-            texture_sets = _collect_texture_set_names(textures)
             _export_usdpreview_textures(
                 textures_dir, texture_sets, raw.usdpreview_resolution
             )

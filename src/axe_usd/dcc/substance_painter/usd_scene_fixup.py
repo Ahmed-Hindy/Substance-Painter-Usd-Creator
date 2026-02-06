@@ -12,8 +12,21 @@ from ...core.exceptions import USDStageError, ValidationError
 
 logger = logging.getLogger(__name__)
 
-SP_ROOT_PATH = Sdf.Path("/root")
-SP_MATERIAL_PATH = SP_ROOT_PATH.AppendChild("material")
+
+def _detect_source_root(stage: Usd.Stage) -> Usd.Prim:
+    pseudo_root = stage.GetPseudoRoot()
+    if not pseudo_root:
+        raise USDStageError("Stage is missing a pseudo-root.")
+
+    children = [child for child in pseudo_root.GetChildren() if child.IsValid()]
+    if not children:
+        raise USDStageError("No root prims found in stage.")
+
+    if len(children) == 1:
+        return children[0]
+
+    details = {"root_paths": [str(child.GetPath()) for child in children]}
+    raise USDStageError("Ambiguous root prims; cannot auto-detect.", details=details)
 
 
 def _compute_mesh_extent(mesh: UsdGeom.Mesh) -> Optional[List[Gf.Vec3f]]:
@@ -148,8 +161,8 @@ def _instance_proxy_prim(
 def fix_sp_mesh_stage(stage: Usd.Stage, target_root: str) -> bool:
     """Normalize a Substance Painter mesh stage for component layout.
 
-    - Removes /root/material (and its children).
-    - Moves all prims under /root to the target root prim.
+    - Removes material scope under the detected root prim.
+    - Moves all prims under the detected root prim to the target root prim.
 
     Args:
         stage: The opened USD stage to modify.
@@ -160,6 +173,15 @@ def fix_sp_mesh_stage(stage: Usd.Stage, target_root: str) -> bool:
     """
     if not stage:
         raise USDStageError("No stage provided for SP mesh fixup.")
+
+    pseudo_root = stage.GetPseudoRoot()
+    if pseudo_root:
+        root_children = [str(child.GetPath()) for child in pseudo_root.GetChildren()]
+        logger.debug("Initial stage root prims: %s", root_children)
+
+    source_root = _detect_source_root(stage)
+    source_root_path = source_root.GetPath()
+    logger.debug("Detected source root prim: %s", source_root_path)
 
     target_path = Sdf.Path(target_root)
     if not (target_path.IsAbsolutePath() and target_path.IsPrimPath()):
@@ -183,7 +205,8 @@ def fix_sp_mesh_stage(stage: Usd.Stage, target_root: str) -> bool:
         )
         changed = True
 
-    if _remove_prim(stage, SP_MATERIAL_PATH):
+    material_path = source_root_path.AppendChild("material")
+    if _remove_prim(stage, material_path):
         changed = True
 
     UsdGeom.Xform.Define(stage, target_path.pathString)
@@ -202,13 +225,7 @@ def fix_sp_mesh_stage(stage: Usd.Stage, target_root: str) -> bool:
     UsdGeom.Imageable(render_prim).CreatePurposeAttr().Set("render")
     render_prim.CreateRelationship("proxyPrim").SetTargets([proxy_path])
 
-    root_prim = stage.GetPrimAtPath(SP_ROOT_PATH)
-    if not root_prim or not root_prim.IsValid():
-        raise USDStageError(
-            "Expected /root prim is missing from the stage.",
-            details={"root_path": SP_ROOT_PATH.pathString},
-        )
-    children = list(root_prim.GetChildren())
+    children = list(source_root.GetChildren())
     skip_names = {"material", "render", "proxy"}
     for child in children:
         child_name = child.GetName()
@@ -230,9 +247,8 @@ def fix_sp_mesh_stage(stage: Usd.Stage, target_root: str) -> bool:
 
     _author_mesh_extents(stage, render_path)
 
-    root_prim = stage.GetPrimAtPath(SP_ROOT_PATH)
-    if root_prim and root_prim.IsValid() and not list(root_prim.GetChildren()):
-        if _remove_prim(stage, SP_ROOT_PATH):
+    if source_root.IsValid() and not list(source_root.GetChildren()):
+        if _remove_prim(stage, source_root_path):
             changed = True
 
     return changed

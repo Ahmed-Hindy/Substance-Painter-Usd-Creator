@@ -165,6 +165,17 @@ Substance Painter Texture Context
 
 The parser ignores unknown texture tokens and skips empty bundles.
 
+Mesh Assignments
+----------------
+
+The ``context.textures`` payload does not include mesh assignment data. To
+preserve per-texture-set mesh bindings, the plugin queries
+``substance_painter.textureset.all_texture_sets()`` and records the
+``all_mesh_names()`` results on each exported material. These mesh names are
+used during material binding to target the corresponding Xform prims under
+``/Asset/geo/render`` (and proxy equivalents), ensuring assignments stay stable
+even when mesh prim names include suffixes.
+
 Extending Renderers
 -------------------
 

@@ -87,3 +87,19 @@ def test_parse_textures_ignores_unknown_textures():
     bundle = bundles[0]
     assert bundle.name == "Mat_Unknowns"
     assert set(bundle.textures.keys()) == {"basecolor", "roughness"}
+
+
+def test_parse_textures_includes_mesh_names():
+    """Ensure mesh name assignments are captured when provided."""
+    textures = {
+        ("Mat_Assigned", ""): [
+            "C:/tex/Mat_Assigned_BaseColor.png",
+        ],
+    }
+    mesh_map = {"Mat_Assigned": ["Mesh_A", "Mesh_A_1"]}
+
+    bundles = parse_textures(textures, mesh_name_map=mesh_map)
+
+    assert len(bundles) == 1
+    bundle = bundles[0]
+    assert bundle.mesh_names == ("Mesh_A", "Mesh_A_1")

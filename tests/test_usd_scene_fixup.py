@@ -30,3 +30,23 @@ def test_fixup_authors_mesh_extents_on_render_meshes():
     assert len(extent) == 2
     assert extent[0] == Gf.Vec3f(0, 0, 0)
     assert extent[1] == Gf.Vec3f(1, 2, 0)
+
+
+def test_fixup_autodetects_root_node():
+    stage = Usd.Stage.CreateInMemory()
+    UsdGeom.Xform.Define(stage, "/RootNode")
+    mesh = UsdGeom.Mesh.Define(stage, "/RootNode/MeshA")
+    points = [
+        Gf.Vec3f(0, 0, 0),
+        Gf.Vec3f(1, 0, 0),
+        Gf.Vec3f(1, 1, 0),
+        Gf.Vec3f(0, 1, 0),
+    ]
+    mesh.CreatePointsAttr(points)
+    mesh.CreateFaceVertexCountsAttr([4])
+    mesh.CreateFaceVertexIndicesAttr([0, 1, 2, 3])
+
+    usd_scene_fixup.fix_sp_mesh_stage(stage, "/Asset")
+
+    mesh_prim = stage.GetPrimAtPath("/Asset/geo/render/MeshA")
+    assert mesh_prim and mesh_prim.IsValid()
