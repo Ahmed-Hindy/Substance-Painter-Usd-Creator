@@ -26,6 +26,7 @@ from .qt_compat import (
     QUrl,
     Qt,
 )
+from .ui_settings import resolve_arnold_displacement_mode
 
 DEFAULT_DIALOGUE_DICT = {
     "title": "USD Exporter",
@@ -34,6 +35,7 @@ DEFAULT_DIALOGUE_DICT = {
     "enable_materialx": True,
     "enable_openpbr": False,
     "enable_save_geometry": True,
+    "arnold_displacement_mode": "bump",
 }
 
 LOG_LEVELS = {
@@ -54,6 +56,7 @@ class USDSettings:
         arnold (bool): Include Arnold standard_surface shader.
         materialx (bool): Include MaterialX standard_surface shader.
         openpbr (bool): Include MaterialX OpenPBR shader.
+        arnold_displacement_mode (str): Arnold height handling ("bump" or "displacement").
         save_geometry (bool): Whether to export mesh geometry.
         usdpreview_resolution (int): Size of USD Preview textures (pixels).
         texture_format_overrides (Dict[str, str]): Optional per-renderer overrides.
@@ -65,6 +68,7 @@ class USDSettings:
     materialx: bool
     save_geometry: bool
     openpbr: bool
+    arnold_displacement_mode: str
     usdpreview_resolution: int
     texture_format_overrides: Dict[str, str]
     log_level: str
@@ -186,11 +190,24 @@ class USDExporterView(QDialog):
 
         self.arnold = QCheckBox("Arnold Standard Surface")
         self.arnold.setChecked(DEFAULT_DIALOGUE_DICT["enable_arnold"])
+        self.arnold_displacement = QCheckBox("Use Displacement")
+        self.arnold_displacement.setChecked(
+            DEFAULT_DIALOGUE_DICT["arnold_displacement_mode"] == "displacement"
+        )
+        self.arnold_displacement.setToolTip(
+            "Use height maps as true displacement instead of bump."
+        )
+        self.arnold_displacement.setEnabled(self.arnold.isChecked())
+        self.arnold.toggled.connect(self.arnold_displacement.setEnabled)
 
         engine_layout.addWidget(self.usdpreview)
         engine_layout.addWidget(self.materialx)
         engine_layout.addWidget(self.openpbr)
-        engine_layout.addWidget(self.arnold)
+        arnold_row = QHBoxLayout()
+        arnold_row.addWidget(self.arnold)
+        arnold_row.addWidget(self.arnold_displacement)
+        arnold_row.addStretch()
+        engine_layout.addLayout(arnold_row)
 
         help_label = QLabel("Select target renderers for material export.")
         help_label.setWordWrap(True)
@@ -287,6 +304,9 @@ class USDExporterView(QDialog):
         self.geom.setChecked(DEFAULT_DIALOGUE_DICT["enable_save_geometry"])
         self.usdpreview.setChecked(DEFAULT_DIALOGUE_DICT["enable_usdpreview"])
         self.arnold.setChecked(DEFAULT_DIALOGUE_DICT["enable_arnold"])
+        self.arnold_displacement.setChecked(
+            DEFAULT_DIALOGUE_DICT["arnold_displacement_mode"] == "displacement"
+        )
         self.materialx.setChecked(DEFAULT_DIALOGUE_DICT["enable_materialx"])
         self.openpbr.setChecked(DEFAULT_DIALOGUE_DICT["enable_openpbr"])
 
@@ -344,6 +364,9 @@ class USDExporterView(QDialog):
         overrides = {}
         if format_override and format_override != "auto":
             overrides["usd_preview"] = format_override
+        arnold_displacement_mode = resolve_arnold_displacement_mode(
+            self.arnold.isChecked(), self.arnold_displacement.isChecked()
+        )
 
         return USDSettings(
             self.usdpreview.isChecked(),
@@ -351,6 +374,7 @@ class USDExporterView(QDialog):
             self.materialx.isChecked(),
             self.geom.isChecked(),
             self.openpbr.isChecked(),
+            arnold_displacement_mode,
             int(self.usdpreview_resolution.currentText()),
             overrides,
             self._log_level_name,

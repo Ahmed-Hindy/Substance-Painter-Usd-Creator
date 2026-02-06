@@ -9,8 +9,13 @@ __pycache__/
 .coverage
 dist/
 .idea/
+.vscode/
 .temp/
 docs/_build/
 packaging/axe_usd_plugin/dependencies/*
 !packaging/axe_usd_plugin/dependencies/
 !packaging/axe_usd_plugin/dependencies/README.md
+
+*.rat
+*.txt
+*.tex

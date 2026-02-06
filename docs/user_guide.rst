@@ -77,6 +77,7 @@ The plugin looks for tokens in exported texture file names:
 - ``roughness`` → roughness
 - ``normal`` → normal
 - ``opacity``, ``alpha`` → opacity
+- ``emission``, ``emissive``, ``glow`` → emission
 - ``occlusion``, ``ao`` → occlusion
 - ``height``, ``displacement`` → displacement
 

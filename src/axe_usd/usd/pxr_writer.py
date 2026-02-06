@@ -38,6 +38,7 @@ class PxrUsdWriter:
             create_arnold=settings.arnold,
             create_mtlx=settings.materialx,
             create_openpbr=settings.openpbr,
+            arnold_displacement_mode=settings.arnold_displacement_mode,
             texture_format_overrides=settings.texture_format_overrides,
         )
 

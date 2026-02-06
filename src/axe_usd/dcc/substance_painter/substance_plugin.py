@@ -232,6 +232,26 @@ def _collect_mesh_name_map(
     return assignments
 
 
+def _build_export_settings(
+    raw,
+    primitive_path: str,
+    publish_dir: str,
+    save_geometry: bool,
+    texture_overrides: Optional[Dict[str, str]],
+) -> ExportSettings:
+    return ExportSettings(
+        usdpreview=raw.usdpreview,
+        arnold=raw.arnold,
+        materialx=raw.materialx,
+        openpbr=raw.openpbr,
+        arnold_displacement_mode=raw.arnold_displacement_mode,
+        primitive_path=primitive_path,
+        publish_directory=Path(publish_dir),
+        save_geometry=save_geometry,
+        texture_format_overrides=texture_overrides or None,
+    )
+
+
 def _build_preview_export_config(
     preview_dir: Path,
     texture_sets: Sequence[str],
@@ -517,15 +537,12 @@ def on_post_export(context: ExportContext) -> None:
                 raise ValidationError(
                     "Save Geometry must be enabled to stop after mesh export."
                 )
-            settings = ExportSettings(
-                usdpreview=raw.usdpreview,
-                arnold=raw.arnold,
-                materialx=raw.materialx,
-                openpbr=raw.openpbr,
-                primitive_path=primitive_path,
-                publish_directory=Path(publish_dir),
+            settings = _build_export_settings(
+                raw,
+                primitive_path,
+                publish_dir,
                 save_geometry=True,
-                texture_format_overrides=raw.texture_format_overrides or None,
+                texture_overrides=raw.texture_format_overrides or None,
             )
             mesh_exporter = MeshExporter(settings, skip_postprocess=True)
             geo_file = mesh_exporter.export_mesh()
@@ -563,15 +580,12 @@ def on_post_export(context: ExportContext) -> None:
                 udim_texture_sets=udim_texture_sets,
             )
 
-        settings = ExportSettings(
-            usdpreview=raw.usdpreview,
-            arnold=raw.arnold,
-            materialx=raw.materialx,
-            openpbr=raw.openpbr,
-            primitive_path=primitive_path,
-            publish_directory=Path(publish_dir),
+        settings = _build_export_settings(
+            raw,
+            primitive_path,
+            publish_dir,
             save_geometry=raw.save_geometry,
-            texture_format_overrides=texture_overrides or None,
+            texture_overrides=texture_overrides or None,
         )
 
         geo_file = None
