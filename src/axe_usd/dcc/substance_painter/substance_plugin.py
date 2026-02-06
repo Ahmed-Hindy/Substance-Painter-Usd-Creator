@@ -7,7 +7,6 @@ import gc
 import logging
 import os
 import shutil
-import sys
 from pathlib import Path
 from typing import Dict, Mapping, Optional, Protocol, Sequence, Tuple
 
@@ -27,6 +26,7 @@ from ...core.texture_parser import parse_textures
 from ...usd.pxr_writer import PxrUsdWriter
 
 from . import usd_scene_fixup
+from .logging_utils import configure_logging, set_base_log_level
 from .qt_compat import QMessageBox
 from .ui import LOG_LEVELS, USDExporterView
 import substance_painter.application
@@ -36,26 +36,8 @@ import substance_painter.textureset
 import substance_painter.ui
 
 
-BASE_LOGGER_NAME = "axe_usd"
-
-
-def _configure_logging() -> None:
-    base_logger = logging.getLogger(BASE_LOGGER_NAME)
-    if not base_logger.handlers:
-        stream_handler = logging.StreamHandler(sys.stdout)
-        stream_handler.setLevel(logging.DEBUG)
-        stream_handler.setFormatter(
-            logging.Formatter("[AxeUSD] %(levelname)s: %(message)s")
-        )
-        base_logger.addHandler(stream_handler)
-    base_logger.setLevel(logging.DEBUG)
-    base_logger.propagate = False
-
-
-_configure_logging()
+configure_logging(__name__)
 logger = logging.getLogger(__name__)
-if logger.handlers:
-    logger.handlers.clear()
 logger.propagate = True
 
 DEFAULT_PRIMITIVE_PATH = "/Asset"
@@ -469,7 +451,7 @@ def on_post_export(context: ExportContext) -> None:
         raw = usd_exported_qdialog.get_settings()
         log_level = LOG_LEVELS.get(raw.log_level)
         if log_level is not None:
-            logging.getLogger(BASE_LOGGER_NAME).setLevel(log_level)
+            set_base_log_level(log_level)
             logger.setLevel(log_level)
         primitive_path = DEFAULT_PRIMITIVE_PATH
         publish_dir = str(export_dir)

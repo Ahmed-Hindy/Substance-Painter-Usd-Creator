@@ -3,6 +3,7 @@
 Copyright Ahmed Hindy. Please mention the author if you found any part of this code useful.
 """
 
+import inspect
 import logging
 import os
 import shutil
@@ -126,13 +127,15 @@ class USDShaderCreate:
         return collect_usd_material
 
     def _build_context(self) -> MaterialBuildContext:
-        return MaterialBuildContext(
-            stage=self.stage,
-            material_dict=self.material_dict,
-            is_transmissive=self.is_transmissive,
-            texture_format_overrides=self.texture_format_overrides,
-            logger=logger,
-        )
+        kwargs = {
+            "stage": self.stage,
+            "material_dict": self.material_dict,
+            "is_transmissive": self.is_transmissive,
+            "texture_format_overrides": self.texture_format_overrides,
+        }
+        if "logger" in inspect.signature(MaterialBuildContext).parameters:
+            kwargs["logger"] = logger
+        return MaterialBuildContext(**kwargs)
 
     def run(self) -> None:
         """Create the collect material and requested shader networks."""
