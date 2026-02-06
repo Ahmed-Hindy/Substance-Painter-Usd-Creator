@@ -89,6 +89,7 @@ def parse_textures(
         material_name = _material_name_from_key(key)
         textures: Dict[str, str] = {}
         udim_textures: Dict[str, str] = {}
+        udim_slots: list[str] = []
         mesh_names: Tuple[str, ...] = ()
 
         if mesh_name_map:
@@ -111,6 +112,8 @@ def parse_textures(
             udim_path = udim_token_path(str(path))
             if udim_path:
                 udim_textures.setdefault(slot, udim_path)
+                if slot not in udim_slots:
+                    udim_slots.append(slot)
                 continue
             textures[slot] = str(path)
 
@@ -120,7 +123,10 @@ def parse_textures(
         if textures:
             material_bundles.append(
                 MaterialBundle(
-                    name=material_name, textures=textures, mesh_names=mesh_names
+                    name=material_name,
+                    textures=textures,
+                    mesh_names=mesh_names,
+                    udim_slots=tuple(udim_slots),
                 )
             )
         else:

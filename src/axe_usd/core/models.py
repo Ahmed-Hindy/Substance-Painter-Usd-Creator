@@ -38,11 +38,13 @@ class MaterialBundle:
         name: Material identifier.
         textures: Mapping of slot name to texture path.
         mesh_names: Optional mesh names assigned to this material/texture set.
+        udim_slots: Optional texture slots that use UDIM token paths.
     """
 
     name: str
     textures: Dict[str, str]
     mesh_names: Tuple[str, ...] = ()
+    udim_slots: Tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

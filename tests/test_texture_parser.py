@@ -118,3 +118,4 @@ def test_parse_textures_udim_tokens_single_tile():
     assert len(bundles) == 1
     bundle = bundles[0]
     assert bundle.textures["basecolor"].endswith("Mat_UDIM_BaseColor.<UDIM>.exr")
+    assert bundle.udim_slots == ("basecolor",)

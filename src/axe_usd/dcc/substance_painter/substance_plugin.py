@@ -22,7 +22,7 @@ from ...core.exceptions import (
 from ...core.fs_utils import ensure_directory
 from ...core.models import ExportSettings
 from ...core.publish_paths import build_publish_paths
-from ...core.texture_parser import parse_textures, udim_token_path
+from ...core.texture_parser import parse_textures
 from ...usd.pxr_writer import PxrUsdWriter
 
 from . import usd_scene_fixup
@@ -190,24 +190,6 @@ def _collect_texture_set_names(
         if name and name not in names:
             names.append(name)
     return names
-
-
-def _collect_udim_texture_sets(
-    textures: Mapping[Tuple[str, str], Sequence[str]],
-) -> set[str]:
-    udim_sets: set[str] = set()
-    for key, paths in textures.items():
-        if isinstance(key, (tuple, list)) and key:
-            name = str(key[0])
-        else:
-            name = str(key)
-        if not name:
-            continue
-        for path in paths or []:
-            if udim_token_path(str(path)):
-                udim_sets.add(name)
-                break
-    return udim_sets
 
 
 def _collect_mesh_name_map(
@@ -564,11 +546,13 @@ def on_post_export(context: ExportContext) -> None:
         textures = _move_exported_textures(context.textures, textures_dir)
 
         texture_sets = _collect_texture_set_names(textures)
-        udim_texture_sets = _collect_udim_texture_sets(textures)
         mesh_name_map = _collect_mesh_name_map(texture_sets)
         materials = parse_textures(textures, mesh_name_map=mesh_name_map)
         if not materials:
             raise ValidationError("No recognized textures were found.")
+        udim_texture_sets = tuple(
+            sorted({bundle.name for bundle in materials if bundle.udim_slots})
+        )
 
         texture_overrides = dict(raw.texture_format_overrides or {})
         if raw.usdpreview:
