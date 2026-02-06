@@ -188,6 +188,47 @@ def test_renderer_specific_format_overrides(tmp_path, sp_texture_factory):
     )
 
 
+def test_udim_paths_remain_relative(tmp_path):
+    """UDIM token paths should be authored as relative assets."""
+    asset_textures = tmp_path / "Asset" / "textures"
+    asset_textures.mkdir(parents=True, exist_ok=True)
+    for tile in ("1001", "1002"):
+        (asset_textures / f"MatA_BaseColor.{tile}.exr").write_bytes(b"texture")
+
+    material_dict_list = [
+        {
+            "basecolor": {
+                "mat_name": "MatA",
+                "path": str(asset_textures / "MatA_BaseColor.<UDIM>.exr"),
+            }
+        }
+    ]
+
+    material_processor.create_shaded_asset_publish(
+        material_dict_list=material_dict_list,
+        stage=None,
+        geo_file=None,
+        parent_path="/Asset",
+        layer_save_path=str(tmp_path),
+        main_layer_name="main.usda",
+        create_usd_preview=False,
+        create_arnold=False,
+        create_mtlx=True,
+        texture_format_overrides={"mtlx": "exr"},
+    )
+
+    stage = Usd.Stage.Open(str(tmp_path / "Asset/mtl.usdc"))
+    texture_prim = stage.GetPrimAtPath(
+        "/Asset/mtl/MatA/MtlxNodeGraph/mtlx_basecolorTexture"
+    )
+    texture_shader = UsdShade.Shader(texture_prim)
+    assert (
+        _asset_path_value(texture_shader.GetInput("file"))
+        == "textures/MatA_BaseColor.<UDIM>.exr"
+    )
+    assert (tmp_path / "Asset/textures/MatA_BaseColor.1001.exr").exists()
+
+
 def test_mtlx_metalness_is_float(tmp_path, sp_texture_factory):
     """Ensure MaterialX metalness remains float through the network."""
     textures = sp_texture_factory({"metalness": ".exr"})
