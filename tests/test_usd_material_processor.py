@@ -315,3 +315,68 @@ def test_assign_material_binds_mesh():
 
     binding = UsdShade.MaterialBindingAPI(mesh).GetDirectBinding().GetMaterial()
     assert binding
+
+
+def test_bind_materials_in_variant_uses_mesh_names_for_xforms(tmp_path):
+    from axe_usd.usd.asset_files import create_asset_file_structure, create_geo_usd_file
+
+    paths = create_asset_file_structure(tmp_path, "Asset")
+    geo_stage = create_geo_usd_file(paths, "Asset")
+
+    render_xform = UsdGeom.Xform.Define(
+        geo_stage, "/Asset/geo/render/locust_antenna_001_geo"
+    )
+    UsdGeom.Mesh.Define(
+        geo_stage,
+        "/Asset/geo/render/locust_antenna_001_geo/locust_antenna_001_geo",
+    )
+    proxy_xform = UsdGeom.Xform.Define(
+        geo_stage, "/Asset/geo/proxy/locust_antenna_001_geo"
+    )
+    UsdGeom.Mesh.Define(
+        geo_stage,
+        "/Asset/geo/proxy/locust_antenna_001_geo/locust_antenna_001_geo",
+    )
+    geo_stage.Save()
+
+    tex_dir = tmp_path / "input_textures"
+    tex_dir.mkdir(parents=True, exist_ok=True)
+    tex_path = tex_dir / "antenna_BaseColor.png"
+    tex_path.write_bytes(b"texture")
+
+    material_dict_list = [
+        {
+            "basecolor": {
+                "mat_name": "antenna",
+                "path": str(tex_path),
+                "mesh_names": ["locust_antenna_001_geo"],
+            }
+        }
+    ]
+
+    material_processor.create_shaded_asset_publish(
+        material_dict_list=material_dict_list,
+        stage=None,
+        geo_file=str(paths.geo_file),
+        parent_path="/Asset",
+        layer_save_path=str(tmp_path),
+        main_layer_name="main.usda",
+        create_usd_preview=False,
+        create_arnold=False,
+        create_mtlx=False,
+    )
+
+    stage = Usd.Stage.Open(str(paths.mtl_file))
+    root = stage.GetPrimAtPath("/Asset")
+    variant = root.GetVariantSets().GetVariantSet("mtl")
+    variant.SetVariantSelection("default")
+
+    for path in (
+        "/Asset/geo/render/locust_antenna_001_geo",
+        "/Asset/geo/proxy/locust_antenna_001_geo",
+    ):
+        prim = stage.GetPrimAtPath(path)
+        assert prim.IsValid()
+        binding = UsdShade.MaterialBindingAPI(prim).GetDirectBinding().GetMaterial()
+        assert binding
+        assert str(binding.GetPrim().GetPath()) == "/Asset/mtl/antenna"

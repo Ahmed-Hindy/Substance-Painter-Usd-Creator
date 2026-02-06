@@ -51,7 +51,12 @@ def _bundle_to_dict(bundle: MaterialBundle) -> MaterialTextureDict:
     Returns:
         MaterialTextureDict: Mapping of slots to texture info dictionaries.
     """
+    mesh_names = list(bundle.mesh_names) if bundle.mesh_names else []
     return {
-        slot: {"mat_name": bundle.name, "path": texture_path}
+        slot: {
+            "mat_name": bundle.name,
+            "path": texture_path,
+            **({"mesh_names": mesh_names} if mesh_names else {}),
+        }
         for slot, texture_path in bundle.textures.items()
     }

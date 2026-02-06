@@ -8,9 +8,9 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Iterable, Mapping, Optional
+from typing import Iterable, Mapping, Optional, Sequence
 
-from pxr import Sdf, Tf, Usd, UsdGeom, UsdShade
+from pxr import Sdf, Tf, Usd, UsdGeom, UsdShade, Vt
 
 from ..core.exceptions import GeometryExportError, MaterialAssignmentError
 
@@ -59,6 +59,7 @@ class USDShaderCreate:
         stage: Usd.Stage,
         material_name: str,
         material_dict: MaterialTextureDict,
+        mesh_names: Optional[Sequence[str]] = None,
         parent_primpath: str = "/Asset/material",
         create_usd_preview: bool = False,
         create_arnold: bool = False,
@@ -72,6 +73,7 @@ class USDShaderCreate:
             stage: USD stage to author into.
             material_name: Name of the material to create.
             material_dict: Mapping of texture slots to file paths.
+            mesh_names: Optional mesh names assigned to this material.
             parent_primpath: Parent prim path to place materials under.
             create_usd_preview: Whether to create UsdPreviewSurface materials.
             create_arnold: Whether to create Arnold materials.
@@ -82,6 +84,7 @@ class USDShaderCreate:
         self.stage = stage
         self.material_dict = normalize_material_dict(material_dict, logger=logger)
         self.material_name = material_name
+        self.mesh_names = tuple(mesh_names) if mesh_names else ()
         self.parent_primpath = parent_primpath
         self.create_usd_preview = create_usd_preview
         self.create_arnold = create_arnold
@@ -115,6 +118,10 @@ class USDShaderCreate:
         collect_usd_material.GetPrim().SetCustomDataByKey(
             "source_material_name", self.material_name
         )
+        if self.mesh_names:
+            collect_usd_material.GetPrim().SetCustomDataByKey(
+                "source_mesh_names", Vt.StringArray(list(self.mesh_names))
+            )
         collect_usd_material.GetPrim().SetMetadata("displayName", self.material_name)
         return collect_usd_material
 
@@ -366,6 +373,116 @@ def _relocate_textures(
     return updated_list
 
 
+def _mesh_names_from_material_dict(
+    material_dict: MaterialTextureDict,
+) -> tuple[str, ...]:
+    for info in material_dict.values():
+        mesh_names = info.get("mesh_names")
+        if not mesh_names:
+            continue
+        cleaned: list[str] = []
+        for mesh_name in mesh_names:
+            mesh_str = str(mesh_name)
+            if mesh_str and mesh_str not in cleaned:
+                cleaned.append(mesh_str)
+        return tuple(cleaned)
+    return ()
+
+
+def _mesh_names_from_material_prim(material_prim: Usd.Prim) -> list[str]:
+    data = material_prim.GetCustomDataByKey("source_mesh_names")
+    if not data:
+        return []
+    if isinstance(data, (str, bytes)):
+        raw_names = [data]
+    else:
+        try:
+            raw_names = list(data)
+        except TypeError:
+            raw_names = [data]
+    cleaned: list[str] = []
+    for mesh_name in raw_names:
+        mesh_str = str(mesh_name)
+        if mesh_str and mesh_str not in cleaned:
+            cleaned.append(mesh_str)
+    return cleaned
+
+
+def _collect_binding_candidates(stage: Usd.Stage, root_path: str) -> list[Usd.Prim]:
+    root_prim = stage.GetPrimAtPath(root_path)
+    if not root_prim or not root_prim.IsValid():
+        return []
+    xforms: list[Usd.Prim] = []
+    meshes: list[Usd.Prim] = []
+    for prim in Usd.PrimRange(root_prim):
+        if prim == root_prim:
+            continue
+        if prim.IsA(UsdGeom.Xform):
+            xforms.append(prim)
+        elif prim.IsA(UsdGeom.Mesh):
+            meshes.append(prim)
+    return xforms or meshes
+
+
+def _index_prims_by_name(prims: Iterable[Usd.Prim]) -> dict[str, list[Usd.Prim]]:
+    index: dict[str, list[Usd.Prim]] = {}
+    for prim in prims:
+        name = prim.GetName()
+        if not name:
+            continue
+        index.setdefault(name, []).append(prim)
+    return index
+
+
+def _binding_target_for_prim(prim: Usd.Prim) -> str:
+    if prim.IsA(UsdGeom.Xform):
+        return str(prim.GetPath())
+    parent = prim.GetParent()
+    if parent and parent.IsValid() and parent.IsA(UsdGeom.Xform):
+        return str(parent.GetPath())
+    return str(prim.GetPath())
+
+
+def _proxy_binding_target(stage: Usd.Stage, render_target: str) -> Optional[str]:
+    if "/geo/render/" not in render_target:
+        return None
+    proxy_path = render_target.replace("/geo/render/", "/geo/proxy/", 1)
+    proxy_prim = stage.GetPrimAtPath(proxy_path)
+    if proxy_prim and proxy_prim.IsValid():
+        return _binding_target_for_prim(proxy_prim)
+    proxy_parent_path = proxy_path.rsplit("/", 1)[0]
+    proxy_parent = stage.GetPrimAtPath(proxy_parent_path)
+    if proxy_parent and proxy_parent.IsValid():
+        return _binding_target_for_prim(proxy_parent)
+    return None
+
+
+def _collect_targets_for_mesh_names(
+    stage: Usd.Stage,
+    render_root: str,
+    mesh_names: Iterable[str],
+    name_index: dict[str, list[Usd.Prim]],
+) -> list[str]:
+    targets: list[str] = []
+    seen: set[str] = set()
+    for mesh_name in mesh_names:
+        if not mesh_name:
+            continue
+        direct_path = f"{render_root}/{mesh_name}"
+        direct_prim = stage.GetPrimAtPath(direct_path)
+        if direct_prim and direct_prim.IsValid():
+            target = _binding_target_for_prim(direct_prim)
+            if target not in seen:
+                seen.add(target)
+                targets.append(target)
+        for prim in name_index.get(mesh_name, []):
+            target = _binding_target_for_prim(prim)
+            if target not in seen:
+                seen.add(target)
+                targets.append(target)
+    return targets
+
+
 def _collect_mesh_paths(stage: Usd.Stage, root_path: str) -> list[str]:
     mesh_paths: list[str] = []
     for prim in stage.Traverse():
@@ -427,26 +544,22 @@ def _bind_materials_in_variant(
         return
 
     render_root = f"/{asset_name}/geo/render"
-    mesh_paths = _collect_mesh_paths(asset_stage, render_root)
+    binding_candidates = _collect_binding_candidates(asset_stage, render_root)
+    name_index = _index_prims_by_name(binding_candidates)
     proxy_root = f"/{asset_name}/geo/proxy"
-    proxy_paths: list[str] = []
-    if asset_stage.GetPrimAtPath(proxy_root).IsValid():
-        for path in mesh_paths:
-            proxy_path = path.replace("/geo/render/", "/geo/proxy/", 1)
-            if asset_stage.GetPrimAtPath(proxy_path).IsValid():
-                proxy_paths.append(proxy_path)
-    mesh_paths.extend(proxy_paths)
     logger.debug("Material binding render root: %s", render_root)
     logger.debug("Material binding proxy root: %s", proxy_root)
-    logger.debug("Render mesh paths: %d", len(mesh_paths) - len(proxy_paths))
-    logger.debug("Proxy mesh paths: %d", len(proxy_paths))
-    if mesh_paths:
-        logger.debug("Sample mesh paths: %s", mesh_paths[:3])
+    logger.debug("Render binding candidates: %d", len(binding_candidates))
+    if binding_candidates:
+        logger.debug(
+            "Sample binding candidates: %s",
+            [str(prim.GetPath()) for prim in binding_candidates[:3]],
+        )
 
     with variant_set.GetVariantEditContext():
         from .naming import NamingConvention
 
-        if not mesh_paths:
+        if not binding_candidates:
             logger.warning(
                 "No meshes found for material binding under %s.", render_root
             )
@@ -457,13 +570,41 @@ def _bind_materials_in_variant(
             source_name = material_prim.GetCustomDataByKey("source_material_name")
             raw_name = str(source_name) if source_name else material_prim.GetName()
             cleaned = naming.clean_material_name(raw_name)
-            matches = [
-                path for path in mesh_paths if cleaned in path.rsplit("/", 1)[-1]
-            ]
-            logger.debug("Material %s matches: %d", cleaned, len(matches))
-            if not matches:
+            mesh_names = _mesh_names_from_material_prim(material_prim)
+
+            render_targets: list[str] = []
+            if mesh_names:
+                render_targets = _collect_targets_for_mesh_names(
+                    asset_stage, render_root, mesh_names, name_index
+                )
+                if not render_targets:
+                    logger.warning(
+                        "No prims found for mesh assignments %s (material %s).",
+                        mesh_names,
+                        cleaned,
+                    )
+
+            if not render_targets:
+                render_targets = [
+                    _binding_target_for_prim(prim)
+                    for prim in binding_candidates
+                    if cleaned in prim.GetName()
+                ]
+
+            if not render_targets:
                 logger.warning("No meshes found with name like: %s", cleaned)
                 continue
+
+            bind_targets: list[str] = []
+            seen: set[str] = set()
+            for render_target in render_targets:
+                if render_target not in seen:
+                    seen.add(render_target)
+                    bind_targets.append(render_target)
+                proxy_target = _proxy_binding_target(asset_stage, render_target)
+                if proxy_target and proxy_target not in seen:
+                    seen.add(proxy_target)
+                    bind_targets.append(proxy_target)
 
             material = UsdShade.Material.Get(
                 mtl_stage, f"/{asset_name}/mtl/{material_prim.GetName()}"
@@ -474,8 +615,7 @@ def _bind_materials_in_variant(
                 )
                 continue
 
-            for mesh_path in matches:
-                bind_path = _binding_target_for_mesh_path(mesh_path)
+            for bind_path in bind_targets:
                 mesh_prim = mtl_stage.OverridePrim(bind_path)
                 UsdShade.MaterialBindingAPI.Apply(mesh_prim)
                 UsdShade.MaterialBindingAPI(mesh_prim).Bind(material)
@@ -572,10 +712,12 @@ def create_shaded_asset_publish(
             (info["mat_name"] for info in material_dict.values()),
             "UnknownMaterialName",
         )
+        mesh_names = _mesh_names_from_material_dict(material_dict)
         USDShaderCreate(
             stage=mtl_stage,
             material_name=material_name,
             material_dict=material_dict,
+            mesh_names=mesh_names or None,
             parent_primpath=material_primitive_path,
             create_usd_preview=create_usd_preview,
             create_arnold=create_arnold,
