@@ -49,6 +49,9 @@ Targets Substance Painter 8.3.0+ and the VFX Platform CY2024 spec.
 
 - `powershell -File tools/install_plugin.ps1`
 - this will build and copy `dist/axe_usd_plugin/` into your Substance Painter plugins directory in a single step.
+- `powershell -File tools/install_plugin.ps1 -SkipDependencies` for quick code-only updates while SP is running.
+  - Requires a full install with SP closed to populate `dependencies/` first.
+  - Disable/enable the plugin to reload the updated Python code.
 
 
 ## Documentation

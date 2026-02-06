@@ -47,6 +47,16 @@ Output: ``dist/axe_usd_plugin/``
 
    powershell -File tools/install_plugin.ps1
 
+**Dev update (skip dependencies):**
+
+.. code-block:: powershell
+
+   powershell -File tools/install_plugin.ps1 -SkipDependencies
+
+Use the dev update when SP is running so locked USD ``.pyd`` files are not
+overwritten. Run the full install with SP closed to refresh dependencies.
+Disable/enable the plugin to reload the updated Python code.
+
 CI/CD (GitHub Releases)
 -----------------------
 
