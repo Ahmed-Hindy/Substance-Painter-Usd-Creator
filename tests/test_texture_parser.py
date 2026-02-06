@@ -103,3 +103,19 @@ def test_parse_textures_includes_mesh_names():
     assert len(bundles) == 1
     bundle = bundles[0]
     assert bundle.mesh_names == ("Mesh_A", "Mesh_A_1")
+
+
+def test_parse_textures_udim_tokens_single_tile():
+    """UDIM tiles should be normalized to <UDIM> even if only one tile exists."""
+    textures = {
+        ("Mat_UDIM", ""): [
+            "C:/tex/Mat_UDIM_BaseColor.1001.exr",
+        ],
+    }
+
+    bundles = parse_textures(textures)
+
+    assert len(bundles) == 1
+    bundle = bundles[0]
+    assert bundle.textures["basecolor"].endswith("Mat_UDIM_BaseColor.<UDIM>.exr")
+    assert bundle.udim_slots == ("basecolor",)

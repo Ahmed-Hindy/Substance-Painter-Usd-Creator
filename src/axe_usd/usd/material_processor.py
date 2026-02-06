@@ -312,6 +312,31 @@ class USDMeshConfigure:
             logger.debug("Set attribute %s to %s (Type: %s)", attrName, value, typeName)
 
 
+_UDIM_TOKEN = "<UDIM>"
+
+
+def _relative_asset_path(dest_path: Path, maps_dir: Path) -> str:
+    try:
+        rel_path = dest_path.relative_to(maps_dir.parent)
+        return f"./{rel_path.as_posix()}"
+    except ValueError:
+        logger.warning("Could not compute relative path for %s", dest_path)
+        return dest_path.as_posix()
+
+
+def _move_texture_file(source_path: Path, dest_dir: Path) -> Path:
+    dest_path = dest_dir / source_path.name
+    if dest_path.exists():
+        if dest_path.stat().st_mtime < source_path.stat().st_mtime:
+            dest_path.unlink()
+            shutil.move(str(source_path), str(dest_path))
+        elif source_path.resolve() != dest_path.resolve():
+            source_path.unlink()
+    else:
+        shutil.move(str(source_path), str(dest_path))
+    return dest_path
+
+
 def _relocate_textures(
     material_dict_list: MaterialTextureList,
     maps_dir: Path,
@@ -331,40 +356,42 @@ def _relocate_textures(
         new_mat_dict = {}
         for slot, info in mat_dict.items():
             source_path = Path(info["path"])
+            new_info = info.copy()
+
+            if _UDIM_TOKEN in source_path.name:
+                dest_path = maps_dir / source_path.name
+                if source_path.is_absolute() and (
+                    source_path.parent.resolve() != maps_dir.resolve()
+                ):
+                    logger.warning(
+                        "UDIM textures are expected in %s; got %s",
+                        maps_dir,
+                        source_path.parent,
+                    )
+                new_info["path"] = _relative_asset_path(dest_path, maps_dir)
+                new_mat_dict[slot] = new_info
+                continue
+
             if not source_path.exists():
-                logger.warning(f"Texture not found: {source_path}")
+                logger.warning("Texture not found: %s", source_path)
                 new_mat_dict[slot] = info
                 continue
 
-            # Create destination path
-            dest_name = source_path.name
-            dest_path = maps_dir / dest_name
+            dest_path = maps_dir / source_path.name
+            if source_path.is_absolute() and (
+                source_path.parent.resolve() == maps_dir.resolve()
+            ):
+                new_info["path"] = _relative_asset_path(dest_path, maps_dir)
+                new_mat_dict[slot] = new_info
+                continue
 
-            # Move file to maps directory (avoid duplication)
             try:
-                if (
-                    not dest_path.exists()
-                    or dest_path.stat().st_mtime < source_path.stat().st_mtime
-                ):
-                    shutil.move(str(source_path), str(dest_path))
-                    logger.debug(f"Moved texture: {source_path} -> {dest_path}")
-            except Exception as e:
-                logger.error(f"Failed to move texture {source_path}: {e}")
-
-            new_info = info.copy()
-            # Calculate relative path from the asset root (where mtl.usdc lives)
-            # maps_dir is <Asset>/maps, so parent is <Asset>
-            # dest_path is <Asset>/maps/texture.png
-            try:
-                # relative_to computation
-                rel_path = dest_path.relative_to(maps_dir.parent)
-                # Ensure forward slashes for USD using as_posix()
-                # Prepend ./ to be explicit about relative path
-                new_info["path"] = f"./{rel_path.as_posix()}"
-            except ValueError:
-                # Fallback if paths are on different drives (unlikely here as we moved it)
-                logger.warning(f"Could not compute relative path for {dest_path}")
-                new_info["path"] = dest_path.as_posix()
+                moved_path = _move_texture_file(source_path, maps_dir)
+                logger.debug("Moved texture: %s -> %s", source_path, moved_path)
+                new_info["path"] = _relative_asset_path(moved_path, maps_dir)
+            except Exception as exc:
+                logger.error("Failed to move texture %s: %s", source_path, exc)
+                new_info["path"] = _relative_asset_path(dest_path, maps_dir)
 
             new_mat_dict[slot] = new_info
 

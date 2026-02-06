@@ -51,6 +51,7 @@ USD_PREVIEW_RESOLUTION_LOG2 = {
 }
 PREVIEW_TEXTURE_DIRNAME = "previewTextures"
 PREVIEW_EXPORT_PRESET = "AxeUSDPreview"
+PREVIEW_EXPORT_PRESET_UDIM = "AxeUSDPreviewUDIM"
 
 # Hold references to UI widgets
 plugin_widgets = []
@@ -232,12 +233,20 @@ def _collect_mesh_name_map(
 
 
 def _build_preview_export_config(
-    preview_dir: Path, texture_sets: Sequence[str], resolution: int
+    preview_dir: Path,
+    texture_sets: Sequence[str],
+    resolution: int,
+    udim_texture_sets: Optional[Sequence[str]] = None,
 ) -> Dict[str, object]:
-    export_list = [
-        {"rootPath": name, "exportPreset": PREVIEW_EXPORT_PRESET}
-        for name in texture_sets
-    ]
+    udim_set = {name for name in (udim_texture_sets or []) if name}
+    export_list = []
+    for name in texture_sets:
+        preset = (
+            PREVIEW_EXPORT_PRESET_UDIM
+            if name in udim_set
+            else PREVIEW_EXPORT_PRESET
+        )
+        export_list.append({"rootPath": name, "exportPreset": preset})
     size_log2 = USD_PREVIEW_RESOLUTION_LOG2.get(resolution, USD_PREVIEW_JPEG_SIZE_LOG2)
     export_preset = {
         "name": PREVIEW_EXPORT_PRESET,
@@ -275,17 +284,60 @@ def _build_preview_export_config(
             }
         ],
     }
+    export_presets = [export_preset]
+    if udim_set:
+        export_presets.append(
+            {
+                "name": PREVIEW_EXPORT_PRESET_UDIM,
+                "maps": [
+                    {
+                        "fileName": "$textureSet_BaseColor.$udim",
+                        "channels": [
+                            {
+                                "destChannel": "R",
+                                "srcChannel": "R",
+                                "srcMapType": "documentMap",
+                                "srcMapName": "baseColor",
+                            },
+                            {
+                                "destChannel": "G",
+                                "srcChannel": "G",
+                                "srcMapType": "documentMap",
+                                "srcMapName": "baseColor",
+                            },
+                            {
+                                "destChannel": "B",
+                                "srcChannel": "B",
+                                "srcMapType": "documentMap",
+                                "srcMapName": "baseColor",
+                            },
+                        ],
+                        "parameters": {
+                            "fileFormat": USD_PREVIEW_JPEG_SUFFIX.lstrip("."),
+                            "bitDepth": "8",
+                            "dithering": False,
+                            "sizeLog2": size_log2,
+                            "paddingAlgorithm": "diffusion",
+                            "dilationDistance": 16,
+                        },
+                    }
+                ],
+            }
+        )
     return {
         "exportPath": str(preview_dir),
         "defaultExportPreset": PREVIEW_EXPORT_PRESET,
-        "exportPresets": [export_preset],
+        "exportPresets": export_presets,
         "exportList": export_list,
         "exportShaderParams": False,
     }
 
 
 def _export_usdpreview_textures(
-    textures_dir: Path, texture_sets: Sequence[str], resolution: int
+    textures_dir: Path,
+    texture_sets: Sequence[str],
+    resolution: int,
+    udim_texture_sets: Optional[Sequence[str]] = None,
 ) -> None:
     if not texture_sets:
         raise ValidationError("UsdPreview export failed: no texture sets found.")
@@ -293,8 +345,12 @@ def _export_usdpreview_textures(
     ensure_directory(textures_dir)
     preview_dir = textures_dir / PREVIEW_TEXTURE_DIRNAME
     ensure_directory(preview_dir)
-    export_config = _build_preview_export_config(preview_dir, texture_sets, resolution)
+    export_config = _build_preview_export_config(
+        preview_dir, texture_sets, resolution, udim_texture_sets=udim_texture_sets
+    )
     logger.debug("UsdPreview texture sets: %s", texture_sets)
+    if udim_texture_sets:
+        logger.debug("UsdPreview UDIM texture sets: %s", sorted(udim_texture_sets))
     export_fn = getattr(substance_painter.export, "export_project_textures", None)
     if export_fn is None:
         raise ConfigurationError(
@@ -494,11 +550,17 @@ def on_post_export(context: ExportContext) -> None:
         materials = parse_textures(textures, mesh_name_map=mesh_name_map)
         if not materials:
             raise ValidationError("No recognized textures were found.")
+        udim_texture_sets = tuple(
+            sorted({bundle.name for bundle in materials if bundle.udim_slots})
+        )
 
         texture_overrides = dict(raw.texture_format_overrides or {})
         if raw.usdpreview:
             _export_usdpreview_textures(
-                textures_dir, texture_sets, raw.usdpreview_resolution
+                textures_dir,
+                texture_sets,
+                raw.usdpreview_resolution,
+                udim_texture_sets=udim_texture_sets,
             )
 
         settings = ExportSettings(

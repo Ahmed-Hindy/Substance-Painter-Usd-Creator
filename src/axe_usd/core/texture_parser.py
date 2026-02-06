@@ -1,4 +1,6 @@
 import logging
+import re
+from pathlib import Path
 from typing import Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 from .exceptions import TextureParsingError
@@ -7,6 +9,10 @@ from .texture_keys import slot_from_path
 
 
 logger = logging.getLogger(__name__)
+
+_UDIM_PATTERN = re.compile(
+    r"^(?P<stem>.+?)(?P<sep>[._-])(?P<tile>1\d{3})(?P<suffix>\.[^.]+)?$"
+)
 
 
 TextureKey = Union[str, Tuple[str, ...]]
@@ -25,6 +31,23 @@ def _material_name_from_key(key: TextureKey) -> str:
     if isinstance(key, (list, tuple)) and key:
         return str(key[0])
     return str(key)
+
+
+def udim_token_path(path: str) -> Optional[str]:
+    if not path:
+        return None
+    if "<UDIM>" in path:
+        return path
+    name = Path(path).name
+    match = _UDIM_PATTERN.match(name)
+    if not match:
+        return None
+    tile = int(match.group("tile"))
+    if tile < 1001:
+        return None
+    suffix = match.group("suffix") or ""
+    token_name = f"{match.group('stem')}{match.group('sep')}<UDIM>{suffix}"
+    return str(Path(path).with_name(token_name))
 
 
 def parse_textures(
@@ -65,6 +88,8 @@ def parse_textures(
     for key, paths in textures_dict.items():
         material_name = _material_name_from_key(key)
         textures: Dict[str, str] = {}
+        udim_textures: Dict[str, str] = {}
+        udim_slots: list[str] = []
         mesh_names: Tuple[str, ...] = ()
 
         if mesh_name_map:
@@ -84,12 +109,24 @@ def parse_textures(
             if not slot:
                 logger.debug("Skipping unrecognized texture path: %s", path)
                 continue
+            udim_path = udim_token_path(str(path))
+            if udim_path:
+                udim_textures.setdefault(slot, udim_path)
+                if slot not in udim_slots:
+                    udim_slots.append(slot)
+                continue
             textures[slot] = str(path)
+
+        if udim_textures:
+            textures.update(udim_textures)
 
         if textures:
             material_bundles.append(
                 MaterialBundle(
-                    name=material_name, textures=textures, mesh_names=mesh_names
+                    name=material_name,
+                    textures=textures,
+                    mesh_names=mesh_names,
+                    udim_slots=tuple(udim_slots),
                 )
             )
         else:

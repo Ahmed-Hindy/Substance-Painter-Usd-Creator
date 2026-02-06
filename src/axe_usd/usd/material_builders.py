@@ -93,7 +93,10 @@ def _iter_textures(
 
 def _preview_texture_path(path: str, mat_name: str) -> str:
     source_path = Path(path)
-    preview_name = f"{mat_name}_BaseColor{PREVIEW_TEXTURE_SUFFIX}"
+    if "<UDIM>" in path:
+        preview_name = f"{mat_name}_BaseColor.<UDIM>{PREVIEW_TEXTURE_SUFFIX}"
+    else:
+        preview_name = f"{mat_name}_BaseColor{PREVIEW_TEXTURE_SUFFIX}"
     preview_dir = source_path.parent / PREVIEW_TEXTURE_DIRNAME
     preview_path = preview_dir / preview_name
     if source_path.is_absolute():

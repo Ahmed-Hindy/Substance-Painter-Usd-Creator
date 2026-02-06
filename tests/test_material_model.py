@@ -34,6 +34,14 @@ def test_apply_texture_format_override_appends_when_missing_suffix():
     assert overridden.replace("\\", "/") == "C:/tex/MatA_BaseColor.jpg"
 
 
+def test_apply_texture_format_override_preserves_udim_token():
+    path = "./textures/MatA_BaseColor.<UDIM>.exr"
+
+    overridden = apply_texture_format_override(path, "jpg")
+
+    assert overridden == "./textures/MatA_BaseColor.<UDIM>.jpg"
+
+
 def test_is_transmissive_material_matches_tokens():
     assert is_transmissive_material("Mat_Glass_Clear")
     assert not is_transmissive_material("Mat_Metal_Painted")
@@ -46,13 +54,13 @@ def test_texture_format_overrides_normalizes_keys():
 
     assert overrides.for_renderer("usd_preview") == "jpg"
     assert overrides.for_renderer("arnold") == ".tif"
-    assert overrides.for_renderer("mtlx") == "png"
+    assert overrides.for_renderer("mtlx") is None
 
 
-def test_texture_format_overrides_default_to_png():
+def test_texture_format_overrides_default_to_none():
     overrides = TextureFormatOverrides.from_mapping(None)
 
     assert overrides.for_renderer("usd_preview") is None
-    assert overrides.for_renderer("arnold") == "png"
-    assert overrides.for_renderer("mtlx") == "png"
-    assert overrides.for_renderer("openpbr") == "png"
+    assert overrides.for_renderer("arnold") is None
+    assert overrides.for_renderer("mtlx") is None
+    assert overrides.for_renderer("openpbr") is None
