@@ -17,6 +17,8 @@ class ExportSettings:
         save_geometry: Whether to export mesh geometry.
         main_layer_name: Name of the main layer file.
         texture_format_overrides: Optional per-renderer texture format overrides.
+        arnold_displacement_mode: Whether to use bump or true displacement for
+                                  Arnold height maps.
     """
 
     usdpreview: bool
@@ -28,6 +30,7 @@ class ExportSettings:
     save_geometry: bool
     main_layer_name: str = "main.usda"
     texture_format_overrides: Optional[Dict[str, str]] = None
+    arnold_displacement_mode: str = "bump"
 
 
 @dataclass(frozen=True)

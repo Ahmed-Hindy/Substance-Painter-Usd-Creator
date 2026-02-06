@@ -16,6 +16,7 @@ from ..core.exceptions import GeometryExportError, MaterialAssignmentError
 
 from . import utils as usd_utils
 from .material_builders import (
+    ARNOLD_DISPLACEMENT_BUMP,
     ArnoldBuilder,
     MaterialBuildContext,
     MtlxBuilder,
@@ -25,6 +26,7 @@ from .material_builders import (
 from .material_model import (
     TextureFormatOverrides,
     is_transmissive_material,
+    normalize_asset_path,
     normalize_material_dict,
 )
 from .types import MaterialTextureDict, MaterialTextureList
@@ -65,6 +67,7 @@ class USDShaderCreate:
         create_arnold: bool = False,
         create_mtlx: bool = False,
         create_openpbr: bool = False,
+        arnold_displacement_mode: str = ARNOLD_DISPLACEMENT_BUMP,
         texture_format_overrides: Optional[Mapping[str, str]] = None,
     ) -> None:
         """Initialize the shader creator and build the materials.
@@ -79,6 +82,8 @@ class USDShaderCreate:
             create_arnold: Whether to create Arnold materials.
             create_mtlx: Whether to create MaterialX materials.
             create_openpbr: Whether to create MaterialX OpenPBR materials.
+            arnold_displacement_mode: Whether to use bump or true displacement for
+                                      Arnold height maps.
             texture_format_overrides: Optional per-renderer texture format overrides (usd_preview, arnold, mtlx, openpbr).
         """
         self.stage = stage
@@ -90,6 +95,7 @@ class USDShaderCreate:
         self.create_arnold = create_arnold
         self.create_mtlx = create_mtlx
         self.create_openpbr = create_openpbr
+        self.arnold_displacement_mode = arnold_displacement_mode
         self.texture_format_overrides = TextureFormatOverrides.from_mapping(
             texture_format_overrides
         )
@@ -132,6 +138,7 @@ class USDShaderCreate:
             is_transmissive=self.is_transmissive,
             texture_format_overrides=self.texture_format_overrides,
             logger=logger,
+            arnold_displacement_mode=self.arnold_displacement_mode,
         )
 
     def run(self) -> None:
@@ -148,6 +155,11 @@ class USDShaderCreate:
             collect_usd_material.CreateOutput(
                 "arnold:surface", Sdf.ValueTypeNames.Token
             ).ConnectToSource(arnold_nodegraph.ConnectableAPI(), "surface")
+            displacement_output = arnold_nodegraph.GetOutput("displacement")
+            if displacement_output and displacement_output.GetAttr().IsValid():
+                collect_usd_material.CreateOutput(
+                    "arnold:displacement", displacement_output.GetTypeName()
+                ).ConnectToSource(arnold_nodegraph.ConnectableAPI(), "displacement")
 
         if self.create_openpbr and self.create_mtlx:
             logger.warning(
@@ -163,6 +175,11 @@ class USDShaderCreate:
             collect_usd_material.CreateOutput(
                 "kma:surface", Sdf.ValueTypeNames.Token
             ).ConnectToSource(mtlx_nodegraph.ConnectableAPI(), "surface")
+            displacement_output = mtlx_nodegraph.GetOutput("displacement")
+            if displacement_output and displacement_output.GetAttr().IsValid():
+                collect_usd_material.CreateOutput(
+                    "mtlx:displacement", displacement_output.GetTypeName()
+                ).ConnectToSource(mtlx_nodegraph.ConnectableAPI(), "displacement")
 
         if self.create_openpbr:
             openpbr_nodegraph = OpenPbrBuilder(context).build(collect_path)
@@ -172,6 +189,11 @@ class USDShaderCreate:
             collect_usd_material.CreateOutput(
                 "kma:surface", Sdf.ValueTypeNames.Token
             ).ConnectToSource(openpbr_nodegraph.ConnectableAPI(), "surface")
+            displacement_output = openpbr_nodegraph.GetOutput("displacement")
+            if displacement_output and displacement_output.GetAttr().IsValid():
+                collect_usd_material.CreateOutput(
+                    "mtlx:displacement", displacement_output.GetTypeName()
+                ).ConnectToSource(openpbr_nodegraph.ConnectableAPI(), "displacement")
 
 
 class USDShaderAssign:
@@ -357,6 +379,11 @@ def _relocate_textures(
         for slot, info in mat_dict.items():
             source_path = Path(info["path"])
             new_info = info.copy()
+
+            if not source_path.is_absolute():
+                new_info["path"] = normalize_asset_path(info["path"])
+                new_mat_dict[slot] = new_info
+                continue
 
             if _UDIM_TOKEN in source_path.name:
                 dest_path = maps_dir / source_path.name
@@ -666,6 +693,7 @@ def create_shaded_asset_publish(
     create_arnold: bool = False,
     create_mtlx: bool = True,
     create_openpbr: bool = False,
+    arnold_displacement_mode: str = ARNOLD_DISPLACEMENT_BUMP,
     texture_format_overrides: Optional[Mapping[str, str]] = None,
 ) -> None:
     """Create a component-builder USD asset with materials and optional geometry.
@@ -685,6 +713,8 @@ def create_shaded_asset_publish(
         create_arnold: Whether to create Arnold materials.
         create_mtlx: Whether to create MaterialX materials.
         create_openpbr: Whether to create MaterialX OpenPBR materials.
+        arnold_displacement_mode: Whether to use bump or true displacement for
+                                  Arnold height maps.
         texture_format_overrides: Optional per-renderer texture format overrides.
     """
     from .asset_files import (
@@ -750,6 +780,7 @@ def create_shaded_asset_publish(
             create_arnold=create_arnold,
             create_mtlx=create_mtlx,
             create_openpbr=create_openpbr,
+            arnold_displacement_mode=arnold_displacement_mode,
             texture_format_overrides=texture_format_overrides,
         )
     mtl_stage.Save()

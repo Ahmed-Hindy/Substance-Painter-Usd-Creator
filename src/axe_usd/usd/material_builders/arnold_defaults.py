@@ -1,0 +1,65 @@
+"""Arnold standard surface defaults."""
+
+from pxr import Sdf, UsdShade
+
+
+STANDARD_SURFACE_DEFAULTS = (
+    ("aov_id1", Sdf.ValueTypeNames.Float3, (0, 0, 0)),
+    ("aov_id2", Sdf.ValueTypeNames.Float3, (0, 0, 0)),
+    ("aov_id3", Sdf.ValueTypeNames.Float3, (0, 0, 0)),
+    ("aov_id4", Sdf.ValueTypeNames.Float3, (0, 0, 0)),
+    ("aov_id5", Sdf.ValueTypeNames.Float3, (0, 0, 0)),
+    ("aov_id6", Sdf.ValueTypeNames.Float3, (0, 0, 0)),
+    ("aov_id7", Sdf.ValueTypeNames.Float3, (0, 0, 0)),
+    ("aov_id8", Sdf.ValueTypeNames.Float3, (0, 0, 0)),
+    ("base", Sdf.ValueTypeNames.Float, 1),
+    ("base_color", Sdf.ValueTypeNames.Float3, (0.8, 0.8, 0.8)),
+    ("specular", Sdf.ValueTypeNames.Float, 1),
+    ("specular_color", Sdf.ValueTypeNames.Float3, (1, 1, 1)),
+    ("specular_roughness", Sdf.ValueTypeNames.Float, 0.2),
+    ("specular_IOR", Sdf.ValueTypeNames.Float, 1.5),
+    ("specular_anisotropy", Sdf.ValueTypeNames.Float, 0),
+    ("specular_rotation", Sdf.ValueTypeNames.Float, 0),
+    ("caustics", Sdf.ValueTypeNames.Bool, False),
+    ("coat", Sdf.ValueTypeNames.Float, 0.0),
+    ("coat_color", Sdf.ValueTypeNames.Float3, (1, 1, 1)),
+    ("coat_roughness", Sdf.ValueTypeNames.Float, 0.1),
+    ("coat_IOR", Sdf.ValueTypeNames.Float, 1.5),
+    ("coat_normal", Sdf.ValueTypeNames.Float3, (0, 0, 0)),
+    ("coat_affect_color", Sdf.ValueTypeNames.Float, 0),
+    ("coat_affect_roughness", Sdf.ValueTypeNames.Float, 0),
+    ("indirect_diffuse", Sdf.ValueTypeNames.Float, 1),
+    ("indirect_specular", Sdf.ValueTypeNames.Float, 1),
+    ("subsurface", Sdf.ValueTypeNames.Float, 0),
+    ("subsurface_anisotropy", Sdf.ValueTypeNames.Float, 0),
+    ("subsurface_color", Sdf.ValueTypeNames.Float3, (1, 1, 1)),
+    ("subsurface_radius", Sdf.ValueTypeNames.Float3, (1, 1, 1)),
+    ("subsurface_scale", Sdf.ValueTypeNames.Float, 1),
+    ("subsurface_type", Sdf.ValueTypeNames.String, "randomwalk"),
+    ("emission", Sdf.ValueTypeNames.Float, 0),
+    ("emission_color", Sdf.ValueTypeNames.Float3, (1, 1, 1)),
+    ("normal", Sdf.ValueTypeNames.Float3, (0, 0, 0)),
+    ("opacity", Sdf.ValueTypeNames.Float3, (1, 1, 1)),
+    ("sheen", Sdf.ValueTypeNames.Float, 0),
+    ("sheen_color", Sdf.ValueTypeNames.Float3, (1, 1, 1)),
+    ("sheen_roughness", Sdf.ValueTypeNames.Float, 0.3),
+    ("internal_reflections", Sdf.ValueTypeNames.Bool, True),
+    ("exit_to_background", Sdf.ValueTypeNames.Bool, False),
+    ("tangent", Sdf.ValueTypeNames.Float3, (0, 0, 0)),
+    ("transmission", Sdf.ValueTypeNames.Float, 0),
+    ("transmission_color", Sdf.ValueTypeNames.Float3, (1, 1, 1)),
+    ("transmission_depth", Sdf.ValueTypeNames.Float, 0),
+    ("transmission_scatter", Sdf.ValueTypeNames.Float3, (0, 0, 0)),
+    ("transmission_scatter_anisotropy", Sdf.ValueTypeNames.Float, 0),
+    ("transmission_dispersion", Sdf.ValueTypeNames.Float, 0),
+    ("transmission_extra_roughness", Sdf.ValueTypeNames.Float, 0),
+    ("thin_film_IOR", Sdf.ValueTypeNames.Float, 1.5),
+    ("thin_film_thickness", Sdf.ValueTypeNames.Float, 0),
+    ("thin_walled", Sdf.ValueTypeNames.Bool, False),
+    ("transmit_aovs", Sdf.ValueTypeNames.Bool, False),
+)
+
+
+def initialize_standard_surface(shader: UsdShade.Shader) -> None:
+    for name, type_name, value in STANDARD_SURFACE_DEFAULTS:
+        shader.CreateInput(name, type_name).Set(value)
