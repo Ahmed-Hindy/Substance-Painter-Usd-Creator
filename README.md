@@ -14,19 +14,6 @@ Targets Substance Painter 8.3.0+ and the VFX Platform CY2024 spec.
 
 ## Features
 - Export Substance Painter materials as USD with shader networks for:
-  - USD Preview Surface.
-  - MaterialX Standard Surface
-  - MaterialX OpenPBR Surface.
-  - Arnold Standard Surface.
-- Export mesh geometry to USD.
-- Simple UI for export settings.
-- Automatically runs wehn the user exports the textures.
-
-
-## User Installation
-
-1. Download the packaged release zip (`axe_usd_plugin.zip`) from GitHub Releases.
-2. Unzip it into your Substance Painter plugins folder:
     - Windows: `C:\Users\<USERNAME>\Documents\Adobe\Adobe Substance 3D Painter\python\plugins`
     - macOS: `~/Library/Application Support/Adobe/Adobe Substance 3D Painter/python/plugins`
     - Linux: `~/.local/share/Adobe/Adobe Substance 3D Painter/python/plugins`
