@@ -39,16 +39,24 @@ def normalize_material_dict(
     return normalized
 
 
+import re
+
+
 def normalize_asset_path(path: str) -> str:
     if not path:
         return path
     path_str = str(path)
     is_absolute = Path(path_str).is_absolute()
+    # On non-Windows, Path("C:/...") is not absolute. Check for drive letter.
+    if not is_absolute and re.match(r"^[a-zA-Z]:", path_str):
+        is_absolute = True
+
     normalized = path_str.replace("\\", "/")
     if normalized.startswith("./") or normalized.startswith("../"):
         return normalized
     if is_absolute:
         return normalized
+    # For relative paths, prepend ./ if safe (not already containing protocol/drive)
     return f"./{normalized}"
 
 
