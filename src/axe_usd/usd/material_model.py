@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 import logging
+import re
 from pathlib import Path, PurePosixPath
 from typing import Dict, Mapping, Optional
 
