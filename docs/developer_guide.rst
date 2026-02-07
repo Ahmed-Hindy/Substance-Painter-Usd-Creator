@@ -192,6 +192,26 @@ Extending Renderers
 - Add a shader network builder in ``src/axe_usd/usd/material_builders.py``.
 - Wire the builder into ``src/axe_usd/usd/material_processor.py``.
 - Update ``src/axe_usd/core/texture_keys.py`` if new texture slot tokens are required.
+- Keep ``core`` independent of USD or DCC imports.
+
+Packaging Notes
+---------------
+
+**Only ship:**
+
+- ``axe_usd_plugin/``
+
+  - ``axe_usd/``
+
+**Do not ship:**
+
+
+Extending Renderers
+-------------------
+
+- Add a shader network builder in ``src/axe_usd/usd/material_builders.py``.
+- Wire the builder into ``src/axe_usd/usd/material_processor.py``.
+- Update ``src/axe_usd/core/texture_keys.py`` if new texture slot tokens are required.
 - Keep ``core`` independent of USD or Substance Painter imports.
 
 Packaging Notes
@@ -212,3 +232,67 @@ Troubleshooting
 
 - If the plugin fails to import ``pxr``, verify ``usd-core`` is available in the Substance Painter Python environment.
 - If materials are missing, confirm texture filenames include expected tokens (see :doc:`user_guide`).
+
+Standalone / Other DCC Usage
+----------------------------
+
+The ``axe_usd.core`` and ``axe_usd.usd`` packages are designed to be DCC-agnostic. You can use them in any Python environment (Blender, Houdini, Maya, or standalone scripts) to generate USD assets.
+
+**Example: Standalone Python Script**
+
+.. code-block:: python
+
+   from pathlib import Path
+   from axe_usd.usd.material_processor import create_shaded_asset_publish
+
+   # 1. Define your texture inputs (MaterialTextureDict)
+   # Structure: List[Dict[slot_name, {mat_name, path, mesh_names?}]]
+   material_data = [
+       {
+           "basecolor": {"mat_name": "MyMat", "path": "C:/textures/MyMat_BaseColor.png"},
+           "roughness": {"mat_name": "MyMat", "path": "C:/textures/MyMat_Roughness.png"},
+           "normal":    {"mat_name": "MyMat", "path": "C:/textures/MyMat_Normal.png"},
+           # Optional: Assign this material to specific mesh components
+           "basecolor": {
+               "mat_name": "MyMat",
+               "path": "C:/textures/MyMat_BaseColor.png",
+               "mesh_names": ["Mesh_Head", "Mesh_Body"]  
+           }
+       }
+   ]
+
+   # 2. Call the exporter
+   create_shaded_asset_publish(
+       material_dict_list=material_data,
+       geo_file="C:/geometry/my_asset.usd",  # Optional: source geometry
+       parent_path="/Asset",                 # Root prim path
+       layer_save_path="C:/output/MyAsset",  # Output directory
+       create_usd_preview=True,
+       create_mtlx=True,
+       create_arnold=True,
+   )
+
+This script will generate a full ASWF-compliant USD asset in ``C:/output/MyAsset``.
+
+Adding Support for a New DCC
+----------------------------
+
+To integrate ``axe_usd`` into a new DCC (e.g., Blender, Houdini), you need to write a simple **Adapter**.
+
+**Steps:**
+
+1.  **Create a DCC package**:
+    Create ``src/axe_usd/dcc/<dcc_name>/`` (e.g., ``blender/``).
+
+2.  **Implement the Collector**:
+    Write a function that:
+    
+    - Iterates over the DCC's material selection.
+    - Extracts texture file paths for each slot (Base Color, Roughness, etc.).
+    - Formats them into the ``MaterialTextureDict`` structure shown above.
+
+3.  **Call the Exporter**:
+    Pass the collected data to ``create_shaded_asset_publish``.
+
+**Architecture Tip:**
+Keep your DCC-specific code (UI, selection logic) inside ``src/axe_usd/dcc/`` and import ``src/axe_usd/usd`` to do the heavy lifting. This ensures your integration remains clean and maintainable.

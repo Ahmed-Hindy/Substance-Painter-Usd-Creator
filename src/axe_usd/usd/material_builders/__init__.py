@@ -8,7 +8,11 @@ from .base import (
 )
 from .mtlx import MtlxBuilder
 from .openpbr import OpenPbrBuilder
-from .usd_preview import UsdPreviewBuilder
+from .usd_preview import (
+    PREVIEW_TEXTURE_DIRNAME,
+    PREVIEW_TEXTURE_SUFFIX,
+    UsdPreviewBuilder,
+)
 
 __all__ = [
     "ARNOLD_DISPLACEMENT_BUMP",
@@ -17,5 +21,7 @@ __all__ = [
     "MaterialBuildContext",
     "MtlxBuilder",
     "OpenPbrBuilder",
+    "PREVIEW_TEXTURE_DIRNAME",
+    "PREVIEW_TEXTURE_SUFFIX",
     "UsdPreviewBuilder",
 ]

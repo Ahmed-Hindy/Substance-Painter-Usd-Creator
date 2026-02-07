@@ -3,7 +3,6 @@
 from pxr import Gf, Sdf, UsdShade
 
 from .base import (
-    MaterialBuildContext,
     RENDERER_MTLX,
     _MtlxLikeBuilder,
     _connect_nodegraph_output,
@@ -64,9 +63,7 @@ class MtlxBuilder(_MtlxLikeBuilder):
         shader.CreateInput("specular_roughness", Sdf.ValueTypeNames.Float).Set(0.2)
         shader.CreateInput("transmission", Sdf.ValueTypeNames.Float).Set(0)
         shader.CreateInput("thin_walled", Sdf.ValueTypeNames.Int).Set(0)
-        shader.CreateInput("opacity", Sdf.ValueTypeNames.Color3f).Set(
-            Gf.Vec3f(1, 1, 1)
-        )
+        shader.CreateInput("opacity", Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f(1, 1, 1))
 
     def _connect_displacement(
         self,

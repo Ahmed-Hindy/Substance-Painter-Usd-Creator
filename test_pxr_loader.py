@@ -1,4 +1,5 @@
 """Test script for pxr_loader path detection and functionality."""
+
 import sys
 from pathlib import Path
 
@@ -16,6 +17,7 @@ def main() -> None:
     print("\n[Test 1] Importing pxr_loader from new location...")
     try:
         from axe_usd.dcc.substance_painter.pxr_loader import load_dependencies
+
         print("[OK] Import successful")
     except ImportError as e:
         print(f"[FAIL] Import failed: {e}")
@@ -28,7 +30,9 @@ def main() -> None:
     if result:
         print("[OK] Dependencies loaded successfully")
     else:
-        print("[FAIL] Dependencies failed to load (expected if Python version is not 3.9, 3.10, or 3.11)")
+        print(
+            "[FAIL] Dependencies failed to load (expected if Python version is not 3.9, 3.10, or 3.11)"
+        )
 
     # Test 3: Check dependencies path
     print("\n[Test 3] Verifying dependencies path...")
@@ -48,7 +52,9 @@ def main() -> None:
 
     # Test 4: Test auto-detection (without explicit plugin_dir)
     print("\n[Test 4] Testing auto-detection of plugin_dir...")
-    print("Note: This will fail because __file__ in pxr_loader will point to the wrong location")
+    print(
+        "Note: This will fail because __file__ in pxr_loader will point to the wrong location"
+    )
     print("Auto-detection only works when loaded from within the plugin structure")
 
     print("\n" + "=" * 60)

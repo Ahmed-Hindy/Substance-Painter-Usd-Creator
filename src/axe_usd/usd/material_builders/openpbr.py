@@ -3,7 +3,6 @@
 from pxr import Gf, Sdf, UsdShade
 
 from .base import (
-    MaterialBuildContext,
     RENDERER_OPENPBR,
     _MtlxLikeBuilder,
     _connect_nodegraph_output,
@@ -39,9 +38,7 @@ class OpenPbrBuilder(_MtlxLikeBuilder):
 
     def build(self, collect_path: str) -> UsdShade.NodeGraph:
         stage = self._context.stage
-        override = self._context.texture_format_overrides.for_renderer(
-            RENDERER_OPENPBR
-        )
+        override = self._context.texture_format_overrides.for_renderer(RENDERER_OPENPBR)
 
         nodegraph_path = f"{collect_path}/OpenPbrNodeGraph"
         nodegraph = UsdShade.NodeGraph.Define(stage, nodegraph_path)

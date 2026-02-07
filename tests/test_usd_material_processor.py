@@ -446,7 +446,9 @@ def test_openpbr_displacement_output_authored(tmp_path):
         stage.GetPrimAtPath("/Asset/mtl/MatA/OpenPbrNodeGraph")
     )
     openpbr_displacement_output = openpbr_nodegraph.GetOutput("displacement")
-    assert openpbr_displacement_output and openpbr_displacement_output.HasConnectedSource()
+    assert (
+        openpbr_displacement_output and openpbr_displacement_output.HasConnectedSource()
+    )
     openpbr_displacement_source = openpbr_displacement_output.GetConnectedSource()
     assert openpbr_displacement_source
     assert openpbr_displacement_source[1] == "out"
@@ -463,7 +465,9 @@ def test_openpbr_displacement_output_authored(tmp_path):
     )
 
     openpbr_displacement_tex = UsdShade.Shader(
-        stage.GetPrimAtPath("/Asset/mtl/MatA/OpenPbrNodeGraph/openpbr_displacementTexture")
+        stage.GetPrimAtPath(
+            "/Asset/mtl/MatA/OpenPbrNodeGraph/openpbr_displacementTexture"
+        )
     )
     assert (
         _asset_path_value(openpbr_displacement_tex.GetInput("file"))
@@ -530,7 +534,9 @@ def test_arnold_displacement_mode_authors_displacement_output(tmp_path):
     assert displacement_input and displacement_input.HasConnectedSource()
 
     displacement_tex = UsdShade.Shader(
-        stage.GetPrimAtPath("/Asset/mtl/MatA/ArnoldNodeGraph/arnold_displacementTexture")
+        stage.GetPrimAtPath(
+            "/Asset/mtl/MatA/ArnoldNodeGraph/arnold_displacementTexture"
+        )
     )
     assert (
         _asset_path_value(displacement_tex.GetInput("filename"))

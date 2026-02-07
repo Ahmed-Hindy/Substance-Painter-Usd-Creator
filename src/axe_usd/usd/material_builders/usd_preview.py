@@ -58,9 +58,7 @@ class UsdPreviewBuilder:
             texture_prim.CreateInput("file", Sdf.ValueTypeNames.Asset).Set(file_path)
             texture_prim.CreateInput("wrapS", Sdf.ValueTypeNames.Token).Set("repeat")
             texture_prim.CreateInput("wrapT", Sdf.ValueTypeNames.Token).Set("repeat")
-            texture_prim.CreateInput(
-                "st", Sdf.ValueTypeNames.Float2
-            ).ConnectToSource(
+            texture_prim.CreateInput("st", Sdf.ValueTypeNames.Float2).ConnectToSource(
                 st_reader.ConnectableAPI(), "result"
             )
             return texture_prim

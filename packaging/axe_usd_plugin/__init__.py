@@ -30,9 +30,7 @@ def _ensure_dependencies() -> None:
 
 _ensure_dependencies()
 
-_SUBSTANCE_PLUGIN_NAME = (
-    f"{__name__}.axe_usd.dcc.substance_painter.substance_plugin"
-)
+_SUBSTANCE_PLUGIN_NAME = f"{__name__}.axe_usd.dcc.substance_painter.substance_plugin"
 _PXR_LOADER_NAME = f"{__name__}.axe_usd.dcc.substance_painter.pxr_loader"
 _substance_plugin: Optional[ModuleType] = None
 

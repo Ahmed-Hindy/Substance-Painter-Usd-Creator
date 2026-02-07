@@ -20,9 +20,10 @@ def derive_base_logger_name(module_name: str) -> str:
 
 def _ensure_stdout_handler(base_logger: logging.Logger) -> None:
     for handler in base_logger.handlers:
-        if isinstance(handler, logging.StreamHandler) and getattr(
-            handler, "stream", None
-        ) is sys.stdout:
+        if (
+            isinstance(handler, logging.StreamHandler)
+            and getattr(handler, "stream", None) is sys.stdout
+        ):
             return
 
     stream_handler = logging.StreamHandler(sys.stdout)
@@ -34,9 +35,7 @@ def _ensure_stdout_handler(base_logger: logging.Logger) -> None:
     base_logger.addHandler(stream_handler)
 
 
-def configure_logging(
-    module_name: str, level: int = logging.DEBUG
-) -> logging.Logger:
+def configure_logging(module_name: str, level: int = logging.DEBUG) -> logging.Logger:
     global BASE_LOGGER_NAME
     if BASE_LOGGER_NAME == DEFAULT_BASE_LOGGER_NAME:
         BASE_LOGGER_NAME = derive_base_logger_name(module_name)
