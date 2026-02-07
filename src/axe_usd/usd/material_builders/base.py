@@ -120,9 +120,7 @@ class _MtlxLikeBuilder:
         input_name: str,
     ) -> None:
         color_correct_path = f"{collect_path}/{self.texture_prefix}_{slot}ColorCorrect"
-        color_correct_shader = self._initialize_color_correct_shader(
-            color_correct_path
-        )
+        color_correct_shader = self._initialize_color_correct_shader(color_correct_path)
         color_correct_shader.CreateInput(
             "in", Sdf.ValueTypeNames.Color3f
         ).ConnectToSource(
@@ -146,9 +144,7 @@ class _MtlxLikeBuilder:
     ) -> None:
         range_path = f"{collect_path}/{self.texture_prefix}_{slot}Range"
         range_shader = self._initialize_range_shader(range_path, signature="float")
-        range_shader.CreateInput(
-            "in", Sdf.ValueTypeNames.Float
-        ).ConnectToSource(
+        range_shader.CreateInput("in", Sdf.ValueTypeNames.Float).ConnectToSource(
             texture_shader.ConnectableAPI(),
             "out",
         )
@@ -168,9 +164,7 @@ class _MtlxLikeBuilder:
     ) -> None:
         normal_map_path = f"{collect_path}/{self.texture_prefix}_NormalMap"
         normal_map_shader = self._initialize_normal_map_shader(normal_map_path)
-        normal_map_shader.CreateInput(
-            "in", Sdf.ValueTypeNames.Float3
-        ).ConnectToSource(
+        normal_map_shader.CreateInput("in", Sdf.ValueTypeNames.Float3).ConnectToSource(
             texture_shader.ConnectableAPI(),
             "out",
         )
@@ -239,9 +233,7 @@ class _MtlxLikeBuilder:
                     if self.image_signatures[slot] == "float"
                     else Sdf.ValueTypeNames.Color3f
                 )
-                std_surf_shader.CreateInput(
-                    input_name, opacity_type
-                ).ConnectToSource(
+                std_surf_shader.CreateInput(input_name, opacity_type).ConnectToSource(
                     texture_shader.ConnectableAPI(),
                     "out",
                 )

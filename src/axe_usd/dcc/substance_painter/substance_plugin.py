@@ -226,9 +226,7 @@ def _collect_mesh_name_map(
                 cleaned.append(mesh_str)
         if set_name:
             assignments[set_name] = cleaned
-            logger.debug(
-                "Texture set '%s' assigned to meshes: %s", set_name, cleaned
-            )
+            logger.debug("Texture set '%s' assigned to meshes: %s", set_name, cleaned)
     return assignments
 
 
@@ -262,9 +260,7 @@ def _build_preview_export_config(
     export_list = []
     for name in texture_sets:
         preset = (
-            PREVIEW_EXPORT_PRESET_UDIM
-            if name in udim_set
-            else PREVIEW_EXPORT_PRESET
+            PREVIEW_EXPORT_PRESET_UDIM if name in udim_set else PREVIEW_EXPORT_PRESET
         )
         export_list.append({"rootPath": name, "exportPreset": preset})
     size_log2 = USD_PREVIEW_RESOLUTION_LOG2.get(resolution, USD_PREVIEW_JPEG_SIZE_LOG2)

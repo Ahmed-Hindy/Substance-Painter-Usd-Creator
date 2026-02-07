@@ -40,7 +40,6 @@ def normalize_material_dict(
     return normalized
 
 
-import re
 
 
 def normalize_asset_path(path: str) -> str:

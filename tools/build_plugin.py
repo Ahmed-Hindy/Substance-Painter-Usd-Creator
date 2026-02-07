@@ -66,14 +66,18 @@ def _pip_available() -> bool:
     return True
 
 
-def _download_usd_wheel_from_pypi(py_ver: str, usd_version: str, wheel_dir: Path) -> Path:
+def _download_usd_wheel_from_pypi(
+    py_ver: str, usd_version: str, wheel_dir: Path
+) -> Path:
     wheel_tag = f"cp{py_ver}-none-{USD_WHEEL_PLATFORM}.whl"
     index_url = f"https://pypi.org/pypi/usd-core/{usd_version}/json"
     try:
         with urllib.request.urlopen(index_url, timeout=60) as response:
             payload = json.load(response)
     except (urllib.error.URLError, json.JSONDecodeError) as exc:
-        raise SystemExit(f"Failed to query PyPI for usd-core {usd_version}: {exc}") from exc
+        raise SystemExit(
+            f"Failed to query PyPI for usd-core {usd_version}: {exc}"
+        ) from exc
 
     if "urls" in payload:
         files = payload.get("urls", [])
@@ -91,7 +95,10 @@ def _download_usd_wheel_from_pypi(py_ver: str, usd_version: str, wheel_dir: Path
                 return wheel_path
             tmp_path = wheel_path.with_suffix(".tmp")
             try:
-                with urllib.request.urlopen(url, timeout=120) as response, open(tmp_path, "wb") as handle:
+                with (
+                    urllib.request.urlopen(url, timeout=120) as response,
+                    open(tmp_path, "wb") as handle,
+                ):
                     shutil.copyfileobj(response, handle)
             except urllib.error.URLError as exc:
                 raise SystemExit(f"Failed to download {filename}: {exc}") from exc
@@ -139,7 +146,11 @@ def _download_usd_wheel(py_ver: str, usd_version: str, wheel_dir: Path) -> Path:
     if wheel_path.exists():
         return wheel_path
 
-    matches = list(wheel_dir.glob(f"usd_core-{usd_version}-cp{py_ver}-none-{USD_WHEEL_PLATFORM}.whl"))
+    matches = list(
+        wheel_dir.glob(
+            f"usd_core-{usd_version}-cp{py_ver}-none-{USD_WHEEL_PLATFORM}.whl"
+        )
+    )
     if matches:
         return matches[0]
 
