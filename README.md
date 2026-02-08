@@ -11,13 +11,6 @@ Supports Substance Painter 8.3.0+ and the VFX Platform CY2024 spec.
 
 **[Full User Documentation](docs/user_guide.rst)**
 
-## At a Glance
-
-- Renderers: USD Preview Surface, MaterialX Standard Surface, MaterialX OpenPBR, Arnold.
-- Output style: component-style USD publish (ASWF-oriented layout).
-- Texture parsing: automatic map detection from common filename tokens (basecolor, roughness, normal, metallic, opacity, emission).
-- Developer workflow: includes one-command Windows install/update helper scripts.
-
 ## Screenshots
 
 | | |
@@ -29,6 +22,14 @@ Supports Substance Painter 8.3.0+ and the VFX Platform CY2024 spec.
     <em>The screenshots above show the plugin UI in Substance Painter and exported USD assets validated in Houdini (OpenGL and Karma XPU) and Blender 5.0.</em>
 </p>
 
+## Features
+
+- Exports material networks for USD Preview, Arnold, MaterialX Standard Surface, and OpenPBR.
+- Optionally exports mesh geometry and writes a layered USD publish (`Asset.usd`, `payload.usdc`, `mtl.usdc`, optional `geo.usdc`).
+- Moves exported textures into a structured publish folder: `<export_dir>/Asset/textures/`.
+- Supports optional USD Preview texture format and max resolution overrides.
+- Preserves per-texture-set mesh assignment intent during material binding.
+
 ## Quick Start (End Users)
 
 1. Download and extract the latest `axe_usd_plugin.zip` from [GitHub Releases](https://github.com/Ahmed-Hindy/Substance-Painter-Usd-Creator/releases).
@@ -39,14 +40,6 @@ Supports Substance Painter 8.3.0+ and the VFX Platform CY2024 spec.
 3. Restart Substance Painter.
 4. Open `Plugins -> USD Exporter` and export textures as usual.
 5. Open `<export_dir>/Asset/Asset.usd` in your USD viewer.
-
-## Features
-
-- Exports material networks for USD Preview, Arnold, MaterialX Standard Surface, and OpenPBR.
-- Optionally exports mesh geometry and writes a layered USD publish (`Asset.usd`, `payload.usdc`, `mtl.usdc`, optional `geo.usdc`).
-- Moves exported textures into a structured publish folder: `<export_dir>/Asset/textures/`.
-- Supports optional USD Preview texture format and max resolution overrides.
-- Preserves per-texture-set mesh assignment intent during material binding.
 
 ## Output Layout
 
