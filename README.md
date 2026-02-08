@@ -11,6 +11,17 @@ Targets Substance Painter 8.3.0+ and the VFX Platform CY2024 spec.
 
 **[Full Documentation](docs/user_guide.rst)**
 
+## Screenshots
+
+| | |
+|:---:|:---:|
+| <img src="Examples/images/Screenshot_3.png" width="300"><br>Substance Plugin UI | <img src="Examples/images/Screenshot_4.png" width="300"><br>Houdini OpenGL |
+| <img src="Examples/images/Screenshot_5.png" width="300"><br>Houdini Karma XPU | <img src="Examples/images/Screenshot_6.png" width="300"><br>Blender 5.0 |
+
+<p align="center">
+    <em>The screenshots above show the Plugin UI in Substance Painter, and the exported USD assets validated in multiple renderers: Houdini (OpenGL & Karma XPU) and Blender 5.0.</em>
+</p>
+
 
 ## Features
 - Export Substance Painter materials as USD with shader networks for:
@@ -60,15 +71,6 @@ Targets Substance Painter 8.3.0+ and the VFX Platform CY2024 spec.
 5. Output is written to `<export_dir>/Asset/`.
 6. The plugin moves all exported textures into `<export_dir>/Asset/textures/`.
 7. Open `<export_dir>/Asset/Asset.usd` in any USD viewer.
-
-| | |
-|:---:|:---:|
-| <img src="Examples/images/Screenshot_3.png" width="300"><br>Substance Plugin UI | <img src="Examples/images/Screenshot_4.png" width="300"><br>Houdini OpenGL |
-| <img src="Examples/images/Screenshot_5.png" width="300"><br>Houdini Karma XPU | <img src="Examples/images/Screenshot_6.png" width="300"><br>Blender 5.0 |
-
-<p align="center">
-    <em>The screenshots above show the Plugin UI in Substance Painter, and the exported USD assets validated in multiple renderers: Houdini (OpenGL & Karma XPU) and Blender 5.0.</em>
-</p>
 
 ### Example USD File:
 Example File provided: [Asset/Asset.usd](Examples/Asset/Asset.usd)
