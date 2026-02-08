@@ -488,6 +488,17 @@ def _index_prims_by_name(prims: Iterable[Usd.Prim]) -> dict[str, list[Usd.Prim]]
     return index
 
 
+def _mesh_name_lookup_keys(mesh_name: str) -> tuple[str, ...]:
+    raw_name = str(mesh_name or "").strip()
+    if not raw_name:
+        return ()
+    keys: list[str] = [raw_name]
+    sanitized = Tf.MakeValidIdentifier(raw_name)
+    if sanitized and sanitized not in keys:
+        keys.append(sanitized)
+    return tuple(keys)
+
+
 def _binding_target_for_prim(prim: Usd.Prim) -> str:
     if prim.IsA(UsdGeom.Xform):
         return str(prim.GetPath())
@@ -520,20 +531,22 @@ def _collect_targets_for_mesh_names(
     targets: list[str] = []
     seen: set[str] = set()
     for mesh_name in mesh_names:
-        if not mesh_name:
+        lookup_names = _mesh_name_lookup_keys(str(mesh_name))
+        if not lookup_names:
             continue
-        direct_path = f"{render_root}/{mesh_name}"
-        direct_prim = stage.GetPrimAtPath(direct_path)
-        if direct_prim and direct_prim.IsValid():
-            target = _binding_target_for_prim(direct_prim)
-            if target not in seen:
-                seen.add(target)
-                targets.append(target)
-        for prim in name_index.get(mesh_name, []):
-            target = _binding_target_for_prim(prim)
-            if target not in seen:
-                seen.add(target)
-                targets.append(target)
+        for lookup_name in lookup_names:
+            direct_path = f"{render_root}/{lookup_name}"
+            direct_prim = stage.GetPrimAtPath(direct_path)
+            if direct_prim and direct_prim.IsValid():
+                target = _binding_target_for_prim(direct_prim)
+                if target not in seen:
+                    seen.add(target)
+                    targets.append(target)
+            for prim in name_index.get(lookup_name, []):
+                target = _binding_target_for_prim(prim)
+                if target not in seen:
+                    seen.add(target)
+                    targets.append(target)
     return targets
 
 
