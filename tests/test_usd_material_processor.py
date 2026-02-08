@@ -232,8 +232,25 @@ def test_emission_and_opacity_wired_for_non_preview_renderers(tmp_path):
         stage.GetPrimAtPath("/Asset/mtl/MatA/ArnoldNodeGraph/arnold_standard_surface1")
     )
     assert arnold_shader.GetInput("emission").Get() == 1
+    arnold_emission_color = arnold_shader.GetInput("emission_color")
+    assert arnold_emission_color and arnold_emission_color.HasConnectedSource()
+    arnold_emission_source = arnold_emission_color.GetConnectedSource()
+    assert arnold_emission_source
+    assert arnold_emission_source[1] == "rgb"
+    assert (
+        str(arnold_emission_source[0].GetPrim().GetPath())
+        == "/Asset/mtl/MatA/ArnoldNodeGraph/arnold_emissionColorCorrect"
+    )
+
     arnold_opacity_input = arnold_shader.GetInput("opacity")
     assert arnold_opacity_input and arnold_opacity_input.HasConnectedSource()
+    arnold_opacity_source = arnold_opacity_input.GetConnectedSource()
+    assert arnold_opacity_source
+    assert arnold_opacity_source[1] == "rgb"
+    assert (
+        str(arnold_opacity_source[0].GetPrim().GetPath())
+        == "/Asset/mtl/MatA/ArnoldNodeGraph/arnold_opacityRange"
+    )
 
     arnold_emission_tex = UsdShade.Shader(
         stage.GetPrimAtPath("/Asset/mtl/MatA/ArnoldNodeGraph/arnold_emissionTexture")
@@ -242,6 +259,12 @@ def test_emission_and_opacity_wired_for_non_preview_renderers(tmp_path):
         _asset_path_value(arnold_emission_tex.GetInput("filename"))
         == "textures/MatA_Emissive.png"
     )
+    arnold_emission_cc = UsdShade.Shader(
+        stage.GetPrimAtPath("/Asset/mtl/MatA/ArnoldNodeGraph/arnold_emissionColorCorrect")
+    )
+    arnold_emission_cc_input = arnold_emission_cc.GetInput("input")
+    assert arnold_emission_cc_input and arnold_emission_cc_input.HasConnectedSource()
+
     arnold_opacity_tex = UsdShade.Shader(
         stage.GetPrimAtPath("/Asset/mtl/MatA/ArnoldNodeGraph/arnold_opacityTexture")
     )
@@ -249,13 +272,35 @@ def test_emission_and_opacity_wired_for_non_preview_renderers(tmp_path):
         _asset_path_value(arnold_opacity_tex.GetInput("filename"))
         == "textures/MatA_Opacity.png"
     )
+    arnold_opacity_range = UsdShade.Shader(
+        stage.GetPrimAtPath("/Asset/mtl/MatA/ArnoldNodeGraph/arnold_opacityRange")
+    )
+    arnold_opacity_range_input = arnold_opacity_range.GetInput("input")
+    assert arnold_opacity_range_input and arnold_opacity_range_input.HasConnectedSource()
 
     mtlx_shader = UsdShade.Shader(
         stage.GetPrimAtPath("/Asset/mtl/MatA/MtlxNodeGraph/mtlx_mtlxstandard_surface1")
     )
     assert mtlx_shader.GetInput("emission").Get() == 1
+    mtlx_emission_color = mtlx_shader.GetInput("emission_color")
+    assert mtlx_emission_color and mtlx_emission_color.HasConnectedSource()
+    mtlx_emission_source = mtlx_emission_color.GetConnectedSource()
+    assert mtlx_emission_source
+    assert mtlx_emission_source[1] == "out"
+    assert (
+        str(mtlx_emission_source[0].GetPrim().GetPath())
+        == "/Asset/mtl/MatA/MtlxNodeGraph/mtlx_emissionColorCorrect"
+    )
+
     mtlx_opacity_input = mtlx_shader.GetInput("opacity")
     assert mtlx_opacity_input and mtlx_opacity_input.HasConnectedSource()
+    mtlx_opacity_source = mtlx_opacity_input.GetConnectedSource()
+    assert mtlx_opacity_source
+    assert mtlx_opacity_source[1] == "out"
+    assert (
+        str(mtlx_opacity_source[0].GetPrim().GetPath())
+        == "/Asset/mtl/MatA/MtlxNodeGraph/mtlx_opacityRange"
+    )
 
     mtlx_emission_tex = UsdShade.Shader(
         stage.GetPrimAtPath("/Asset/mtl/MatA/MtlxNodeGraph/mtlx_emissionTexture")
@@ -264,6 +309,13 @@ def test_emission_and_opacity_wired_for_non_preview_renderers(tmp_path):
         _asset_path_value(mtlx_emission_tex.GetInput("file"))
         == "textures/MatA_Emissive.png"
     )
+    mtlx_emission_cc = UsdShade.Shader(
+        stage.GetPrimAtPath("/Asset/mtl/MatA/MtlxNodeGraph/mtlx_emissionColorCorrect")
+    )
+    assert mtlx_emission_cc.GetIdAttr().Get() == "ND_colorcorrect_color3"
+    mtlx_emission_cc_input = mtlx_emission_cc.GetInput("in")
+    assert mtlx_emission_cc_input and mtlx_emission_cc_input.HasConnectedSource()
+
     mtlx_opacity_tex = UsdShade.Shader(
         stage.GetPrimAtPath("/Asset/mtl/MatA/MtlxNodeGraph/mtlx_opacityTexture")
     )
@@ -271,6 +323,12 @@ def test_emission_and_opacity_wired_for_non_preview_renderers(tmp_path):
         _asset_path_value(mtlx_opacity_tex.GetInput("file"))
         == "textures/MatA_Opacity.png"
     )
+    mtlx_opacity_range = UsdShade.Shader(
+        stage.GetPrimAtPath("/Asset/mtl/MatA/MtlxNodeGraph/mtlx_opacityRange")
+    )
+    assert mtlx_opacity_range.GetIdAttr().Get() == "ND_range_color3"
+    mtlx_opacity_range_input = mtlx_opacity_range.GetInput("in")
+    assert mtlx_opacity_range_input and mtlx_opacity_range_input.HasConnectedSource()
 
     openpbr_src_dir = tmp_path / "openpbr_textures"
     openpbr_src_dir.mkdir(parents=True, exist_ok=True)
@@ -327,8 +385,26 @@ def test_emission_and_opacity_wired_for_non_preview_renderers(tmp_path):
         openpbr_material_source[0].GetPrim().GetPath()
         == openpbr_nodegraph.GetPrim().GetPath()
     )
+    openpbr_emission_color = openpbr_shader.GetInput("emission_color")
+    assert openpbr_emission_color and openpbr_emission_color.HasConnectedSource()
+    openpbr_emission_source = openpbr_emission_color.GetConnectedSource()
+    assert openpbr_emission_source
+    assert openpbr_emission_source[1] == "out"
+    assert (
+        str(openpbr_emission_source[0].GetPrim().GetPath())
+        == "/Asset/mtl/MatA/OpenPbrNodeGraph/openpbr_emissionColorCorrect"
+    )
+
     openpbr_opacity_input = openpbr_shader.GetInput("geometry_opacity")
     assert openpbr_opacity_input and openpbr_opacity_input.HasConnectedSource()
+    openpbr_opacity_source = openpbr_opacity_input.GetConnectedSource()
+    assert openpbr_opacity_source
+    assert openpbr_opacity_source[1] == "out"
+    assert (
+        str(openpbr_opacity_source[0].GetPrim().GetPath())
+        == "/Asset/mtl/MatA/OpenPbrNodeGraph/openpbr_opacityRange"
+    )
+
     openpbr_emission_tex = UsdShade.Shader(
         stage.GetPrimAtPath("/Asset/mtl/MatA/OpenPbrNodeGraph/openpbr_emissionTexture")
     )
@@ -336,12 +412,29 @@ def test_emission_and_opacity_wired_for_non_preview_renderers(tmp_path):
         _asset_path_value(openpbr_emission_tex.GetInput("file"))
         == "textures/MatA_Emissive.png"
     )
+    openpbr_emission_cc = UsdShade.Shader(
+        stage.GetPrimAtPath(
+            "/Asset/mtl/MatA/OpenPbrNodeGraph/openpbr_emissionColorCorrect"
+        )
+    )
+    assert openpbr_emission_cc.GetIdAttr().Get() == "ND_colorcorrect_color3"
+    openpbr_emission_cc_input = openpbr_emission_cc.GetInput("in")
+    assert openpbr_emission_cc_input and openpbr_emission_cc_input.HasConnectedSource()
+
     openpbr_opacity_tex = UsdShade.Shader(
         stage.GetPrimAtPath("/Asset/mtl/MatA/OpenPbrNodeGraph/openpbr_opacityTexture")
     )
     assert (
         _asset_path_value(openpbr_opacity_tex.GetInput("file"))
         == "textures/MatA_Opacity.png"
+    )
+    openpbr_opacity_range = UsdShade.Shader(
+        stage.GetPrimAtPath("/Asset/mtl/MatA/OpenPbrNodeGraph/openpbr_opacityRange")
+    )
+    assert openpbr_opacity_range.GetIdAttr().Get() == "ND_range_float"
+    openpbr_opacity_range_input = openpbr_opacity_range.GetInput("in")
+    assert (
+        openpbr_opacity_range_input and openpbr_opacity_range_input.HasConnectedSource()
     )
 
 

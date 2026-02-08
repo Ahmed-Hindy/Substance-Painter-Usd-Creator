@@ -180,10 +180,20 @@ class ArnoldBuilder:
                     "rgb",
                 )
             elif slot == "emission":
+                color_correct_path = f"{collect_path}/arnold_{slot}ColorCorrect"
+                color_correct_shader = self._initialize_color_correct_shader(
+                    color_correct_path
+                )
+                color_correct_shader.CreateInput(
+                    "input", Sdf.ValueTypeNames.Float4
+                ).ConnectToSource(
+                    texture_shader.ConnectableAPI(),
+                    "rgba",
+                )
                 std_surf_shader.CreateInput(
                     input_name, Sdf.ValueTypeNames.Float3
                 ).ConnectToSource(
-                    texture_shader.ConnectableAPI(),
+                    color_correct_shader.ConnectableAPI(),
                     "rgb",
                 )
                 emission_input = std_surf_shader.GetInput("emission")
@@ -222,10 +232,18 @@ class ArnoldBuilder:
                     "r",
                 )
             elif slot == "opacity":
+                range_path = f"{collect_path}/arnold_{slot}Range"
+                range_shader = self._initialize_range_shader(range_path)
+                range_shader.CreateInput(
+                    "input", Sdf.ValueTypeNames.Float4
+                ).ConnectToSource(
+                    texture_shader.ConnectableAPI(),
+                    "rgba",
+                )
                 std_surf_shader.CreateInput(
                     input_name, Sdf.ValueTypeNames.Float3
                 ).ConnectToSource(
-                    texture_shader.ConnectableAPI(),
+                    range_shader.ConnectableAPI(),
                     "rgb",
                 )
             elif slot == "displacement":
