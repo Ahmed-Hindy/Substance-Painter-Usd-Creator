@@ -16,6 +16,11 @@ packaging/axe_usd_plugin/dependencies/*
 !packaging/axe_usd_plugin/dependencies/
 !packaging/axe_usd_plugin/dependencies/README.md
 
+backup/
+galleries/
 *.rat
 *.txt
 *.tex
+*.tex
+*.hip
+*.spp

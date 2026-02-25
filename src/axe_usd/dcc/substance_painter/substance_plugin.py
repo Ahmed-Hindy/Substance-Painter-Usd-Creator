@@ -41,13 +41,14 @@ logger = logging.getLogger(__name__)
 logger.propagate = True
 
 DEFAULT_PRIMITIVE_PATH = "/Asset"
-USD_PREVIEW_JPEG_SIZE_LOG2 = 7  # 128px
 USD_PREVIEW_JPEG_SUFFIX = ".jpg"
 USD_PREVIEW_RESOLUTION_LOG2 = {
     128: 7,
     256: 8,
     512: 9,
     1024: 10,
+    2048: 11,
+    4096: 12,
 }
 PREVIEW_TEXTURE_DIRNAME = "previewTextures"
 PREVIEW_EXPORT_PRESET = "AxeUSDPreview"
@@ -263,7 +264,7 @@ def _build_preview_export_config(
             PREVIEW_EXPORT_PRESET_UDIM if name in udim_set else PREVIEW_EXPORT_PRESET
         )
         export_list.append({"rootPath": name, "exportPreset": preset})
-    size_log2 = USD_PREVIEW_RESOLUTION_LOG2.get(resolution, USD_PREVIEW_JPEG_SIZE_LOG2)
+    size_log2 = _resolve_preview_resolution_log2(resolution)
     export_preset = {
         "name": PREVIEW_EXPORT_PRESET,
         "maps": [
@@ -347,6 +348,20 @@ def _build_preview_export_config(
         "exportList": export_list,
         "exportShaderParams": False,
     }
+
+
+def _resolve_preview_resolution_log2(resolution: int) -> int:
+    try:
+        return USD_PREVIEW_RESOLUTION_LOG2[int(resolution)]
+    except (TypeError, ValueError, KeyError) as exc:
+        supported_resolutions = sorted(USD_PREVIEW_RESOLUTION_LOG2.keys())
+        raise ValidationError(
+            "Unsupported USD Preview resolution.",
+            details={
+                "resolution": resolution,
+                "supported_resolutions": supported_resolutions,
+            },
+        ) from exc
 
 
 def _export_usdpreview_textures(
