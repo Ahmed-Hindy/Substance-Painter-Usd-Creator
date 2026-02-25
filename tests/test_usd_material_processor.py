@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 from pxr import Sdf, Usd, UsdGeom, UsdShade
 
+from axe_usd.core.exceptions import ValidationError
 from axe_usd.usd import material_processor
 
 SP_SAMPLE_USD = Path(
@@ -106,7 +107,17 @@ def test_create_shaded_asset_publish_creates_layers(tmp_path, sp_texture_factory
     assert (asset_dir / "geo.usdc").exists()
 
 
-def test_usd_preview_texture_override_applies(tmp_path, sp_texture_factory):
+@pytest.mark.parametrize(
+    ("preview_format", "expected_suffix"),
+    [
+        (".jpg", ".jpg"),
+        ("jpeg", ".jpeg"),
+        ("png", ".png"),
+    ],
+)
+def test_usd_preview_texture_override_applies(
+    tmp_path, sp_texture_factory, preview_format: str, expected_suffix: str
+):
     """Ensure usd preview textures honor per-renderer format overrides."""
     textures = sp_texture_factory({"basecolor": ".exr"})
     material_dict_list = _material_dict_from_paths({"basecolor": textures["basecolor"]})
@@ -121,7 +132,7 @@ def test_usd_preview_texture_override_applies(tmp_path, sp_texture_factory):
         create_usd_preview=True,
         create_arnold=False,
         create_mtlx=False,
-        texture_format_overrides={"usd_preview": "jpg"},
+        texture_format_overrides={"usd_preview": preview_format},
     )
 
     # Open mtl.usdc to check material definitions
@@ -132,8 +143,29 @@ def test_usd_preview_texture_override_applies(tmp_path, sp_texture_factory):
     texture_shader = UsdShade.Shader(texture_prim)
     assert (
         _asset_path_value(texture_shader.GetInput("file"))
-        == "textures/previewTextures/MatA_BaseColor.jpg"
+        == f"textures/previewTextures/MatA_BaseColor{expected_suffix}"
     )
+
+
+def test_usd_preview_texture_override_rejects_unsupported_format(
+    tmp_path, sp_texture_factory
+):
+    textures = sp_texture_factory({"basecolor": ".exr"})
+    material_dict_list = _material_dict_from_paths({"basecolor": textures["basecolor"]})
+
+    with pytest.raises(ValidationError):
+        material_processor.create_shaded_asset_publish(
+            material_dict_list=material_dict_list,
+            stage=None,
+            geo_file=None,
+            parent_path="/Asset",
+            layer_save_path=str(tmp_path),
+            main_layer_name="main.usda",
+            create_usd_preview=True,
+            create_arnold=False,
+            create_mtlx=False,
+            texture_format_overrides={"usd_preview": "jpg"},
+        )
 
 
 def test_renderer_specific_format_overrides(tmp_path, sp_texture_factory):
@@ -152,7 +184,7 @@ def test_renderer_specific_format_overrides(tmp_path, sp_texture_factory):
         create_arnold=True,
         create_mtlx=True,
         texture_format_overrides={
-            "usd_preview": "jpg",
+            "usd_preview": ".jpg",
             "arnold": "tif",
             "mtlx": "png",
         },
@@ -850,16 +882,12 @@ def test_bind_materials_in_variant_uses_mesh_names_for_xforms(tmp_path):
     paths = create_asset_file_structure(tmp_path, "Asset")
     geo_stage = create_geo_usd_file(paths, "Asset")
 
-    render_xform = UsdGeom.Xform.Define(
-        geo_stage, "/Asset/geo/render/locust_antenna_001_geo"
-    )
+    UsdGeom.Xform.Define(geo_stage, "/Asset/geo/render/locust_antenna_001_geo")
     UsdGeom.Mesh.Define(
         geo_stage,
         "/Asset/geo/render/locust_antenna_001_geo/locust_antenna_001_geo",
     )
-    proxy_xform = UsdGeom.Xform.Define(
-        geo_stage, "/Asset/geo/proxy/locust_antenna_001_geo"
-    )
+    UsdGeom.Xform.Define(geo_stage, "/Asset/geo/proxy/locust_antenna_001_geo")
     UsdGeom.Mesh.Define(
         geo_stage,
         "/Asset/geo/proxy/locust_antenna_001_geo/locust_antenna_001_geo",
@@ -915,16 +943,12 @@ def test_bind_materials_in_variant_normalizes_mesh_names_for_xforms(tmp_path):
     paths = create_asset_file_structure(tmp_path, "Asset")
     geo_stage = create_geo_usd_file(paths, "Asset")
 
-    render_xform = UsdGeom.Xform.Define(
-        geo_stage, "/Asset/geo/render/locust_grasshopper_v17_copy1"
-    )
+    UsdGeom.Xform.Define(geo_stage, "/Asset/geo/render/locust_grasshopper_v17_copy1")
     UsdGeom.Mesh.Define(
         geo_stage,
         "/Asset/geo/render/locust_grasshopper_v17_copy1/locust_grasshopper_v17_copy1_1",
     )
-    proxy_xform = UsdGeom.Xform.Define(
-        geo_stage, "/Asset/geo/proxy/locust_grasshopper_v17_copy1"
-    )
+    UsdGeom.Xform.Define(geo_stage, "/Asset/geo/proxy/locust_grasshopper_v17_copy1")
     UsdGeom.Mesh.Define(
         geo_stage,
         "/Asset/geo/proxy/locust_grasshopper_v17_copy1/locust_grasshopper_v17_copy1_1",

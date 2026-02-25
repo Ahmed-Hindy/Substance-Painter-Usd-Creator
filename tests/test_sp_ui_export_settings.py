@@ -82,7 +82,7 @@ def test_arnold_displacement_toggle_maps_to_export_settings():
     from axe_usd.dcc.substance_painter import substance_plugin, ui
 
     fake_view = types.SimpleNamespace(
-        override_usdpreview=_FakeCombo("auto", "Auto"),
+        override_usdpreview=_FakeCombo(".jpg", ".jpg"),
         usdpreview=_FakeCheck(True),
         arnold=_FakeCheck(True),
         arnold_displacement=_FakeCheck(True),

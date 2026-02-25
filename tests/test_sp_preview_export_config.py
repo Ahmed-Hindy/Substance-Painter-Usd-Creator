@@ -5,6 +5,7 @@ import types
 import pytest
 
 from axe_usd.core.exceptions import ValidationError
+from axe_usd.core.preview_texture_format import parse_preview_texture_format
 
 
 def _install_qt_stub() -> None:
@@ -82,6 +83,7 @@ def test_build_preview_export_config_supports_all_ui_resolutions(
         preview_dir=Path("C:/tmp/preview"),
         texture_sets=("Body",),
         resolution=resolution,
+        preview_format=parse_preview_texture_format(".jpg"),
     )
 
     parameters = config["exportPresets"][0]["maps"][0]["parameters"]
@@ -98,6 +100,7 @@ def test_build_preview_export_config_rejects_unsupported_resolution() -> None:
             preview_dir=Path("C:/tmp/preview"),
             texture_sets=("Body",),
             resolution=300,
+            preview_format=parse_preview_texture_format(".jpg"),
         )
 
     assert exc_info.value.details["resolution"] == 300
@@ -109,3 +112,37 @@ def test_build_preview_export_config_rejects_unsupported_resolution() -> None:
         2048,
         4096,
     ]
+
+
+@pytest.mark.parametrize(
+    ("format_value", "expected_file_format"),
+    [
+        (".jpg", "jpg"),
+        ("jpeg", "jpeg"),
+        ("png", "png"),
+    ],
+)
+def test_build_preview_export_config_uses_selected_format(
+    format_value: str, expected_file_format: str
+) -> None:
+    _install_qt_stub()
+    _install_sp_stub()
+    from axe_usd.dcc.substance_painter import substance_plugin
+
+    config = substance_plugin._build_preview_export_config(
+        preview_dir=Path("C:/tmp/preview"),
+        texture_sets=("Body",),
+        resolution=1024,
+        preview_format=parse_preview_texture_format(format_value),
+    )
+
+    parameters = config["exportPresets"][0]["maps"][0]["parameters"]
+    assert parameters["fileFormat"] == expected_file_format
+
+
+def test_parse_preview_texture_format_rejects_unsupported_value() -> None:
+    with pytest.raises(ValidationError) as exc_info:
+        parse_preview_texture_format("jpg")
+
+    assert exc_info.value.details["format"] == "jpg"
+    assert exc_info.value.details["supported_formats"] == [".jpg", "jpeg", "png"]
