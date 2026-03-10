@@ -19,7 +19,7 @@ from ...core.exceptions import (
     USDStageError,
     ValidationError,
 )
-from ...core.fs_utils import ensure_directory
+
 from ...core.models import ExportSettings
 from ...core.preview_texture_format import (
     PreviewTextureFormat,
@@ -90,7 +90,7 @@ class MeshExporter:
         Returns:
             Optional[Path]: Path to the exported mesh if successful.
         """
-        ensure_directory(self.mesh_path.parent)
+        self.mesh_path.parent.mkdir(parents=True, exist_ok=True)
         logger.info("Exporting mesh to %s", self.mesh_path)
         logger.debug("Mesh export target suffix: %s", self.mesh_path.suffix)
         export_path = self.mesh_path
@@ -376,9 +376,9 @@ def _export_usdpreview_textures(
     if not texture_sets:
         raise ValidationError("UsdPreview export failed: no texture sets found.")
 
-    ensure_directory(textures_dir)
+    textures_dir.mkdir(parents=True, exist_ok=True)
     preview_dir = textures_dir / PREVIEW_TEXTURE_DIRNAME
-    ensure_directory(preview_dir)
+    preview_dir.mkdir(parents=True, exist_ok=True)
     export_config = _build_preview_export_config(
         preview_dir,
         texture_sets,
@@ -423,7 +423,7 @@ def _export_usdpreview_textures(
 def _move_exported_textures(
     textures: Mapping[Tuple[str, str], Sequence[str]], textures_dir: Path
 ) -> Mapping[Tuple[str, str], Sequence[str]]:
-    ensure_directory(textures_dir)
+    textures_dir.mkdir(parents=True, exist_ok=True)
     updated: dict[Tuple[str, str], list[str]] = {}
     for key, paths in textures.items():
         new_paths: list[str] = []

@@ -34,6 +34,11 @@ def _material_name_from_key(key: TextureKey) -> str:
 
 
 def udim_token_path(path: str) -> Optional[str]:
+    """Replace a UDIM tile number (e.g. 1001) with the ``<UDIM>`` token.
+
+    Returns the tokenized path, or ``None`` if the path does not contain
+    a recognizable UDIM tile pattern.
+    """
     if not path:
         return None
     if "<UDIM>" in path:

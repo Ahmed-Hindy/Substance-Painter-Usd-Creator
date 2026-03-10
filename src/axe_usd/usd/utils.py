@@ -3,9 +3,12 @@
 Copyright Ahmed Hindy. Please mention the author if you found any part of this code useful.
 """
 
+import logging
 from typing import List, Optional, Tuple
 
 from pxr import Usd
+
+logger = logging.getLogger(__name__)
 
 
 def collect_prims_of_type(
@@ -26,24 +29,15 @@ def collect_prims_of_type(
         Tuple[bool, List[Usd.Prim]]: Success flag and list of matching prims.
     """
     if not parent_prim.IsValid():
-        print(f"Invalid prim: {parent_prim}")
+        logger.warning("Invalid prim: %s", parent_prim)
         return False, []
 
-    prims_found = []
+    def _walk(prim: Usd.Prim):
+        for child in prim.GetChildren():
+            if child.IsA(prim_type):
+                if not contains_str or contains_str in child.GetName():
+                    yield child
+            elif recursive:
+                yield from _walk(child)
 
-    def _recursive_search(prim: Usd.Prim) -> List[Usd.Prim]:
-        """Recursively collect matching prims."""
-        for child_prim in prim.GetChildren():  # child_prim: Usd.Prim
-            if child_prim.IsA(prim_type):
-                if contains_str:
-                    if contains_str in child_prim.GetName():
-                        prims_found.append(child_prim)
-                else:
-                    prims_found.append(child_prim)
-            else:
-                if recursive:  # if prim not the type we want, go recurse inside
-                    _recursive_search(child_prim)
-        return prims_found
-
-    all_prims_found = _recursive_search(parent_prim)
-    return True, all_prims_found
+    return True, list(_walk(parent_prim))
