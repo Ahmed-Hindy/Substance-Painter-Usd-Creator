@@ -21,6 +21,10 @@ from ...core.exceptions import (
 )
 from ...core.fs_utils import ensure_directory
 from ...core.models import ExportSettings
+from ...core.preview_texture_format import (
+    PreviewTextureFormat,
+    parse_preview_texture_format,
+)
 from ...core.publish_paths import build_publish_paths
 from ...core.texture_parser import parse_textures
 from ...usd.pxr_writer import PxrUsdWriter
@@ -41,13 +45,13 @@ logger = logging.getLogger(__name__)
 logger.propagate = True
 
 DEFAULT_PRIMITIVE_PATH = "/Asset"
-USD_PREVIEW_JPEG_SIZE_LOG2 = 7  # 128px
-USD_PREVIEW_JPEG_SUFFIX = ".jpg"
 USD_PREVIEW_RESOLUTION_LOG2 = {
     128: 7,
     256: 8,
     512: 9,
     1024: 10,
+    2048: 11,
+    4096: 12,
 }
 PREVIEW_TEXTURE_DIRNAME = "previewTextures"
 PREVIEW_EXPORT_PRESET = "AxeUSDPreview"
@@ -74,9 +78,7 @@ class MeshExporter:
         # Extract asset name from settings (e.g. primitive_path="/Asset" -> "Asset")
         asset_name = settings.primitive_path.strip("/").split("/")[-1]
 
-        publish_paths = build_publish_paths(
-            settings.publish_directory, settings.main_layer_name, asset_name
-        )
+        publish_paths = build_publish_paths(settings.publish_directory, asset_name)
         self.mesh_path = publish_paths.geometry_path
         self.root_prim_path = DEFAULT_PRIMITIVE_PATH
         self.skip_postprocess = skip_postprocess
@@ -254,6 +256,7 @@ def _build_preview_export_config(
     preview_dir: Path,
     texture_sets: Sequence[str],
     resolution: int,
+    preview_format: PreviewTextureFormat,
     udim_texture_sets: Optional[Sequence[str]] = None,
 ) -> Dict[str, object]:
     udim_set = {name for name in (udim_texture_sets or []) if name}
@@ -263,7 +266,7 @@ def _build_preview_export_config(
             PREVIEW_EXPORT_PRESET_UDIM if name in udim_set else PREVIEW_EXPORT_PRESET
         )
         export_list.append({"rootPath": name, "exportPreset": preset})
-    size_log2 = USD_PREVIEW_RESOLUTION_LOG2.get(resolution, USD_PREVIEW_JPEG_SIZE_LOG2)
+    size_log2 = _resolve_preview_resolution_log2(resolution)
     export_preset = {
         "name": PREVIEW_EXPORT_PRESET,
         "maps": [
@@ -290,7 +293,7 @@ def _build_preview_export_config(
                     },
                 ],
                 "parameters": {
-                    "fileFormat": USD_PREVIEW_JPEG_SUFFIX.lstrip("."),
+                    "fileFormat": preview_format.substance_file_format,
                     "bitDepth": "8",
                     "dithering": False,
                     "sizeLog2": size_log2,
@@ -329,7 +332,7 @@ def _build_preview_export_config(
                             },
                         ],
                         "parameters": {
-                            "fileFormat": USD_PREVIEW_JPEG_SUFFIX.lstrip("."),
+                            "fileFormat": preview_format.substance_file_format,
                             "bitDepth": "8",
                             "dithering": False,
                             "sizeLog2": size_log2,
@@ -349,10 +352,25 @@ def _build_preview_export_config(
     }
 
 
+def _resolve_preview_resolution_log2(resolution: int) -> int:
+    try:
+        return USD_PREVIEW_RESOLUTION_LOG2[int(resolution)]
+    except (TypeError, ValueError, KeyError) as exc:
+        supported_resolutions = sorted(USD_PREVIEW_RESOLUTION_LOG2.keys())
+        raise ValidationError(
+            "Unsupported USD Preview resolution.",
+            details={
+                "resolution": resolution,
+                "supported_resolutions": supported_resolutions,
+            },
+        ) from exc
+
+
 def _export_usdpreview_textures(
     textures_dir: Path,
     texture_sets: Sequence[str],
     resolution: int,
+    preview_format: PreviewTextureFormat,
     udim_texture_sets: Optional[Sequence[str]] = None,
 ) -> None:
     if not texture_sets:
@@ -362,7 +380,11 @@ def _export_usdpreview_textures(
     preview_dir = textures_dir / PREVIEW_TEXTURE_DIRNAME
     ensure_directory(preview_dir)
     export_config = _build_preview_export_config(
-        preview_dir, texture_sets, resolution, udim_texture_sets=udim_texture_sets
+        preview_dir,
+        texture_sets,
+        resolution,
+        preview_format,
+        udim_texture_sets=udim_texture_sets,
     )
     logger.debug("UsdPreview texture sets: %s", texture_sets)
     if udim_texture_sets:
@@ -568,11 +590,15 @@ def on_post_export(context: ExportContext) -> None:
         )
 
         texture_overrides = dict(raw.texture_format_overrides or {})
+        preview_format = parse_preview_texture_format(
+            texture_overrides.get("usd_preview")
+        )
         if raw.usdpreview:
             _export_usdpreview_textures(
                 textures_dir,
                 texture_sets,
                 raw.usdpreview_resolution,
+                preview_format,
                 udim_texture_sets=udim_texture_sets,
             )
 

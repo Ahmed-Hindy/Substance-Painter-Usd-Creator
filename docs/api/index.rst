@@ -42,7 +42,7 @@ Core
    :members:
    :undoc-members:
    :show-inheritance:
-   :exclude-members: arnold, geometry_path, main_layer_name, materialx, name, openpbr, primitive_path, publish_directory, root_dir, save_geometry, texture_format_overrides, textures, usdpreview
+   :exclude-members: arnold, geometry_path, materialx, name, openpbr, primitive_path, publish_directory, root_dir, save_geometry, texture_format_overrides, textures, usdpreview
 
 .. automodule:: axe_usd.core.publish_paths
    :members:

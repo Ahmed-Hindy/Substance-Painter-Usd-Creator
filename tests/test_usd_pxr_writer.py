@@ -19,7 +19,7 @@ def test_pxr_writer_exports_layers(tmp_path):
         publish_directory=Path(tmp_path),
         save_geometry=False,
     )
-    paths = build_publish_paths(settings.publish_directory, settings.main_layer_name)
+    paths = build_publish_paths(settings.publish_directory)
 
     PxrUsdWriter().export(materials, settings, None, paths)
 

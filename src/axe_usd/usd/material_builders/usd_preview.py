@@ -4,18 +4,22 @@ from pathlib import Path
 
 from pxr import Sdf, UsdShade
 
+from ...core.preview_texture_format import (
+    PreviewTextureFormat,
+    parse_preview_texture_format,
+)
 from .base import MaterialBuildContext, _connect_nodegraph_output
 
 PREVIEW_TEXTURE_DIRNAME = "previewTextures"
-PREVIEW_TEXTURE_SUFFIX = ".jpg"
+PREVIEW_TEXTURE_SUFFIX = PreviewTextureFormat.JPG.extension
 
 
-def _preview_texture_path(path: str, mat_name: str) -> str:
+def _preview_texture_path(path: str, mat_name: str, extension: str) -> str:
     source_path = Path(path)
     if "<UDIM>" in path:
-        preview_name = f"{mat_name}_BaseColor.<UDIM>{PREVIEW_TEXTURE_SUFFIX}"
+        preview_name = f"{mat_name}_BaseColor.<UDIM>{extension}"
     else:
-        preview_name = f"{mat_name}_BaseColor{PREVIEW_TEXTURE_SUFFIX}"
+        preview_name = f"{mat_name}_BaseColor{extension}"
     preview_dir = source_path.parent / PREVIEW_TEXTURE_DIRNAME
     preview_path = preview_dir / preview_name
     if source_path.is_absolute():
@@ -30,6 +34,9 @@ class UsdPreviewBuilder:
 
     def build(self, collect_path: str) -> UsdShade.Shader:
         stage = self._context.stage
+        preview_format = parse_preview_texture_format(
+            self._context.texture_format_overrides.for_renderer("usd_preview")
+        )
 
         nodegraph_path = f"{collect_path}/UsdPreviewNodeGraph"
         nodegraph = UsdShade.NodeGraph.Define(stage, nodegraph_path)
@@ -68,7 +75,9 @@ class UsdPreviewBuilder:
             path = base_info.get("path")
             if path:
                 mat_name = base_info.get("mat_name", "")
-                tex_filepath = _preview_texture_path(path, mat_name)
+                tex_filepath = _preview_texture_path(
+                    path, mat_name, preview_format.extension
+                )
                 texture_prim = _define_texture("basecolorTexture", tex_filepath)
                 shader.CreateInput(
                     "diffuseColor", Sdf.ValueTypeNames.Float3

@@ -6,14 +6,11 @@ from .models import PublishPaths
 _USD_EXTENSIONS = {".usd", ".usda", ".usdc"}
 
 
-def build_publish_paths(
-    publish_directory: Path, main_layer_name: str, asset_name: str = ""
-) -> PublishPaths:
+def build_publish_paths(publish_directory: Path, asset_name: str = "") -> PublishPaths:
     """Build publish paths for an export directory.
 
     Args:
         publish_directory: Target directory or main layer file path.
-        main_layer_name: File name for the main layer.
         asset_name: Optional asset name to subfolder geometry.
 
     Returns:

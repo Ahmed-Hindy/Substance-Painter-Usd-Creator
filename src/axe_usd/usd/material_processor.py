@@ -701,7 +701,6 @@ def create_shaded_asset_publish(
     geo_file: Optional[str] = None,
     parent_path: str = "/Asset",
     layer_save_path: Optional[str] = None,
-    main_layer_name: str = "main.usda",
     create_usd_preview: bool = True,
     create_arnold: bool = False,
     create_mtlx: bool = True,
@@ -721,7 +720,6 @@ def create_shaded_asset_publish(
         geo_file: Optional geometry USD file to reference (source).
         parent_path: Root prim path for the published asset (e.g., "/Asset").
         layer_save_path: Output directory.
-        main_layer_name: Ignored (uses AssetName.usd).
         create_usd_preview: Whether to create UsdPreviewSurface materials.
         create_arnold: Whether to create Arnold materials.
         create_mtlx: Whether to create MaterialX materials.

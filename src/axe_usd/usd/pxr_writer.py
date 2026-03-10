@@ -33,7 +33,6 @@ class PxrUsdWriter:
             geo_file=str(geo_file) if geo_file else None,
             parent_path=settings.primitive_path,
             layer_save_path=str(paths.root_dir),
-            main_layer_name=settings.main_layer_name,
             create_usd_preview=settings.usdpreview,
             create_arnold=settings.arnold,
             create_mtlx=settings.materialx,
