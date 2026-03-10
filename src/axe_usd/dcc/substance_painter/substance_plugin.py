@@ -493,7 +493,7 @@ def start_plugin() -> None:
         return
 
     global usd_exported_qdialog
-    usd_exported_qdialog = USDExporterView(logger=logger)
+    usd_exported_qdialog = USDExporterView()
     substance_painter.ui.add_dock_widget(usd_exported_qdialog)
     plugin_widgets.append(usd_exported_qdialog)
     register_callbacks()

@@ -1,39 +1,11 @@
-"""File system abstraction for testability and validation."""
+"""File system helpers with validation and consistent error wrapping."""
 
 import json
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, Optional, Protocol
+from typing import Any, Dict, Optional
 
 from .exceptions import FileSystemError, ValidationError
-
-
-class FileSystem(Protocol):
-    """Protocol for file system operations.
-
-    This protocol defines the interface for file system operations,
-    allowing for easy mocking in tests and centralized validation.
-    """
-
-    def ensure_directory(self, path: Path) -> Path:
-        """Create directory if it doesn't exist."""
-        ...
-
-    def validate_path(self, path: Path, base_dir: Optional[Path] = None) -> Path:
-        """Validate and resolve a path."""
-        ...
-
-    def path_exists(self, path: Path) -> bool:
-        """Check if path exists."""
-        ...
-
-    def read_json(self, path: Path) -> Dict[str, Any]:
-        """Read JSON file."""
-        ...
-
-    def write_json(self, path: Path, data: Dict[str, Any]) -> None:
-        """Write JSON file."""
-        ...
 
 
 class DefaultFileSystem:
@@ -103,3 +75,6 @@ class DefaultFileSystem:
 
             with path.open("w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
+
+
+__all__ = ["DefaultFileSystem"]

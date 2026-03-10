@@ -3,33 +3,8 @@
 from __future__ import annotations
 
 from importlib import metadata
-from pathlib import Path
-from typing import Optional
-import re
 
-
-def _version_from_pyproject() -> Optional[str]:
-    repo_root = Path(__file__).resolve().parents[2]
-    pyproject = repo_root / "pyproject.toml"
-    if not pyproject.exists():
-        return None
-    try:
-        content = pyproject.read_text(encoding="utf-8")
-    except Exception:
-        return None
-
-    in_project = False
-    for line in content.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("[") and stripped.endswith("]"):
-            in_project = stripped == "[project]"
-            continue
-        if not in_project or not stripped.startswith("version"):
-            continue
-        match = re.match(r'version\s*=\s*"([^"]+)"', stripped)
-        if match:
-            return match.group(1)
-    return None
+from ._project_version import read_project_version
 
 
 def get_version() -> str:
@@ -48,7 +23,7 @@ def get_version() -> str:
     except Exception:
         pass
 
-    return _version_from_pyproject() or "unknown"
+    return read_project_version() or "unknown"
 
 
 __all__ = ["get_version"]

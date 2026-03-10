@@ -102,17 +102,4 @@ def load_dependencies(plugin_dir: Optional[Path] = None) -> bool:
     return True
 
 
-def verify_pxr_available() -> bool:
-    """Verify that pxr module can be imported.
-
-    Returns:
-        bool: True if pxr is importable, False otherwise.
-    """
-    try:
-        import pxr
-
-        logger.debug(f"pxr module verified: {pxr.__file__}")
-        return True
-    except ImportError as e:
-        logger.error(f"Failed to import pxr module: {e}")
-        return False
+__all__ = ["load_dependencies"]

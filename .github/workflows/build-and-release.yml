@@ -26,29 +26,6 @@ jobs:
       - name: Build plugin bundle
         run: python tools/build_plugin.py
 
-      - name: Package zip
-        run: |
-          python - <<'PY'
-          import pathlib
-          import zipfile
-
-          dist_dir = pathlib.Path("dist")
-          zip_path = dist_dir / "axe_usd_plugin.zip"
-
-          required = [dist_dir / "axe_usd_plugin"]
-          for path in required:
-              if not path.exists():
-                  raise SystemExit(f"Missing bundle component: {path}")
-
-          with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-              for path in dist_dir.rglob("*"):
-                  if path == zip_path:
-                      continue
-                  zf.write(path, path.relative_to(dist_dir))
-
-          print(f"Created {zip_path}")
-          PY
-
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
