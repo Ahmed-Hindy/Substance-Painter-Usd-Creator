@@ -23,7 +23,6 @@ def create_aswf_asset_publish(
         geo_file=geo_file,
         parent_path=f"/{asset_name}",
         layer_save_path=output_directory,
-        main_layer_name="main.usda",
         create_usd_preview=create_usd_preview,
         create_arnold=create_arnold,
         create_mtlx=create_mtlx,

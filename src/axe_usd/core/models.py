@@ -15,7 +15,6 @@ class ExportSettings:
         primitive_path: Root prim path for published assets.
         publish_directory: Output directory for USD layers.
         save_geometry: Whether to export mesh geometry.
-        main_layer_name: Name of the main layer file.
         texture_format_overrides: Optional per-renderer texture format overrides.
         arnold_displacement_mode: Whether to use bump or true displacement for
                                   Arnold height maps.
@@ -28,7 +27,6 @@ class ExportSettings:
     primitive_path: str
     publish_directory: Path
     save_geometry: bool
-    main_layer_name: str = "main.usda"
     texture_format_overrides: Optional[Dict[str, str]] = None
     arnold_displacement_mode: str = "bump"
 

@@ -43,6 +43,6 @@ def export_publish(
     Returns:
         PublishPaths: The resolved publish paths used for export.
     """
-    paths = build_publish_paths(settings.publish_directory, settings.main_layer_name)
+    paths = build_publish_paths(settings.publish_directory)
     writer.export(materials, settings, geo_file, paths)
     return paths

@@ -78,9 +78,7 @@ class MeshExporter:
         # Extract asset name from settings (e.g. primitive_path="/Asset" -> "Asset")
         asset_name = settings.primitive_path.strip("/").split("/")[-1]
 
-        publish_paths = build_publish_paths(
-            settings.publish_directory, settings.main_layer_name, asset_name
-        )
+        publish_paths = build_publish_paths(settings.publish_directory, asset_name)
         self.mesh_path = publish_paths.geometry_path
         self.root_prim_path = DEFAULT_PRIMITIVE_PATH
         self.skip_postprocess = skip_postprocess
