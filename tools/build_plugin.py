@@ -20,6 +20,7 @@ USD_DEPENDENCIES = {
     "39": ("24.5", "py39_usd24_5"),
     "310": ("24.5", "py310_usd24_5"),
     "311": ("25.5.1", "py311_usd25_5_1"),
+    "313": ("25.5.1", "py313_usd25_5_1"),
 }
 USD_WHEEL_PLATFORM = "win_amd64"
 
@@ -193,10 +194,21 @@ def _populate_usd_dependencies(plugin_dist: Path) -> None:
     extract_root.mkdir(parents=True, exist_ok=True)
 
     for py_ver, (usd_version, folder_name) in USD_DEPENDENCIES.items():
-        wheel_path = _download_usd_wheel(py_ver, usd_version, wheel_dir)
-        dest_dir = deps_root / folder_name / "pxr"
-        dest_dir.parent.mkdir(parents=True, exist_ok=True)
-        _extract_usd_pxr(wheel_path, dest_dir, extract_root)
+        try:
+            wheel_path = _download_usd_wheel(py_ver, usd_version, wheel_dir)
+            dest_dir = deps_root / folder_name / "pxr"
+            dest_dir.parent.mkdir(parents=True, exist_ok=True)
+            _extract_usd_pxr(wheel_path, dest_dir, extract_root)
+        except SystemExit as e:
+            if py_ver == "313":
+                print(
+                    f"\nWARNING: Skipping Python 3.13 (SP 12.0) USD dependencies due to missing PyPI wheel: {e}"
+                )
+                print(
+                    f"You will need to manually compile and add 'pxr' to {folder_name} for SP 12.0 support.\n"
+                )
+            else:
+                raise
 
 
 def _zip_plugin(plugin_dist: Path, zip_path: Path) -> None:

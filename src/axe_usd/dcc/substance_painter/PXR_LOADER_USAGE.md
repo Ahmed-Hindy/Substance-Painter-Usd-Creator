@@ -29,11 +29,12 @@ When the plugin is loaded by Substance Painter, the bootloader runs automaticall
    ```
 
 2. **Bootloader Execution**:
-   - Detects Python version (3.9, 3.10, or 3.11)
+   - Detects Python version (3.9, 3.10, 3.11, or 3.13)
    - Maps to appropriate dependency folder:
      - Python 3.9 → `dependencies/py39_usd24_5/` (USD 24.5)
      - Python 3.10 → `dependencies/py310_usd24_5/` (USD 24.5)
      - Python 3.11 → `dependencies/py311_usd25_5_1/` (USD 25.5.1)
+     - Python 3.13 → `dependencies/py313_usd25_5_1/` (USD 25.5.1)
    - Adds dependency path to `sys.path`
    - Registers DLL directory for Windows
    - Sets global flag to prevent duplicate loading
@@ -46,7 +47,8 @@ When the plugin is loaded by Substance Painter, the bootloader runs automaticall
 |------------|----------------|-------------------|
 | 9.x | 3.10 | `py310_usd24_5/` |
 | 10.0 | 3.9 | `py39_usd24_5/` |
-| 10.1+ | 3.11 | `py311_usd25_5_1/` |
+| 10.1 - 11.x | 3.11 | `py311_usd25_5_1/` |
+| 12.0+ | 3.13 | `py313_usd25_5_1/` |
 
 ---
 
@@ -83,9 +85,9 @@ Load result: True/False (depends on Python version)
 
 ---
 
-### Method 2: Manual Testing with Python 3.9, 3.10, or 3.11
+### Method 2: Manual Testing with Python 3.9, 3.10, 3.11, or 3.13
 
-If you have Python 3.10 or 3.11 installed:
+If you have Python 3.10, 3.11, or 3.13 installed:
 
 ```python
 import sys
@@ -113,7 +115,7 @@ if result:
         print("✓ Successfully imported pxr modules!")
 ```
 
-**Expected output** (Python 3.9, 3.10, or 3.11):
+**Expected output** (Python 3.9, 3.10, 3.11, or 3.13):
 ```
 Load result: True
 pxr available: True
@@ -143,9 +145,9 @@ except ImportError as e:
 
 **Expected output**:
 ```
-Python version: 3.11.x (or 3.10.x / 3.9.x)
+Python version: 3.13.x (or 3.11.x / 3.10.x / 3.9.x)
 ✓ pxr module loaded successfully!
-USD version: (25, 5, 1) for Python 3.11, (24, 5, 0) for Python 3.9/3.10
+USD version: (25, 5, 1) for Python 3.11/3.13, (24, 5, 0) for Python 3.9/3.10
 ```
 
 ---
@@ -154,10 +156,10 @@ USD version: (25, 5, 1) for Python 3.11, (24, 5, 0) for Python 3.9/3.10
 
 ### "Unsupported Python version" Error
 
-**Cause**: Your Python version is not 3.9, 3.10, or 3.11.
+**Cause**: Your Python version is not 3.9, 3.10, 3.11, or 3.13.
 
 **Solution**: 
-- For testing: Use Python 3.10 or 3.11
+- For testing: Use Python 3.10, 3.11, or 3.13
 - For Substance Painter: Ensure you're using SP 9.x+ (which uses Python 3.10 or 3.11)
 
 ---
@@ -289,7 +291,10 @@ plugin_root/
     │       ├── UsdShade/
     │       ├── __init__.py
     │       └── *.dll
-    └── py311_usd25_5_1/      # Python 3.11
+    ├── py311_usd25_5_1/      # Python 3.11
+    │   └── pxr/
+    │       ├── (same structure)
+    └── py313_usd25_5_1/      # Python 3.13
         └── pxr/
             ├── (same structure)
 ```
