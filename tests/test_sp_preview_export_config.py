@@ -83,7 +83,7 @@ def test_build_preview_export_config_supports_all_ui_resolutions(
         preview_dir=Path("C:/tmp/preview"),
         texture_sets=("Body",),
         resolution=resolution,
-        preview_format=parse_preview_texture_format(".jpg"),
+        preview_format=parse_preview_texture_format("jpg"),
     )
 
     parameters = config["exportPresets"][0]["maps"][0]["parameters"]
@@ -100,7 +100,7 @@ def test_build_preview_export_config_rejects_unsupported_resolution() -> None:
             preview_dir=Path("C:/tmp/preview"),
             texture_sets=("Body",),
             resolution=300,
-            preview_format=parse_preview_texture_format(".jpg"),
+            preview_format=parse_preview_texture_format("jpg"),
         )
 
     assert exc_info.value.details["resolution"] == 300
@@ -117,9 +117,12 @@ def test_build_preview_export_config_rejects_unsupported_resolution() -> None:
 @pytest.mark.parametrize(
     ("format_value", "expected_file_format"),
     [
+        ("jpg", "jpg"),
         (".jpg", "jpg"),
         ("jpeg", "jpeg"),
+        (".jpeg", "jpeg"),
         ("png", "png"),
+        (".png", "png"),
     ],
 )
 def test_build_preview_export_config_uses_selected_format(
@@ -140,9 +143,16 @@ def test_build_preview_export_config_uses_selected_format(
     assert parameters["fileFormat"] == expected_file_format
 
 
+@pytest.mark.parametrize("format_value", ["jpg", ".jpg", "jpeg", ".jpeg", "png", ".png"])
+def test_parse_preview_texture_format_accepts_dotted_and_plain_values(
+    format_value: str,
+) -> None:
+    assert parse_preview_texture_format(format_value).substance_file_format == format_value.lstrip(".")
+
+
 def test_parse_preview_texture_format_rejects_unsupported_value() -> None:
     with pytest.raises(ValidationError) as exc_info:
-        parse_preview_texture_format("jpg")
+        parse_preview_texture_format("tif")
 
-    assert exc_info.value.details["format"] == "jpg"
-    assert exc_info.value.details["supported_formats"] == [".jpg", "jpeg", "png"]
+    assert exc_info.value.details["format"] == "tif"
+    assert exc_info.value.details["supported_formats"] == ["jpg", "jpeg", "png"]

@@ -19,15 +19,11 @@ class PreviewTextureFormat(Enum):
 
     @property
     def substance_file_format(self) -> str:
-        if self is PreviewTextureFormat.JPG:
-            return "jpg"
-        if self is PreviewTextureFormat.JPEG:
-            return "jpeg"
-        return "png"
+        return self.value.lstrip(".")
 
 
 _SUPPORTED_PREVIEW_FORMATS = {
-    ".jpg": PreviewTextureFormat.JPG,
+    "jpg": PreviewTextureFormat.JPG,
     "jpeg": PreviewTextureFormat.JPEG,
     "png": PreviewTextureFormat.PNG,
 }
@@ -38,7 +34,7 @@ def parse_preview_texture_format(
 ) -> PreviewTextureFormat:
     if value is None:
         return PreviewTextureFormat.JPG
-    normalized = str(value).strip().lower()
+    normalized = str(value).strip().lower().lstrip(".")
     if not normalized:
         return PreviewTextureFormat.JPG
     preview_format = _SUPPORTED_PREVIEW_FORMATS.get(normalized)
@@ -48,6 +44,6 @@ def parse_preview_texture_format(
         "Unsupported USD Preview texture format.",
         details={
             "format": value,
-            "supported_formats": [".jpg", "jpeg", "png"],
+            "supported_formats": ["jpg", "jpeg", "png"],
         },
     )

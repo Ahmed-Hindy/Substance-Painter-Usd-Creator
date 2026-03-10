@@ -241,8 +241,8 @@ class USDExporterView(QDialog):
         preview_grid.setLabelAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
         self.override_usdpreview = QComboBox()
-        self.override_usdpreview.addItems([".jpg", "jpeg", "png"])
-        self.override_usdpreview.setItemData(0, ".jpg")
+        self.override_usdpreview.addItems(["jpg", "jpeg", "png"])
+        self.override_usdpreview.setItemData(0, "jpg")
         self.override_usdpreview.setItemData(1, "jpeg")
         self.override_usdpreview.setItemData(2, "png")
         self.override_usdpreview.setToolTip(

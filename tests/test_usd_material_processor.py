@@ -109,9 +109,12 @@ def test_create_shaded_asset_publish_creates_layers(tmp_path, sp_texture_factory
 @pytest.mark.parametrize(
     ("preview_format", "expected_suffix"),
     [
+        ("jpg", ".jpg"),
         (".jpg", ".jpg"),
         ("jpeg", ".jpeg"),
+        (".jpeg", ".jpeg"),
         ("png", ".png"),
+        (".png", ".png"),
     ],
 )
 def test_usd_preview_texture_override_applies(
@@ -180,7 +183,7 @@ def test_renderer_specific_format_overrides(tmp_path, sp_texture_factory):
         create_arnold=True,
         create_mtlx=True,
         texture_format_overrides={
-            "usd_preview": ".jpg",
+            "usd_preview": "jpg",
             "arnold": "tif",
             "mtlx": "png",
         },
