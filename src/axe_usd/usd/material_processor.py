@@ -12,7 +12,7 @@ from typing import Iterable, Mapping, Optional, Sequence
 
 from pxr import Sdf, Tf, Usd, UsdGeom, UsdShade, Vt
 
-from ..core.exceptions import GeometryExportError, MaterialAssignmentError
+from ..core.exceptions import GeometryExportError
 
 from . import utils as usd_utils
 from .material_builders import (
@@ -194,144 +194,6 @@ class USDShaderCreate:
                 collect_usd_material.CreateOutput(
                     "mtlx:displacement", displacement_output.GetTypeName()
                 ).ConnectToSource(openpbr_nodegraph.ConnectableAPI(), "displacement")
-
-
-class USDShaderAssign:
-    """Assign USD materials to matching mesh prims."""
-
-    def __init__(self, stage: Usd.Stage, naming_convention=None) -> None:
-        """Initialize the material assigner.
-
-        Args:
-            stage: USD stage to update.
-            naming_convention: Optional naming convention for cleaning material names.
-                             If None, uses the default convention.
-        """
-        from .naming import NamingConvention
-
-        self.stage = stage
-        self.naming_convention = naming_convention or NamingConvention()
-
-    def assign_material_to_primitives(
-        self,
-        material_prim: Usd.Prim,
-        prims_to_assign_to: Iterable[Usd.Prim],
-    ) -> None:
-        """Assign a USD material to a list of primitives.
-
-        Args:
-            material_prim: Material prim to bind.
-            prims_to_assign_to: Prims that should receive the material.
-
-        Raises:
-            MaterialAssignmentError: If the provided material is not a UsdShade.Material.
-        """
-        if (
-            not material_prim
-            or not material_prim.IsValid()
-            or not material_prim.IsA(UsdShade.Material)
-        ):
-            raise MaterialAssignmentError(
-                "Invalid material type for assignment",
-                details={
-                    "material_type": type(material_prim).__name__,
-                    "is_valid": material_prim.IsValid() if material_prim else False,
-                },
-            )
-
-        material = UsdShade.Material(material_prim)
-
-        for prim in prims_to_assign_to:
-            UsdShade.MaterialBindingAPI(prim).Bind(material)
-
-    def run(self, mats_parent_path: str, mesh_parent_path: str) -> None:
-        """Bind materials to meshes with matching names.
-
-        Args:
-            mats_parent_path: Parent prim path containing materials.
-            mesh_parent_path: Parent prim path containing meshes.
-        """
-        mats_parent_prim = self.stage.GetPrimAtPath(mats_parent_path)
-
-        # 1. get list of Materials under a parent prim:
-        check, found_mats = usd_utils.collect_prims_of_type(
-            mats_parent_prim, prim_type=UsdShade.Material, recursive=False
-        )
-        if not check:
-            raise MaterialAssignmentError(
-                "No UsdShade.Material found under prim.",
-                details={"mats_parent_path": mats_parent_path},
-            )
-
-        for mat_prim in found_mats:
-            # 2. cleaning material name:
-            source_name = mat_prim.GetCustomDataByKey("source_material_name")
-            if source_name:
-                mat_name = str(source_name)
-            else:
-                # Use naming convention to clean material name
-                mat_name = self.naming_convention.clean_material_name(
-                    mat_prim.GetName()
-                )
-
-            mesh_parent_prim = self.stage.GetPrimAtPath(mesh_parent_path)
-
-            # 3. collect all meshes that have the mat name as part of its name:
-            check, asset_prims = usd_utils.collect_prims_of_type(
-                mesh_parent_prim,
-                prim_type=UsdGeom.Mesh,
-                contains_str=mat_name,
-                recursive=True,
-            )
-            if not asset_prims:
-                logger.warning("No meshes found with name like: %s", mat_name)
-                continue
-
-            asset_names = [x.GetName() for x in asset_prims]
-            logger.debug("mat_name: %s, asset_names: %s", mat_name, asset_names[0])
-
-            # 4. assign the material to the list of mesh prims:
-            self.assign_material_to_primitives(mat_prim, asset_prims)
-
-
-class USDMeshConfigure:
-    """Configure mesh primvars and metadata.
-
-    Notes:
-        TODO: Add transmission support to MTLX.
-        TODO: Add Karma render settings for caustics and double sided.
-        TODO: Set subdiv schema to "__none__".
-    """
-
-    def __init__(self, stage: Usd.Stage) -> None:
-        """Initialize the mesh configurator.
-
-        Args:
-            stage: USD stage to update.
-        """
-        self.stage = stage
-
-    def add_karma_primvars(self, prim: Usd.Prim) -> None:
-        """Add Karma-specific primvars to a prim.
-
-        Args:
-            prim: Prim to update.
-        """
-        karma_primvars = {
-            "primvars:karma:object:causticsenable": (True, Sdf.ValueTypeNames.Bool),
-            # "karma:customShading": (0.5, Sdf.ValueTypeNames.Float),
-            # "karma:shadowBias": (0.05, Sdf.ValueTypeNames.Float)
-        }
-
-        for attrName, (value, typeName) in karma_primvars.items():
-            # Check if the attribute already exists; if not, create it.
-            attr = prim.GetAttribute(attrName)
-            if not attr:
-                attr = prim.CreateAttribute(attrName, typeName)
-
-            # Set the attribute value.
-            attr.Set(value)
-            logger.debug("Set attribute %s to %s (Type: %s)", attrName, value, typeName)
 
 
 _UDIM_TOKEN = "<UDIM>"
@@ -548,23 +410,6 @@ def _collect_targets_for_mesh_names(
                     seen.add(target)
                     targets.append(target)
     return targets
-
-
-def _collect_mesh_paths(stage: Usd.Stage, root_path: str) -> list[str]:
-    mesh_paths: list[str] = []
-    for prim in stage.Traverse():
-        if prim.IsA(UsdGeom.Mesh):
-            path = str(prim.GetPath())
-            if root_path and not path.startswith(root_path):
-                continue
-            mesh_paths.append(path)
-    return mesh_paths
-
-
-def _binding_target_for_mesh_path(mesh_path: str) -> str:
-    if "/geo/proxy/" in mesh_path:
-        return mesh_path.rsplit("/", 1)[0]
-    return mesh_path
 
 
 def _collect_material_prims(stage: Usd.Stage, parent_path: str) -> list[Usd.Prim]:

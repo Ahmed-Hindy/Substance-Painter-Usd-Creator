@@ -290,7 +290,9 @@ def test_emission_and_opacity_wired_for_non_preview_renderers(tmp_path):
         == "textures/MatA_Emissive.png"
     )
     arnold_emission_cc = UsdShade.Shader(
-        stage.GetPrimAtPath("/Asset/mtl/MatA/ArnoldNodeGraph/arnold_emissionColorCorrect")
+        stage.GetPrimAtPath(
+            "/Asset/mtl/MatA/ArnoldNodeGraph/arnold_emissionColorCorrect"
+        )
     )
     arnold_emission_cc_input = arnold_emission_cc.GetInput("input")
     assert arnold_emission_cc_input and arnold_emission_cc_input.HasConnectedSource()
@@ -306,7 +308,9 @@ def test_emission_and_opacity_wired_for_non_preview_renderers(tmp_path):
         stage.GetPrimAtPath("/Asset/mtl/MatA/ArnoldNodeGraph/arnold_opacityRange")
     )
     arnold_opacity_range_input = arnold_opacity_range.GetInput("input")
-    assert arnold_opacity_range_input and arnold_opacity_range_input.HasConnectedSource()
+    assert (
+        arnold_opacity_range_input and arnold_opacity_range_input.HasConnectedSource()
+    )
 
     mtlx_shader = UsdShade.Shader(
         stage.GetPrimAtPath("/Asset/mtl/MatA/MtlxNodeGraph/mtlx_mtlxstandard_surface1")
@@ -829,42 +833,6 @@ def test_openpbr_input_names(tmp_path, sp_texture_factory):
     assert shader.GetInput("geometry_normal") is not None
 
 
-def test_assign_material_raises_for_non_material():
-    """assign_material_to_primitives raises MaterialAssignmentError for non-materials."""
-    from axe_usd.core.exceptions import MaterialAssignmentError
-
-    stage = Usd.Stage.CreateInMemory()
-    prim = stage.DefinePrim("/NotMaterial", "Xform")
-    assigner = material_processor.USDShaderAssign(stage)
-
-    with pytest.raises(MaterialAssignmentError):
-        assigner.assign_material_to_primitives(prim, [])
-
-
-def test_assign_material_binds_mesh():
-    stage = Usd.Stage.CreateInMemory()
-    material_processor.USDShaderCreate(
-        stage=stage,
-        material_name="MatA",
-        material_dict={
-            "basecolor": {"mat_name": "MatA", "path": "./textures/MatA_BaseColor.png"}
-        },
-        parent_primpath="/Asset/material",
-        create_usd_preview=True,
-        create_arnold=False,
-        create_mtlx=False,
-    )
-    mesh = UsdGeom.Mesh.Define(stage, "/Asset/mesh/Mesh_MatA")
-
-    material_processor.USDShaderAssign(stage).run(
-        mats_parent_path="/Asset/material",
-        mesh_parent_path="/Asset",
-    )
-
-    binding = UsdShade.MaterialBindingAPI(mesh).GetDirectBinding().GetMaterial()
-    assert binding
-
-
 def test_bind_materials_in_variant_uses_mesh_names_for_xforms(tmp_path):
     from axe_usd.usd.asset_files import create_asset_file_structure, create_geo_usd_file
 
@@ -983,4 +951,3 @@ def test_bind_materials_in_variant_normalizes_mesh_names_for_xforms(tmp_path):
         binding = UsdShade.MaterialBindingAPI(prim).GetDirectBinding().GetMaterial()
         assert binding
         assert str(binding.GetPrim().GetPath()) == "/Asset/mtl/body"
-

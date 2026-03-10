@@ -511,6 +511,57 @@ def register_callbacks() -> None:
     callbacks_registered = True
 
 
+def _verify_export_context(context: ExportContext) -> Path:
+    """Validate export context and return the root export directory."""
+    if usd_exported_qdialog is None:
+        raise ConfigurationError("USD Export UI is not available.")
+    if not context.textures:
+        raise ValidationError("No textures were exported.")
+
+    empty_sets = [key for key, paths in context.textures.items() if not paths]
+    if empty_sets:
+        empty_names = _collect_texture_set_names({key: [] for key in empty_sets})
+        raise ValidationError(
+            "Texture set exported no files.",
+            details={"texture_sets": empty_names},
+        )
+
+    first_path = next((paths[0] for paths in context.textures.values() if paths), None)
+    if not first_path:
+        raise ValidationError("No exported texture files found.")
+    return Path(first_path).parent
+
+
+def _handle_mesh_export_only(
+    raw_settings, primitive_path: str, publish_dir: str
+) -> None:
+    """Handle early exit when stopping after mesh export."""
+    if not raw_settings.save_geometry:
+        raise ValidationError(
+            "Save Geometry must be enabled to stop after mesh export."
+        )
+    settings = _build_export_settings(
+        raw_settings,
+        primitive_path,
+        publish_dir,
+        save_geometry=True,
+        texture_overrides=raw_settings.texture_format_overrides or None,
+    )
+    mesh_exporter = MeshExporter(settings, skip_postprocess=True)
+    geo_file = mesh_exporter.export_mesh()
+    if geo_file is None:
+        raise GeometryExportError(
+            "Mesh export failed.",
+            details={"message": mesh_exporter.last_error},
+        )
+    if usd_exported_qdialog is not None:
+        QMessageBox.information(
+            usd_exported_qdialog,
+            "USD Exporter",
+            f"Mesh export complete.\n\nMesh file:\n{geo_file}",
+        )
+
+
 def on_post_export(context: ExportContext) -> None:
     """Handle the texture export completion event.
 
@@ -521,61 +572,23 @@ def on_post_export(context: ExportContext) -> None:
     if _is_preview_export_context(context):
         logger.info("Preview texture export detected; skipping USD publish.")
         return
+
     try:
-        if usd_exported_qdialog is None:
-            raise ConfigurationError("USD Export UI is not available.")
-        if not context.textures:
-            raise ValidationError("No textures were exported.")
-
-        empty_sets = [key for key, paths in context.textures.items() if not paths]
-        if empty_sets:
-            empty_names = _collect_texture_set_names({key: [] for key in empty_sets})
-            raise ValidationError(
-                "Texture set exported no files.",
-                details={"texture_sets": empty_names},
-            )
-
-        first_path = next(
-            (paths[0] for paths in context.textures.values() if paths), None
-        )
-        if not first_path:
-            raise ValidationError("No exported texture files found.")
-        export_dir = Path(first_path).parent
+        export_dir = _verify_export_context(context)
 
         raw = usd_exported_qdialog.get_settings()
         log_level = LOG_LEVELS.get(raw.log_level)
         if log_level is not None:
             set_base_log_level(log_level)
             logger.setLevel(log_level)
+
         primitive_path = DEFAULT_PRIMITIVE_PATH
         publish_dir = str(export_dir)
 
         if _env_flag("AXEUSD_STOP_AFTER_MESH_EXPORT"):
-            if not raw.save_geometry:
-                raise ValidationError(
-                    "Save Geometry must be enabled to stop after mesh export."
-                )
-            settings = _build_export_settings(
-                raw,
-                primitive_path,
-                publish_dir,
-                save_geometry=True,
-                texture_overrides=raw.texture_format_overrides or None,
-            )
-            mesh_exporter = MeshExporter(settings, skip_postprocess=True)
-            geo_file = mesh_exporter.export_mesh()
-            if geo_file is None:
-                raise GeometryExportError(
-                    "Mesh export failed.",
-                    details={"message": mesh_exporter.last_error},
-                )
-            if usd_exported_qdialog is not None:
-                QMessageBox.information(
-                    usd_exported_qdialog,
-                    "USD Exporter",
-                    f"Mesh export complete.\n\nMesh file:\n{geo_file}",
-                )
+            _handle_mesh_export_only(raw, primitive_path, publish_dir)
             return
+
         asset_name = primitive_path.strip("/").split("/")[-1]
         textures_dir = export_dir / asset_name / "textures"
         textures = _move_exported_textures(context.textures, textures_dir)
@@ -583,8 +596,10 @@ def on_post_export(context: ExportContext) -> None:
         texture_sets = _collect_texture_set_names(textures)
         mesh_name_map = _collect_mesh_name_map(texture_sets)
         materials = parse_textures(textures, mesh_name_map=mesh_name_map)
+
         if not materials:
             raise ValidationError("No recognized textures were found.")
+
         udim_texture_sets = tuple(
             sorted({bundle.name for bundle in materials if bundle.udim_slots})
         )
@@ -593,6 +608,7 @@ def on_post_export(context: ExportContext) -> None:
         preview_format = parse_preview_texture_format(
             texture_overrides.get("usd_preview")
         )
+
         if raw.usdpreview:
             _export_usdpreview_textures(
                 textures_dir,
@@ -621,6 +637,7 @@ def on_post_export(context: ExportContext) -> None:
                 )
 
         export_publish(materials, settings, geo_file, PxrUsdWriter())
+
     except AxeUSDError as exc:
         logger.error("USD export failed: %s", exc.message)
         if exc.details:
