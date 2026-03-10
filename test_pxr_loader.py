@@ -44,9 +44,11 @@ def main() -> None:
         py39_path = dep_path / "py39_usd24_5"
         py310_path = dep_path / "py310_usd24_5"
         py311_path = dep_path / "py311_usd25_5_1"
+        py313_path = dep_path / "py313_usd25_5_1"
         print(f"  - py39_usd24_5 exists: {py39_path.exists()}")
         print(f"  - py310_usd24_5 exists: {py310_path.exists()}")
         print(f"  - py311_usd25_5_1 exists: {py311_path.exists()}")
+        print(f"  - py313_usd25_5_1 exists: {py313_path.exists()}")
     else:
         print("[FAIL] Dependencies directory not found")
 

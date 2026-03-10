@@ -56,6 +56,7 @@ def load_dependencies(plugin_dir: Optional[Path] = None) -> bool:
         "39": "py39_usd24_5",  # For Substance Painter 10.0 (USD 24.5)
         "310": "py310_usd24_5",  # For Substance Painter 9.x (USD 24.5)
         "311": "py311_usd25_5_1",  # For Substance Painter 10.1+ (USD 25.5.1)
+        "313": "py313_usd25_5_1",  # For Substance Painter 12.0+ (USD 25.5.1, via PyPI representation)
     }
 
     if py_ver not in dep_map:
