@@ -51,5 +51,4 @@ def set_base_log_level(level: int) -> None:
     logging.getLogger(BASE_LOGGER_NAME).setLevel(level)
 
 
-def get_base_logger_name() -> str:
-    return BASE_LOGGER_NAME
+__all__ = ["configure_logging", "set_base_log_level"]

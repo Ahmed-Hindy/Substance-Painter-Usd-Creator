@@ -75,11 +75,13 @@ class NamingConvention:
         for suffix in self.strip_suffixes:
             if name.endswith(suffix):
                 name = name[: -len(suffix)]
+                break
 
         # Remove prefixes
         for prefix in self.strip_prefixes:
             if name.startswith(prefix):
                 name = name[len(prefix) :]
+                break
 
         return name
 

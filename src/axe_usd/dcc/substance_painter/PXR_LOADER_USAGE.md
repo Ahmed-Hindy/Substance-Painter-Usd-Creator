@@ -54,13 +54,13 @@ When the plugin is loaded by Substance Painter, the bootloader runs automaticall
 
 ## Testing Without Substance Painter
 
-### Method 1: Using the Provided Test Script
+### Method 1: Using the Provided Verification Script
 
-A test script is provided in the repository root:
+A verification script is provided under `tools/`:
 
 ```bash
 cd G:\Projects\Dev\Github\SP_usd_creator
-python test_pxr_loader.py
+python tools/verify_pxr_loader.py
 ```
 
 **What it tests**:
@@ -87,7 +87,7 @@ Load result: True/False (depends on Python version)
 
 ### Method 2: Manual Testing with Python 3.9, 3.10, 3.11, or 3.13
 
-If you have Python 3.10, 3.11, or 3.13 installed:
+If you have Python 3.9, 3.10, 3.11, or 3.13 installed:
 
 ```python
 import sys
@@ -98,7 +98,7 @@ plugin_dir = Path("G:/Projects/Dev/Github/SP_usd_creator/dist/axe_usd_plugin")
 sys.path.insert(0, str(plugin_dir))
 
 # Import and test
-from axe_usd.dcc.substance_painter.pxr_loader import load_dependencies, verify_pxr_available
+from axe_usd.dcc.substance_painter.pxr_loader import load_dependencies
 
 # Load dependencies
 result = load_dependencies(plugin_dir)
@@ -106,19 +106,13 @@ print(f"Load result: {result}")
 
 # Verify pxr is importable
 if result:
-    pxr_available = verify_pxr_available()
-    print(f"pxr available: {pxr_available}")
-    
-    if pxr_available:
-        # Test actual pxr imports
-        from pxr import Usd, UsdGeom, UsdShade
-        print("✓ Successfully imported pxr modules!")
+    from pxr import Usd, UsdGeom, UsdShade
+    print("✓ Successfully imported pxr modules!")
 ```
 
 **Expected output** (Python 3.9, 3.10, 3.11, or 3.13):
 ```
 Load result: True
-pxr available: True
 ✓ Successfully imported pxr modules!
 ```
 
@@ -229,24 +223,6 @@ success = load_dependencies(plugin_dir)
 
 ---
 
-### `verify_pxr_available() -> bool`
-
-Verify that pxr module can be imported.
-
-**Returns**:
-- `bool`: True if pxr is importable, False otherwise.
-
-**Example**:
-```python
-from axe_usd.dcc.substance_painter.pxr_loader import verify_pxr_available
-
-if verify_pxr_available():
-    from pxr import Usd, UsdGeom
-    # Use USD modules
-```
-
----
-
 ## Development Notes
 
 ### Path Detection Logic
@@ -320,6 +296,6 @@ To add support for a new Python version (e.g., 3.12):
 ## Related Files
 
 - **Plugin Entry Point**: `dist/axe_usd_plugin/__init__.py`
-- **Test Script**: `test_pxr_loader.py`
+- **Verification Script**: `tools/verify_pxr_loader.py`
 - **Dependencies README**: `dist/axe_usd_plugin/dependencies/README.md`
 - **Main README**: `README.md`

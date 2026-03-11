@@ -33,11 +33,6 @@ Core
    :undoc-members:
    :show-inheritance:
 
-.. automodule:: axe_usd.core.fs_utils
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 .. automodule:: axe_usd.core.models
    :members:
    :undoc-members:
@@ -68,11 +63,6 @@ USD
    :show-inheritance:
 
 .. automodule:: axe_usd.usd.asset_structure
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-.. automodule:: axe_usd.usd.aswf_export
    :members:
    :undoc-members:
    :show-inheritance:
@@ -116,11 +106,6 @@ USD
 
 Substance Painter
 -----------------
-
-.. automodule:: axe_usd.dcc.substance_painter.presets
-   :members:
-   :undoc-members:
-   :show-inheritance:
 
 .. automodule:: axe_usd.dcc.substance_painter.qt_compat
    :members:

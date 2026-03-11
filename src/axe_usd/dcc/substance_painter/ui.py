@@ -3,7 +3,7 @@
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict
 
 from ...version import get_version
 from .qt_compat import (
@@ -79,15 +79,13 @@ class USDExporterView(QDialog):
     UI widget for USD export settings.
     """
 
-    def __init__(self, parent=None, logger: Optional[logging.Logger] = None) -> None:
+    def __init__(self, parent=None) -> None:
         """Build the export settings UI.
 
         Args:
             parent: Optional parent widget.
-            logger: Optional logger to use for UI-related messages.
         """
         super().__init__(parent)
-        self._logger = logger or logging.getLogger(__name__)
         self._plugin_version = get_version()
         self._log_level_actions = {}
         self._log_level_name = "Debug"

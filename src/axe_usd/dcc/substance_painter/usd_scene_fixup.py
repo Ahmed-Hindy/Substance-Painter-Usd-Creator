@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import List, Optional
 
 from pxr import Gf, Sdf, Usd, UsdGeom
@@ -254,24 +253,4 @@ def fix_sp_mesh_stage(stage: Usd.Stage, target_root: str) -> bool:
     return changed
 
 
-def fix_sp_mesh_layer(layer_path: Path, target_root: str) -> bool:
-    """Open and fix a Substance Painter mesh layer on disk.
-
-    Args:
-        layer_path: Path to the USD layer to modify in place.
-        target_root: Target root prim path (e.g. "/Asset").
-
-    Returns:
-        bool: True if changes were applied and saved.
-    """
-    stage = Usd.Stage.Open(str(layer_path))
-    if not stage:
-        raise USDStageError(
-            "Failed to open USD layer.",
-            details={"layer_path": str(layer_path)},
-        )
-
-    changed = fix_sp_mesh_stage(stage, target_root)
-    if changed:
-        stage.GetRootLayer().Save()
-    return changed
+__all__ = ["fix_sp_mesh_stage"]
