@@ -2,7 +2,7 @@
 
 [![Python 3.9](https://img.shields.io/badge/python-3.9-blue.svg)](https://www.python.org/downloads/)
 [![VFX Platform CY2024](https://img.shields.io/badge/VFX_Platform-CY2024-2b7a78.svg)](https://vfxplatform.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 [![Code style: Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Documentation](https://img.shields.io/badge/docs-sphinx-blue)](docs/user_guide.rst)
 
@@ -85,3 +85,7 @@ Windows helper (build + install in one step):
 ## Example USD File
 
 [Asset/Asset.usd](Examples/Asset/Asset.usd)
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).
